@@ -1,0 +1,28 @@
+name: Build Windows Installer
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: Public HTTPS chat URL
+        required: true
+        default: https://chat.example.com
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: clients/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - shell: pwsh
+        run: |
+          $config = @{ appUrl = "${{ inputs.app_url }}" } | ConvertTo-Json
+          Set-Content -Path config.json -Value $config
+      - run: npm install
+      - run: npm run build:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ConnectChat-Pro-Windows
+          path: clients/desktop/dist/*.exe
