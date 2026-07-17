@@ -1,0 +1,29 @@
+CONNECTCHAT PRO - INTERNET DEPLOYMENT CHECKLIST
+================================================
+
+This release includes one-to-one audio/video calling. To use it between UAE,
+Lebanon, and other countries, deploy one server on the public Internet.
+
+REQUIRED
+--------
+1. A Linux server/container running Node.js 22 LTS.
+2. A domain name, for example chat.yourcompany.com.
+3. HTTPS using a reverse proxy such as Caddy or Nginx.
+4. WebSocket forwarding for Socket.IO.
+5. A TURN service for reliable audio/video calls.
+6. Persistent backup storage for connectchat.db and the uploads folder.
+
+ENVIRONMENT
+-----------
+Set NODE_ENV=production, a long random SESSION_SECRET, and the three TURN
+variables shown in .env.example. Do not commit real secrets into the project.
+
+IMPORTANT
+---------
+- Camera/microphone access works on localhost for testing, but public use must
+  be served over HTTPS.
+- STUN-only calls are not reliable across all mobile operators and firewalls.
+- This package is suitable for pilot/small-team use on one server.
+- Before commercial or large-scale use, migrate SQLite and the default session
+  store to managed production services, add account recovery/verification,
+  rate limiting, moderation, malware scanning, monitoring, and security review.
