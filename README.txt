@@ -19,6 +19,7 @@ FEATURES
 - Responsive mobile and desktop design
 - Installable PWA
 - Windows one-click launcher
+- Build-ready Windows EXE and Android APK client projects
 
 RUN ON WINDOWS
 --------------

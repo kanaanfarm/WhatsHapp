@@ -13,12 +13,14 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 15 * 1024 * 1024 });
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const UPLOAD_DIR = path.join(ROOT, "uploads");
+const DATA_DIR = process.env.DATA_DIR || ROOT;
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(ROOT, "uploads");
+fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 console.log("Starting ConnectChat Pro...");
 console.log("Opening database...");
-const db = new Database(path.join(ROOT, "connectchat.db"), { timeout: 5000 });
+const db = new Database(path.join(DATA_DIR, "connectchat.db"), { timeout: 5000 });
 db.pragma("journal_mode = WAL");
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (

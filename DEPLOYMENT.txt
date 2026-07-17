@@ -27,3 +27,11 @@ IMPORTANT
 - Before commercial or large-scale use, migrate SQLite and the default session
   store to managed production services, add account recovery/verification,
   rate limiting, moderation, malware scanning, monitoring, and security review.
+
+WINDOWS EXE AND ANDROID APK
+---------------------------
+The clients/desktop and clients/android folders contain the installer projects.
+The .github/workflows folder contains automatic builders. After the public HTTPS
+URL exists, run each workflow and enter that URL. The resulting EXE/APK appears
+as a downloadable build artifact. The Android workflow creates a test/debug APK;
+Google Play distribution requires a private signing key and a signed release.
