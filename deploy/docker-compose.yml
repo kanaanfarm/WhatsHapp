@@ -1,0 +1,36 @@
+services:
+  app:
+    build: ..
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET}
+      TURN_URL: ${TURN_URL}
+      TURN_USERNAME: ${TURN_USERNAME}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL}
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - connectchat_data:/app/data
+      - connectchat_uploads:/app/uploads
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+
+networks:
+  web:
+
+volumes:
+  connectchat_data:
+  connectchat_uploads:
+  caddy_data:
+  caddy_config:

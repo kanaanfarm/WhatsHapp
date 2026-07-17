@@ -1,0 +1,13 @@
+{
+  "appId": "com.connectchat.pro",
+  "appName": "ConnectChat Pro",
+  "webDir": "www",
+  "server": {
+    "url": "https://chat.example.com",
+    "cleartext": false,
+    "allowNavigation": ["chat.example.com"]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
