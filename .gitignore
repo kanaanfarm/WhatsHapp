@@ -1,0 +1,9 @@
+node_modules/
+.env
+connectchat.db
+connectchat.db-shm
+connectchat.db-wal
+uploads/
+clients/desktop/dist/
+clients/android/android/
+*.log
