@@ -39,7 +39,17 @@ $("authForm").onsubmit=async e=>{
   try{
     $("authError").textContent="";
     submit.disabled=true;submit.textContent=authMode==="login"?"Signing in…":"Creating account…";
-    const data=await api(`/api/${authMode}`,{method:"POST",body:JSON.stringify({username,password})});
+    const requestOptions={method:"POST",body:JSON.stringify({username,password})};
+    let data;
+    try{
+      data=await api(`/api/${authMode}`,requestOptions);
+    }catch(error){
+      // A cookie from an older server release can point to a session format
+      // that no longer exists. Remove it once and retry the login safely.
+      if(authMode!=="login"||error.status!==400||error.message!=="Request failed.")throw error;
+      await api("/api/session-reset",{method:"POST",body:"{}"});
+      data=await api("/api/login",requestOptions);
+    }
     if(authMode==="register"&&data.pending){
       showSavedRecovery(data.recoveryCode,data.message);
       $("authPassword").value="";setMode("login");
