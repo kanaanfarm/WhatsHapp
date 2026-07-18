@@ -12,6 +12,8 @@ function setMode(mode){
   $("loginTab").classList.toggle("active",mode==="login");
   $("registerTab").classList.toggle("active",mode==="register");
   $("authSubmit").textContent=mode==="login"?"Login":"Create account";
+  $("authSubtitle").textContent=mode==="login"?"Welcome back. Sign in to continue.":"Create a private account in a few seconds.";
+  $("authPassword").autocomplete=mode==="login"?"current-password":"new-password";
   $("authError").textContent="";
 }
 $("loginTab").onclick=()=>setMode("login");
@@ -20,29 +22,89 @@ $("registerTab").onclick=()=>setMode("register");
 async function api(url,options={}){
   const res=await fetch(url,{...options,headers:options.body instanceof FormData?{}:{"Content-Type":"application/json",...(options.headers||{})}});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok)throw new Error(data.error||"Request failed");
+  if(!res.ok){const error=new Error(data.error||"Request failed");error.code=data.code;error.status=res.status;throw error}
   return data;
 }
 
-$("authSubmit").onclick=async()=>{
+$("authForm").onsubmit=async e=>{
+  e.preventDefault();
+  const username=$("authUsername").value.trim();
+  const password=$("authPassword").value;
+  if(username.length<3){$("authError").textContent="Username must contain at least 3 characters.";return}
+  if(password.length<6){$("authError").textContent="Password must contain at least 6 characters.";return}
+  const submit=$("authSubmit");
   try{
     $("authError").textContent="";
-    me=await api(`/api/${authMode}`,{method:"POST",body:JSON.stringify({username:$("authUsername").value.trim(),password:$("authPassword").value})});
-    await startApp();
-  }catch(e){$("authError").textContent=e.message}
+    submit.disabled=true;submit.textContent=authMode==="login"?"Signing in…":"Creating account…";
+    const data=await api(`/api/${authMode}`,{method:"POST",body:JSON.stringify({username,password})});
+    if(authMode==="register"&&data.pending){
+      showSavedRecovery(data.recoveryCode,data.message);
+      $("authPassword").value="";setMode("login");
+      $("authError").textContent="Account created. Login will work after Abokanaan approves it.";
+      return;
+    }
+    me=data;await startApp();
+    if(me.recoveryCode){showSavedRecovery(me.recoveryCode);delete me.recoveryCode}
+  }catch(error){$("authError").textContent=error.message}
+  finally{submit.disabled=false;submit.textContent=authMode==="login"?"Login":"Create account"}
 };
-$("authPassword").onkeydown=e=>{if(e.key==="Enter")$("authSubmit").click()};
+$("togglePasswordBtn").onclick=()=>{
+  const field=$("authPassword");
+  const showing=field.type==="text";field.type=showing?"password":"text";
+  $("togglePasswordBtn").textContent=showing?"Show":"Hide";
+  $("togglePasswordBtn").setAttribute("aria-label",showing?"Show password":"Hide password");
+};
+
+function openRecoveryForm(){
+  $("savedCodePanel").classList.add("hidden");
+  $("recoverFormPanel").classList.remove("hidden");
+  $("recoveryIntro").textContent="Use the private recovery code supplied when the account was created.";
+  $("recoveryResult").textContent="";
+  $("recoveryCodeInput").value="";$("newPasswordInput").value="";
+  $("recoveryOverlay").classList.remove("hidden");
+}
+
+function showSavedRecovery(code,message="Your account is ready. Save this private code now."){
+  $("recoverFormPanel").classList.add("hidden");
+  $("savedCodePanel").classList.remove("hidden");
+  $("recoveryIntro").textContent=message;
+  $("recoveryCodeText").textContent=code;$("recoveryResult").textContent="";
+  $("recoveryOverlay").classList.remove("hidden");
+}
+
+$("forgotBtn").onclick=openRecoveryForm;
+$("closeRecoveryBtn").onclick=()=>$("recoveryOverlay").classList.add("hidden");
+$("recoveryOverlay").onclick=e=>{if(e.target===$("recoveryOverlay"))$("recoveryOverlay").classList.add("hidden")};
+$("copyRecoveryBtn").onclick=async()=>{
+  try{await navigator.clipboard.writeText($("recoveryCodeText").textContent);$("recoveryResult").textContent="Recovery code copied."}
+  catch{$("recoveryResult").textContent="Select the code and copy it manually."}
+};
+$("findUsernameBtn").onclick=async()=>{
+  try{
+    const data=await api("/api/recover/username",{method:"POST",body:JSON.stringify({recoveryCode:$("recoveryCodeInput").value})});
+    $("recoveryResult").textContent=`Your username is: ${data.username}`;
+  }catch(e){$("recoveryResult").textContent=e.message}
+};
+$("resetPasswordBtn").onclick=async()=>{
+  try{
+    const data=await api("/api/recover/password",{method:"POST",body:JSON.stringify({recoveryCode:$("recoveryCodeInput").value,newPassword:$("newPasswordInput").value})});
+    $("recoveryResult").textContent=`Password changed. Username: ${data.username}`;
+  }catch(e){$("recoveryResult").textContent=e.message}
+};
 
 async function startApp(){
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
   $("meName").textContent="@"+me.username;
+  $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
   renderUsers();connectSocket();
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
 }
 
 function connectSocket(){
+  if(socket)socket.disconnect();
   socket=io();
+  socket.on("connect",refreshUsers);
   socket.on("privateMessage",msg=>{
     const relevant=activeUser&&(msg.sender_id===activeUser.id||msg.receiver_id===activeUser.id);
     if(relevant)addMessage(msg);
@@ -50,8 +112,14 @@ function connectSocket(){
   });
   socket.on("presence",p=>{
     const u=users.find(x=>x.id===p.userId);
-    if(u){u.online=p.online;renderUsers();updateHeader()}
+    if(u){u.online=p.online;renderUsers();updateHeader()}else refreshUsers()
   });
+  socket.on("presence:snapshot",p=>{
+    const activeIds=new Set((p.userIds||[]).map(Number));
+    users.forEach(u=>u.online=u.isSelf||activeIds.has(Number(u.id)));
+    renderUsers();updateHeader();
+  });
+  socket.on("users:changed",()=>{refreshUsers();if(!$("adminOverlay").classList.contains("hidden"))loadAdminUsers()});
   socket.on("typing",p=>{
     if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
   });
@@ -70,20 +138,44 @@ function connectSocket(){
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
+  socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
-async function refreshUsers(){try{users=await api("/api/users");renderUsers()}catch{}}
+async function refreshUsers(){
+  try{
+    users=await api("/api/users");
+    if(activeUser){
+      const refreshed=users.find(u=>u.id===activeUser.id);
+      if(refreshed)activeUser=refreshed;
+      else{activeUser=null;resetConversation()}
+    }
+    renderUsers();updateHeader();
+  }catch{}
+}
+
+function resetConversation(){
+  $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
+  $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
+  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
+}
 
 function initials(name){return name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
 function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
-function time(v){return new Date(v.replace(" ","T")+"Z").toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function time(v){
+  const value=String(v||"");
+  const date=new Date(value.includes("T")?value:value.replace(" ","T")+"Z");
+  return Number.isNaN(date.getTime())?"":date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+}
 
 function renderUsers(){
   const q=$("userSearch").value.toLowerCase();
   $("usersList").innerHTML="";
-  users.filter(u=>u.username.toLowerCase().includes(q)).forEach(u=>{
+  users.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
-    d.innerHTML=`<div class="avatar">${initials(u.username)}</div><div class="user-info"><strong>${escapeHtml(u.username)}</strong><span>${escapeHtml(u.lastPreview||"Start a conversation")}</span></div><div class="dot ${u.online?"online":""}"></div>`;
+    const name=u.displayName||u.username;
+    const avatar=u.isSelf?"★":initials(u.username);
+    const preview=u.isSelf&&!u.lastPreview?"Your private space":(u.lastPreview||"Start a conversation");
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
   });
 }
@@ -198,9 +290,11 @@ $("cameraToggleBtn").onclick=()=>{
 };
 function updateHeader(){
   if(!activeUser)return;
-  $("chatName").textContent=activeUser.username;
-  $("chatStatus").textContent=activeUser.online?"Online":"Offline";
-  $("activeAvatar").textContent=initials(activeUser.username);
+  $("chatName").textContent=activeUser.displayName||activeUser.username;
+  $("chatStatus").textContent=activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":"Offline");
+  $("activeAvatar").textContent=activeUser.isSelf?"★":initials(activeUser.username);
+  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf));
+  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf));
 }
 
 function messageContent(msg){
@@ -285,7 +379,44 @@ $("recordBtn").onclick=async()=>{
 $("backBtn").onclick=()=>{
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
 };
-$("logoutBtn").onclick=async()=>{await api("/api/logout",{method:"POST"});location.reload()};
+$("logoutBtn").onclick=async()=>{if(socket)socket.disconnect();await api("/api/logout",{method:"POST"});location.reload()};
+$("recoveryBtn").onclick=async()=>{
+  if(!confirm("Generate a new recovery code? Any previous recovery code will stop working."))return;
+  try{const data=await api("/api/recovery-code",{method:"POST"});showSavedRecovery(data.recoveryCode)}
+  catch(e){toast(e.message)}
+};
+
+function adminStatusLabel(status){return status.charAt(0).toUpperCase()+status.slice(1)}
+async function loadAdminUsers(){
+  $("adminResult").textContent="";$("adminUsersList").innerHTML='<div class="admin-loading">Loading users…</div>';
+  try{
+    const adminUsers=await api("/api/admin/users");
+    $("adminUsersList").innerHTML="";
+    adminUsers.forEach(user=>{
+      const row=document.createElement("div");row.className="admin-user";
+      const protectedAccount=user.isAdmin||user.id===me.id;
+      row.innerHTML=`<div class="admin-user-main"><div class="avatar">${escapeHtml(initials(user.username))}</div><div><strong>${escapeHtml(user.username)}${user.isAdmin?' <span class="admin-tag">Admin</span>':""}</strong><span><i class="status-pill status-${escapeHtml(user.status)}">${escapeHtml(adminStatusLabel(user.status))}</i> · ${user.online?"Online":"Offline"}</span></div></div><div class="admin-actions">${protectedAccount?'<span class="protected-account">Protected account</span>':`<button data-action="approve" ${user.status==="approved"?"disabled":""}>Approve</button><button data-action="block" class="warn" ${user.status==="blocked"?"disabled":""}>Block</button><button data-action="delete" class="danger">Delete</button>`}</div>`;
+      row.querySelectorAll("button[data-action]").forEach(button=>button.onclick=()=>changeAdminUser(user,button.dataset.action));
+      $("adminUsersList").appendChild(row);
+    });
+  }catch(error){$("adminUsersList").innerHTML="";$("adminResult").textContent=error.message}
+}
+
+async function changeAdminUser(user,action){
+  if(action==="delete"&&!confirm(`Permanently delete ${user.username} and all messages?`))return;
+  try{
+    $("adminResult").textContent="Updating…";
+    if(action==="delete")await api(`/api/admin/users/${user.id}`,{method:"DELETE"});
+    else await api(`/api/admin/users/${user.id}/status`,{method:"POST",body:JSON.stringify({status:action==="approve"?"approved":"blocked"})});
+    await loadAdminUsers();await refreshUsers();
+    $("adminResult").textContent=action==="delete"?"User deleted.":`User ${action==="approve"?"approved":"blocked"}.`;
+  }catch(error){$("adminResult").textContent=error.message}
+}
+
+$("adminBtn").onclick=()=>{$("adminOverlay").classList.remove("hidden");loadAdminUsers()};
+$("closeAdminBtn").onclick=()=>$("adminOverlay").classList.add("hidden");
+$("refreshAdminBtn").onclick=loadAdminUsers;
+$("adminOverlay").onclick=e=>{if(e.target===$("adminOverlay"))$("adminOverlay").classList.add("hidden")};
 
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden")});
 $("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").classList.add("hidden")};

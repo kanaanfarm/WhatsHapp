@@ -6,31 +6,40 @@
   <meta name="theme-color" content="#182132">
   <title>ConnectChat Pro</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
   <section id="authView" class="auth-view">
     <div class="auth-card">
-      <div class="logo">C</div>
+      <img class="brand-logo" src="logo.svg" alt="ConnectChat Pro">
       <h1>ConnectChat Pro</h1>
-      <p>Private messaging for mobile and PC.</p>
+      <p id="authSubtitle">Welcome back. Sign in to continue.</p>
 
-      <div class="tabs">
-        <button id="loginTab" class="active">Login</button>
-        <button id="registerTab">Register</button>
-      </div>
+      <form id="authForm" novalidate>
+        <div class="tabs">
+          <button type="button" id="loginTab" class="active">Login</button>
+          <button type="button" id="registerTab">Register</button>
+        </div>
 
-      <input id="authUsername" placeholder="Username" maxlength="30" autocomplete="username">
-      <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
-      <button id="authSubmit" class="primary">Login</button>
-      <div id="authError" class="error"></div>
+        <label class="auth-label" for="authUsername">Username</label>
+        <input id="authUsername" placeholder="Enter your username" maxlength="30" autocomplete="username" required>
+        <label class="auth-label" for="authPassword">Password</label>
+        <div class="password-field">
+          <input id="authPassword" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+          <button id="togglePasswordBtn" type="button" aria-label="Show password">Show</button>
+        </div>
+        <button id="authSubmit" type="submit" class="primary">Login</button>
+        <button id="forgotBtn" type="button" class="text-btn">Forgot username or password?</button>
+        <div id="authError" class="error" role="alert"></div>
+      </form>
     </div>
   </section>
 
   <section id="appView" class="app hidden">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-head">
-        <div class="logo small">C</div>
+        <img class="brand-logo small" src="logo.svg" alt="">
         <div>
           <strong>ConnectChat</strong>
           <span id="meName"></span>
@@ -45,7 +54,9 @@
       <div id="usersList" class="users-list"></div>
 
       <div class="sidebar-actions">
+        <button id="adminBtn" class="admin-btn hidden">Manage users</button>
         <button id="installBtn" class="install-btn hidden">Install app</button>
+        <button id="recoveryBtn" class="install-btn">Recovery code</button>
         <button id="logoutBtn" class="logout-btn">Logout</button>
       </div>
     </aside>
@@ -75,7 +86,7 @@
       <div id="uploadStatus" class="upload-status hidden">Uploading…</div>
 
       <footer class="composer">
-        <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf" hidden>
+        <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" hidden>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
 
         <button id="attachBtn" class="circle-btn" title="Attach photo or file">＋</button>
@@ -111,7 +122,50 @@
     </div>
   </section>
 
+  <section id="recoveryOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card">
+      <button id="closeRecoveryBtn" class="dialog-close" aria-label="Close">×</button>
+      <h2>Account recovery</h2>
+      <p id="recoveryIntro" class="dialog-intro">Use the private recovery code supplied when the account was created.</p>
+
+      <div id="savedCodePanel" class="hidden">
+        <p>Save this code somewhere private. It is shown only now.</p>
+        <div id="recoveryCodeText" class="recovery-code"></div>
+        <button id="copyRecoveryBtn" class="primary">Copy recovery code</button>
+      </div>
+
+      <div id="recoverFormPanel">
+        <label for="recoveryCodeInput">Recovery code</label>
+        <input id="recoveryCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+        <div class="recovery-actions">
+          <button id="findUsernameBtn" class="secondary-btn">Find username</button>
+        </div>
+        <div class="divider"><span>or reset password</span></div>
+        <label for="newPasswordInput">New password</label>
+        <input id="newPasswordInput" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+        <button id="resetPasswordBtn" class="primary">Reset password</button>
+      </div>
+
+      <div id="recoveryResult" class="dialog-result"></div>
+    </div>
+  </section>
+
+  <section id="adminOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card admin-dialog">
+      <button id="closeAdminBtn" class="dialog-close" aria-label="Close">×</button>
+      <div class="admin-title-row">
+        <div>
+          <h2>User administration</h2>
+          <p class="dialog-intro">Approve new accounts, block access, or permanently delete users.</p>
+        </div>
+        <button id="refreshAdminBtn" class="secondary-btn admin-refresh">Refresh</button>
+      </div>
+      <div id="adminUsersList" class="admin-users"></div>
+      <div id="adminResult" class="dialog-result"></div>
+    </div>
+  </section>
+
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
