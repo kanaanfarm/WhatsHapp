@@ -3,9 +3,9 @@
   "appName": "ConnectChat Pro",
   "webDir": "www",
   "server": {
-    "url": "https://chat.example.com",
+    "url": "https://connectchat-pro-kanaan.onrender.com",
     "cleartext": false,
-    "allowNavigation": ["chat.example.com"]
+    "allowNavigation": ["connectchat-pro-kanaan.onrender.com"]
   },
   "android": {
     "allowMixedContent": false

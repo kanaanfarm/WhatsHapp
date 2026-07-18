@@ -11,22 +11,25 @@ REQUIRED
 3. HTTPS using a reverse proxy such as Caddy or Nginx.
 4. WebSocket forwarding for Socket.IO.
 5. A TURN service for reliable audio/video calls.
-6. Persistent backup storage for connectchat.db and the uploads folder.
+6. A Supabase project for persistent messages and uploaded files.
+7. The security-migration.sql script applied in Supabase.
 
 ENVIRONMENT
 -----------
-Set NODE_ENV=production, a long random SESSION_SECRET, and the three TURN
-variables shown in .env.example. Do not commit real secrets into the project.
+Set NODE_ENV=production, PUBLIC_ORIGIN, a stable random SESSION_SECRET of at
+least 32 characters, the Supabase variables, and the TURN variables shown in
+.env.example. Set CALLS_ENABLED=false when live calls should be disabled. Do
+not commit real secrets.
 
 IMPORTANT
 ---------
 - Camera/microphone access works on localhost for testing, but public use must
   be served over HTTPS.
 - STUN-only calls are not reliable across all mobile operators and firewalls.
-- This package is suitable for pilot/small-team use on one server.
-- Before commercial or large-scale use, migrate SQLite and the default session
-  store to managed production services, add account recovery/verification,
-  rate limiting, moderation, malware scanning, monitoring, and security review.
+- This package is suitable for controlled pilot/small-team use on one server.
+- Supabase-backed sessions and abuse limits are included in version 1.2.0.
+- Before commercial or large-scale use, add email/phone verification,
+  moderation, malware scanning, monitoring, backups, and a professional review.
 
 WINDOWS EXE AND ANDROID APK
 ---------------------------

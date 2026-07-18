@@ -1,0 +1,46 @@
+CONNECTCHAT PRO - FREE PERSISTENT STORAGE SETUP
+================================================
+
+1. Create a free project at https://supabase.com
+2. Open SQL Editor > New query.
+3. Paste the complete contents of supabase-schema.sql and click Run.
+4. Open Project Settings > API and copy:
+   - Project URL
+   - service_role key (secret)
+5. In Render > connectchat-pro-kanaan > Environment, add:
+   SUPABASE_URL = your Project URL
+   SUPABASE_SERVICE_ROLE_KEY = your service_role key
+   SUPABASE_BUCKET = connectchat-files
+6. Keep the service_role key only in Render. Never upload it to GitHub and
+   never paste it into frontend files.
+7. Upload the updated package.json, package-lock.json, server.js and public
+   files to GitHub. Render will redeploy automatically.
+
+SECURITY VERSION 1.2.0
+----------------------
+For an existing database, also run security-migration.sql before deploying.
+This creates the private server-session table and does not delete any account,
+message, or uploaded file.
+
+ADMINISTRATOR APPROVAL UPGRADE
+------------------------------
+1. Register the username Abokanaan before enabling the approval update.
+2. In Supabase > SQL Editor, run admin-migration.sql.
+3. Confirm the final query result shows:
+     username: Abokanaan
+     status: approved
+     is_admin: true
+4. Deploy server.js and the public files from this package.
+5. Log in as Abokanaan and use Manage users to approve, block, or delete users.
+
+If Abokanaan was registered after the migration was first run, run
+admin-migration.sql again. It is safe to run more than once.
+
+The server creates a private Storage bucket automatically. File links are
+signed and expire after 15 minutes. Opening the conversation refreshes them.
+
+IMPORTANT
+---------
+The old SQLite users/messages are not copied automatically. Create new test
+accounts after switching. Uninstalling/reinstalling the desktop application
+does not remove Supabase data.

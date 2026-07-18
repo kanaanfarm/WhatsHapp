@@ -7,7 +7,7 @@
   <title>ConnectChat Pro</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -26,7 +26,7 @@
         <input id="authUsername" placeholder="Enter your username" maxlength="30" autocomplete="username" required>
         <label class="auth-label" for="authPassword">Password</label>
         <div class="password-field">
-          <input id="authPassword" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+          <input id="authPassword" type="password" placeholder="Enter your password" minlength="10" maxlength="128" autocomplete="current-password" required>
           <button id="togglePasswordBtn" type="button" aria-label="Show password">Show</button>
         </div>
         <button id="authSubmit" type="submit" class="primary">Login</button>
@@ -142,7 +142,7 @@
         </div>
         <div class="divider"><span>or reset password</span></div>
         <label for="newPasswordInput">New password</label>
-        <input id="newPasswordInput" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+        <input id="newPasswordInput" type="password" placeholder="At least 10 characters" minlength="10" maxlength="128" autocomplete="new-password">
         <button id="resetPasswordBtn" class="primary">Reset password</button>
       </div>
 
@@ -166,6 +166,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

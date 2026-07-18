@@ -1,0 +1,59 @@
+CONNECTCHAT PRO 1.2.0 - SECURITY UPDATE
+=======================================
+
+IMPORTANT: DO THIS BEFORE DEPLOYING
+-----------------------------------
+1. Open Supabase > SQL Editor > New query.
+2. Paste the complete contents of security-migration.sql.
+3. Click Run.
+4. Confirm the result says: ConnectChat security migration completed.
+
+RENDER ENVIRONMENT
+------------------
+Keep the existing Supabase values and add/check:
+
+  NODE_ENV=production
+  PUBLIC_ORIGIN=https://connectchat-pro-kanaan.onrender.com
+  SESSION_SECRET=a-stable-random-secret-with-at-least-32-characters
+  CALLS_ENABLED=false
+
+Set CALLS_ENABLED=true only where live Internet calling is allowed. Keep the
+same SESSION_SECRET permanently. Changing it signs everyone out and invalidates
+new-format recovery codes.
+
+DEPLOYMENT ORDER
+----------------
+1. Run security-migration.sql in Supabase.
+2. Add PUBLIC_ORIGIN and CALLS_ENABLED in Render Environment.
+3. Upload the new package files to GitHub.
+4. Let Render deploy, or use Manual Deploy > Deploy latest commit.
+5. Test login, messaging, upload, logout, and administrator approval.
+6. Rebuild the Windows installer from GitHub Actions.
+
+WHAT THIS UPDATE PROTECTS
+-------------------------
+- Supabase-backed production sessions; no Express MemoryStore
+- Strong production secret validation and hardened session cookies
+- Login, registration, recovery, API, upload, message, and call rate limits
+- Login session regeneration and session revocation after password reset/block
+- Recovery-code rotation after password reset
+- File-content detection instead of trusting a browser-provided MIME type
+- Safer file names and a reduced upload allowlist
+- Security headers, Content Security Policy, anti-framing, and no-sniff headers
+- Same-origin request checks against browser request forgery
+- Validated and size-limited WebRTC signaling
+- Restricted Electron navigation and camera/microphone permissions
+
+LIMITS THAT STILL REQUIRE PROFESSIONAL SERVICES
+------------------------------------------------
+- Messages are not end-to-end encrypted.
+- Files are not scanned by an antivirus engine.
+- A professional penetration test has not been performed.
+- Reliable calling still requires a TURN service and legal approval.
+- Commercial use requires privacy terms, monitoring, backups, and incident plans.
+
+LOCAL OWNER DEVELOPMENT
+-----------------------
+START_CHAT.bat safely opens the hosted application and needs no Node.js.
+START_LOCAL_SERVER.bat is only for the owner/developer. It requires a private
+.env file. Never share .env or upload it to GitHub.

@@ -1,6 +1,7 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null;
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let peer=null, localStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let callsEnabled=true;
 const $=id=>document.getElementById(id);
 
 function toast(text){
@@ -20,7 +21,9 @@ $("loginTab").onclick=()=>setMode("login");
 $("registerTab").onclick=()=>setMode("register");
 
 async function api(url,options={}){
-  const res=await fetch(url,{...options,headers:options.body instanceof FormData?{}:{"Content-Type":"application/json",...(options.headers||{})}});
+  const headers={"X-ConnectChat-Request":"1",...(options.headers||{})};
+  if(!(options.body instanceof FormData))headers["Content-Type"]="application/json";
+  const res=await fetch(url,{credentials:"same-origin",cache:"no-store",redirect:"error",...options,headers});
   const data=await res.json().catch(()=>({}));
   if(!res.ok){const error=new Error(data.error||"Request failed");error.code=data.code;error.status=res.status;throw error}
   return data;
@@ -31,7 +34,7 @@ $("authForm").onsubmit=async e=>{
   const username=$("authUsername").value.trim();
   const password=$("authPassword").value;
   if(username.length<3){$("authError").textContent="Username must contain at least 3 characters.";return}
-  if(password.length<6){$("authError").textContent="Password must contain at least 6 characters.";return}
+  if(authMode==="register"&&password.length<10){$("authError").textContent="New passwords must contain at least 10 characters.";return}
   const submit=$("authSubmit");
   try{
     $("authError").textContent="";
@@ -88,7 +91,7 @@ $("findUsernameBtn").onclick=async()=>{
 $("resetPasswordBtn").onclick=async()=>{
   try{
     const data=await api("/api/recover/password",{method:"POST",body:JSON.stringify({recoveryCode:$("recoveryCodeInput").value,newPassword:$("newPasswordInput").value})});
-    $("recoveryResult").textContent=`Password changed. Username: ${data.username}`;
+    showSavedRecovery(data.recoveryCode,`Password changed for ${data.username}. Save this new recovery code now; the old code no longer works.`);
   }catch(e){$("recoveryResult").textContent=e.message}
 };
 
@@ -97,6 +100,7 @@ async function startApp(){
   $("meName").textContent="@"+me.username;
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
+  try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
 }
@@ -184,7 +188,7 @@ $("userSearch").oninput=renderUsers;
 async function selectUser(u){
   activeUser=u;renderUsers();updateHeader();
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
-  $("audioCallBtn").disabled=false;$("videoCallBtn").disabled=false;
+  $("audioCallBtn").disabled=!callsEnabled||u.isSelf;$("videoCallBtn").disabled=!callsEnabled||u.isSelf;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   const history=await api(`/api/messages/${u.id}`);history.forEach(addMessage);
   if(window.innerWidth<=760){$("sidebar").classList.add("mobile-hidden");$("chatPanel").classList.remove("mobile-hidden")}
@@ -231,7 +235,7 @@ function showCallUi(name,status,mode,incoming=false){
 }
 
 async function startCall(mode){
-  if(!activeUser||peer)return;
+  if(!callsEnabled||!activeUser||peer)return;
   if(!activeUser.online)return toast("This user is offline.");
   try{
     callPeerId=activeUser.id;callMode=mode;
@@ -245,7 +249,7 @@ async function startCall(mode){
 }
 
 function showIncomingCall(data){
-  if(peer||pendingCall){socket.emit("call:reject",{receiverId:data.callerId});return}
+  if(!callsEnabled||peer||pendingCall){socket.emit("call:reject",{receiverId:data.callerId});return}
   pendingCall=data;callPeerId=data.callerId;callMode=data.mode;
   showCallUi(data.callerName,`Incoming ${data.mode} call`,data.mode,true);
 }
@@ -293,15 +297,21 @@ function updateHeader(){
   $("chatName").textContent=activeUser.displayName||activeUser.username;
   $("chatStatus").textContent=activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":"Offline");
   $("activeAvatar").textContent=activeUser.isSelf?"★":initials(activeUser.username);
-  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf));
-  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf));
+  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
+  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
 }
 
+function safeFileUrl(value){
+  try{const url=new URL(value,location.origin);return url.protocol==="https:"||(!location.protocol.startsWith("https")&&url.protocol==="http:")?url.href:""}
+  catch{return ""}
+}
 function messageContent(msg){
   const caption=msg.body?`<div class="caption">${escapeHtml(msg.body)}</div>`:"";
-  if(msg.kind==="image")return `<a href="${msg.file_url}" target="_blank"><img class="chat-image" src="${msg.file_url}" alt="Shared image"></a>${caption}`;
-  if(msg.kind==="voice")return `<audio class="voice-note" controls preload="metadata" src="${msg.file_url}"></audio>${caption}`;
-  if(msg.kind==="file")return `<a class="file-link" href="${msg.file_url}" target="_blank">📎 ${escapeHtml(msg.file_name||"Download file")}</a>${caption}`;
+  const fileUrl=escapeHtml(safeFileUrl(msg.file_url));
+  if(msg.kind==="image"&&fileUrl)return `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer"><img class="chat-image" src="${fileUrl}" alt="Shared image"></a>${caption}`;
+  if(msg.kind==="voice"&&fileUrl)return `<audio class="voice-note" controls preload="metadata" src="${fileUrl}"></audio>${caption}`;
+  if(msg.kind==="file"&&fileUrl)return `<a class="file-link" href="${fileUrl}" target="_blank" rel="noopener noreferrer">📎 ${escapeHtml(msg.file_name||"Download file")}</a>${caption}`;
+  if(msg.kind!=="text")return `<span>Attachment unavailable</span>${caption}`;
   return escapeHtml(msg.body||"");
 }
 function addMessage(msg){

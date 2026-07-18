@@ -6,14 +6,14 @@ services:
       PORT: 3000
       NODE_ENV: production
       SESSION_SECRET: ${SESSION_SECRET}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-connectchat-files}
+      CALLS_ENABLED: ${CALLS_ENABLED:-false}
       TURN_URL: ${TURN_URL}
       TURN_USERNAME: ${TURN_USERNAME}
       TURN_CREDENTIAL: ${TURN_CREDENTIAL}
-      DATA_DIR: /app/data
-      UPLOAD_DIR: /app/uploads
-    volumes:
-      - connectchat_data:/app/data
-      - connectchat_uploads:/app/uploads
     networks: [web]
 
   caddy:
@@ -30,7 +30,5 @@ networks:
   web:
 
 volumes:
-  connectchat_data:
-  connectchat_uploads:
   caddy_data:
   caddy_config:

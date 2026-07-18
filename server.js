@@ -5,58 +5,289 @@ const crypto = require("crypto");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
+const helmet = require("helmet");
+const { rateLimit } = require("express-rate-limit");
 const { createClient } = require("@supabase/supabase-js");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 15 * 1024 * 1024 });
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STORAGE_BUCKET = process.env.SUPABASE_BUCKET || "connectchat-files";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SESSION_SECRET = String(process.env.SESSION_SECRET || "");
+const PUBLIC_ORIGIN = String(process.env.PUBLIC_ORIGIN || "").replace(/\/$/, "");
+const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 7;
+const PASSWORD_MIN_LENGTH = 10;
+const BCRYPT_ROUNDS = 12;
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const SIGNED_URL_SECONDS = 15 * 60;
+const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
+  process.exit(1);
+}
+if (IS_PRODUCTION && (SESSION_SECRET.length < 32 || SESSION_SECRET.includes("change-me") || SESSION_SECRET.includes("replace-with"))) {
+  console.error("SESSION_SECRET must be a unique random value of at least 32 characters in production.");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false }
 });
+const supabaseOrigin = new URL(SUPABASE_URL).origin;
+
+function requestHost(req) {
+  return String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim().toLowerCase();
+}
+
+function originAllowed(origin, req) {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    if (!/^https?:$/.test(parsed.protocol)) return false;
+    if (PUBLIC_ORIGIN && parsed.origin === PUBLIC_ORIGIN) return true;
+    return parsed.host.toLowerCase() === requestHost(req);
+  } catch {
+    return false;
+  }
+}
+
+const io = new Server(server, {
+  maxHttpBufferSize: 256 * 1024,
+  perMessageDeflate: false,
+  allowRequest: (req, callback) => callback(null, originAllowed(req.headers.origin, req))
+});
 
 const allowedMimeTypes = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
-  "audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
-  "application/pdf", "text/plain", "application/zip", "application/x-zip-compressed",
-  "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+  "audio/webm", "video/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
+  "application/pdf", "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 ];
 
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: "no-referrer" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      connectSrc: ["'self'", "wss:", ...(IS_PRODUCTION ? [] : ["ws:"])],
+      fontSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+      imgSrc: ["'self'", "data:", "blob:", supabaseOrigin],
+      mediaSrc: ["'self'", "blob:", supabaseOrigin],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+      upgradeInsecureRequests: IS_PRODUCTION ? [] : null
+    }
+  }
+}));
+app.use((req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), payment=()");
+  if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
+  next();
+});
+app.use(express.json({ limit: "64kb", strict: true }));
+app.use(express.urlencoded({ extended: false, limit: "32kb", parameterLimit: 20 }));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 600,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please wait and try again." }
+});
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: "Too many login attempts. Please wait 15 minutes and try again." }
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many registration attempts. Please try again later." }
+});
+const recoveryLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  limit: 6,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many recovery attempts. Please wait 30 minutes and try again." }
+});
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Upload limit reached. Please try again later." }
+});
+app.use("/api", apiLimiter);
+app.use("/api/login", loginLimiter);
+app.use("/api/register", registerLimiter);
+app.use("/api/recover", recoveryLimiter);
+app.use("/api/upload", uploadLimiter);
+
+function requireAppRequest(req, res, next) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  if (req.get("x-connectchat-request") !== "1" || !originAllowed(req.get("origin"), req)) {
+    return res.status(403).json({ error: "Request was rejected for security reasons." });
+  }
+  next();
+}
+app.use("/api", requireAppRequest);
+
+function storedSessionId(sid) {
+  return crypto.createHash("sha256").update(String(sid)).digest("hex");
+}
+
+class SupabaseSessionStore extends session.Store {
+  constructor(client) {
+    super();
+    this.client = client;
+  }
+
+  get(sid, callback) {
+    this.client.from("app_sessions").select("sess,expires_at").eq("sid", storedSessionId(sid)).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) return callback(error);
+        if (!data) return callback(null, null);
+        if (new Date(data.expires_at).getTime() <= Date.now()) {
+          return this.destroy(sid, destroyError => callback(destroyError || null, null));
+        }
+        callback(null, data.sess || null);
+      }).catch(callback);
+  }
+
+  set(sid, sess, callback = () => {}) {
+    const expiresAt = sess.cookie?.expires
+      ? new Date(sess.cookie.expires).toISOString()
+      : new Date(Date.now() + SESSION_MAX_AGE).toISOString();
+    this.client.from("app_sessions").upsert({
+      sid: storedSessionId(sid),
+      sess,
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString()
+    }).then(({ error }) => callback(error || null)).catch(callback);
+  }
+
+  destroy(sid, callback = () => {}) {
+    this.client.from("app_sessions").delete().eq("sid", storedSessionId(sid))
+      .then(({ error }) => callback(error || null)).catch(callback);
+  }
+
+  touch(sid, sess, callback = () => {}) {
+    this.set(sid, sess, callback);
+  }
+}
+
+async function destroyUserSessions(userId) {
+  const { error } = await supabase.from("app_sessions").delete().contains("sess", { userId: Number(userId) });
+  if (error) console.error("Could not revoke user sessions:", error.message);
+}
 
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || "connectchat-pro-change-me",
+  name: "connectchat.sid",
+  secret: SESSION_SECRET || crypto.randomBytes(48).toString("hex"),
+  store: new SupabaseSessionStore(supabase),
   resave: false,
   saveUninitialized: false,
+  rolling: true,
+  unset: "destroy",
+  proxy: IS_PRODUCTION,
   cookie: {
-    maxAge: 1000 * 60 * 60 * 24 * 14,
+    maxAge: SESSION_MAX_AGE,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production"
+    secure: IS_PRODUCTION,
+    path: "/"
   }
 });
 
 app.use(sessionMiddleware);
-app.use(express.static(path.join(ROOT, "public")));
+app.use(express.static(path.join(ROOT, "public"), {
+  etag: true,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    if (/\.(?:html|json)$/.test(filePath) || filePath.endsWith("sw.js")) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    }
+  }
+}));
 io.engine.use(sessionMiddleware);
 
 const onlineUsers = new Map();
+const activeCallPairs = new Map();
+
+function callPairKey(firstUserId, secondUserId) {
+  return [Number(firstUserId), Number(secondUserId)].sort((a, b) => a - b).join(":");
+}
+
+function openCallPair(firstUserId, secondUserId) {
+  const key = callPairKey(firstUserId, secondUserId);
+  const previous = activeCallPairs.get(key);
+  if (previous) clearTimeout(previous);
+  activeCallPairs.set(key, setTimeout(() => activeCallPairs.delete(key), 4 * 60 * 60 * 1000));
+}
+
+function closeCallPair(firstUserId, secondUserId) {
+  const key = callPairKey(firstUserId, secondUserId);
+  const timer = activeCallPairs.get(key);
+  if (timer) clearTimeout(timer);
+  activeCallPairs.delete(key);
+}
+
+function closeUserCallPairs(userId) {
+  const id = Number(userId);
+  for (const [key, timer] of activeCallPairs) {
+    if (key.split(":").map(Number).includes(id)) {
+      clearTimeout(timer);
+      activeCallPairs.delete(key);
+    }
+  }
+}
+
+function callPairIsOpen(firstUserId, secondUserId) {
+  return activeCallPairs.has(callPairKey(firstUserId, secondUserId));
+}
+
+function eventAllowed(socket, name, limit, windowMs) {
+  const now = Date.now();
+  const current = socket.data.eventLimits?.[name];
+  if (!socket.data.eventLimits) socket.data.eventLimits = {};
+  if (!current || now - current.startedAt >= windowMs) {
+    socket.data.eventLimits[name] = { startedAt: now, count: 1 };
+    return true;
+  }
+  current.count += 1;
+  return current.count <= limit;
+}
+
+function validDescription(value, expectedType) {
+  return value && value.type === expectedType && typeof value.sdp === "string" && value.sdp.length > 0 && value.sdp.length <= 65536;
+}
+
+function validIceCandidate(value) {
+  return value && typeof value === "object" && typeof value.candidate === "string" && value.candidate.length <= 4096
+    && (value.sdpMid == null || (typeof value.sdpMid === "string" && value.sdpMid.length <= 128))
+    && (value.sdpMLineIndex == null || (Number.isInteger(value.sdpMLineIndex) && value.sdpMLineIndex >= 0 && value.sdpMLineIndex < 128));
+}
 
 function addOnlineSocket(userId, socketId) {
   if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
@@ -112,7 +343,16 @@ function normalizeRecoveryCode(value) {
 }
 
 function recoveryHash(code) {
-  return crypto.createHash("sha256").update(normalizeRecoveryCode(code)).digest("hex");
+  return crypto.createHmac("sha256", SESSION_SECRET || "local-development")
+    .update(normalizeRecoveryCode(code)).digest("hex");
+}
+
+function recoveryHashes(code) {
+  const normalized = normalizeRecoveryCode(code);
+  return [
+    recoveryHash(normalized),
+    crypto.createHash("sha256").update(normalized).digest("hex")
+  ];
 }
 
 function createRecoveryCode() {
@@ -128,7 +368,7 @@ async function getUserById(id, columns = "id,username,avatar") {
 
 async function signedMessage(message) {
   if (!message || !message.file_url) return message;
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(message.file_url, 60 * 60);
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(message.file_url, SIGNED_URL_SECONDS);
   if (error) console.error("Could not sign file URL:", error.message);
   return { ...message, file_url: data?.signedUrl || null };
 }
@@ -139,23 +379,53 @@ async function signedMessages(messages) {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 12 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => {
-    if (!allowedMimeTypes.includes(file.mimetype)) return cb(new Error("Unsupported file type"));
-    cb(null, true);
-  }
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 3, parts: 4 }
 });
 
+function cleanText(value, maxLength) {
+  return String(value || "").normalize("NFC").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, maxLength);
+}
+
+function cleanFileName(value) {
+  return path.basename(String(value || "file")).normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F<>:"/\\|?*]/g, "_").replace(/\s+/g, " ").trim().slice(0, 120) || "file";
+}
+
+async function verifyUpload(file) {
+  const { fileTypeFromBuffer } = await import("file-type");
+  const detected = await fileTypeFromBuffer(file.buffer);
+  if (!detected) {
+    if (file.mimetype !== "text/plain" || file.buffer.includes(0)) throw new Error("The file content does not match an allowed type.");
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
+      return { mime: "text/plain", ext: "txt", kind: "file" };
+    } catch {
+      throw new Error("Text files must use UTF-8 encoding.");
+    }
+  }
+  let mime = detected.mime;
+  if (mime === "video/webm" && file.mimetype === "audio/webm") mime = "audio/webm";
+  if (!allowedMimeTypes.includes(mime)) throw new Error("This file type is not allowed.");
+  const kind = mime.startsWith("image/") ? "image" : (mime.startsWith("audio/") ? "voice" : "file");
+  return { mime, ext: detected.ext.replace(/[^a-z0-9]/gi, "").slice(0, 10), kind };
+}
+
+function validPassword(password) {
+  return typeof password === "string" && password.length >= PASSWORD_MIN_LENGTH && password.length <= 128;
+}
+
+const dummyPasswordHash = bcrypt.hashSync("not-a-real-connectchat-password", BCRYPT_ROUNDS);
+
 app.post("/api/register", async (req, res) => {
-  const username = String(req.body.username || "").trim().slice(0, 30);
+  const username = cleanText(req.body.username, 30);
   const password = String(req.body.password || "");
   if (!/^[A-Za-z0-9_ ]{3,30}$/.test(username)) {
     return res.status(400).json({ error: "Use 3–30 letters, numbers, spaces, or underscores." });
   }
-  if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
+  if (!validPassword(password)) return res.status(400).json({ error: `Password must contain ${PASSWORD_MIN_LENGTH}–128 characters.` });
 
   try {
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const recoveryCode = createRecoveryCode();
     const { data, error } = await supabase.from("users").insert({
       username,
@@ -182,11 +452,12 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const username = String(req.body.username || "").trim();
+    const username = cleanText(req.body.username, 30);
     const password = String(req.body.password || "");
     const { data: user, error } = await supabase.from("users").select("id,username,avatar,password_hash,status,is_admin").eq("username", username).maybeSingle();
     if (error) throw error;
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    const passwordMatches = password.length <= 128 && await bcrypt.compare(password, user?.password_hash || dummyPasswordHash);
+    if (!user || !passwordMatches) {
       return res.status(401).json({ error: "Invalid username or password." });
     }
     if (user.status !== "approved") {
@@ -195,16 +466,29 @@ app.post("/api/login", async (req, res) => {
         code: String(user.status || "pending").toUpperCase()
       });
     }
-    req.session.userId = Number(user.id);
-    req.session.username = user.username;
-    res.json(safeUser(user));
+    req.session.regenerate(regenerateError => {
+      if (regenerateError) return res.status(500).json({ error: "Login failed." });
+      req.session.userId = Number(user.id);
+      req.session.username = user.username;
+      req.session.save(saveError => {
+        if (saveError) return res.status(500).json({ error: "Login failed." });
+        res.json(safeUser(user));
+      });
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Login failed." });
   }
 });
 
-app.post("/api/logout", (req, res) => req.session.destroy(() => res.json({ ok: true })));
+app.post("/api/logout", (req, res) => {
+  const userId = Number(req.session.userId);
+  req.session.destroy(() => {
+    if (userId) io.in(`user:${userId}`).disconnectSockets(true);
+    res.clearCookie("connectchat.sid", { httpOnly: true, sameSite: "lax", secure: IS_PRODUCTION, path: "/" });
+    res.json({ ok: true });
+  });
+});
 
 app.post("/api/recovery-code", auth, async (req, res) => {
   try {
@@ -222,7 +506,7 @@ app.post("/api/recover/username", async (req, res) => {
   try {
     const code = normalizeRecoveryCode(req.body.recoveryCode);
     if (code.length < 20) return res.status(400).json({ error: "Enter a valid recovery code." });
-    const { data: user, error } = await supabase.from("users").select("username").eq("recovery_hash", recoveryHash(code)).maybeSingle();
+    const { data: user, error } = await supabase.from("users").select("username").in("recovery_hash", recoveryHashes(code)).maybeSingle();
     if (error) throw error;
     if (!user) return res.status(404).json({ error: "Recovery code not found." });
     res.json({ username: user.username });
@@ -237,14 +521,20 @@ app.post("/api/recover/password", async (req, res) => {
     const code = normalizeRecoveryCode(req.body.recoveryCode);
     const password = String(req.body.newPassword || "");
     if (code.length < 20) return res.status(400).json({ error: "Enter a valid recovery code." });
-    if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
-    const { data: user, error: findError } = await supabase.from("users").select("id,username").eq("recovery_hash", recoveryHash(code)).maybeSingle();
+    if (!validPassword(password)) return res.status(400).json({ error: `Password must contain ${PASSWORD_MIN_LENGTH}–128 characters.` });
+    const { data: user, error: findError } = await supabase.from("users").select("id,username").in("recovery_hash", recoveryHashes(code)).maybeSingle();
     if (findError) throw findError;
     if (!user) return res.status(404).json({ error: "Recovery code not found." });
-    const passwordHash = await bcrypt.hash(password, 10);
-    const { error } = await supabase.from("users").update({ password_hash: passwordHash }).eq("id", user.id);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const recoveryCode = createRecoveryCode();
+    const { error } = await supabase.from("users").update({
+      password_hash: passwordHash,
+      recovery_hash: recoveryHash(recoveryCode)
+    }).eq("id", user.id);
     if (error) throw error;
-    res.json({ ok: true, username: user.username });
+    await destroyUserSessions(user.id);
+    io.in(`user:${Number(user.id)}`).disconnectSockets(true);
+    res.json({ ok: true, username: user.username, recoveryCode });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Password reset failed." });
@@ -270,10 +560,11 @@ app.get("/api/me", async (req, res) => {
 
 app.get("/api/health", async (_, res) => {
   const { error } = await supabase.from("users").select("id", { head: true, count: "exact" });
-  res.status(error ? 503 : 200).json({ ok: !error, database: error ? "unavailable" : "connected" });
+  res.status(error ? 503 : 200).json({ ok: !error });
 });
 
 app.get("/api/call-config", auth, (_, res) => {
+  if (!CALLS_ENABLED) return res.json({ enabled: false, iceServers: [] });
   const iceServers = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
   if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
     iceServers.push({
@@ -282,7 +573,7 @@ app.get("/api/call-config", auth, (_, res) => {
       credential: process.env.TURN_CREDENTIAL
     });
   }
-  res.json({ iceServers, turnConfigured: Boolean(process.env.TURN_URL) });
+  res.json({ enabled: true, iceServers, turnConfigured: Boolean(process.env.TURN_URL) });
 });
 
 app.get("/api/admin/users", auth, adminOnly, async (_, res) => {
@@ -317,6 +608,7 @@ app.post("/api/admin/users/:userId/status", auth, adminOnly, async (req, res) =>
     const { error } = await supabase.from("users").update({ status }).eq("id", userId);
     if (error) throw error;
     if (status !== "approved") {
+      await destroyUserSessions(userId);
       io.in(`user:${userId}`).disconnectSockets(true);
       onlineUsers.delete(userId);
       io.emit("presence", { userId, online: false });
@@ -351,6 +643,7 @@ app.delete("/api/admin/users/:userId", auth, adminOnly, async (req, res) => {
 
     io.in(`user:${userId}`).disconnectSockets(true);
     onlineUsers.delete(userId);
+    await destroyUserSessions(userId);
     const { error } = await supabase.from("users").delete().eq("id", userId);
     if (error) throw error;
     io.emit("presence", { userId, online: false });
@@ -431,22 +724,23 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     if (!req.file || !receiverId) return res.status(400).json({ error: "Missing file or receiver." });
     const receiver = await getUserById(receiverId, "id,status");
     if (!receiver || receiver.status !== "approved") return res.status(404).json({ error: "Approved receiver not found." });
-    const extension = path.extname(req.file.originalname || "").slice(0, 12).toLowerCase();
+    const verified = await verifyUpload(req.file);
+    const extension = verified.ext ? `.${verified.ext}` : "";
     storagePath = `${req.session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
     const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
-      contentType: req.file.mimetype,
+      contentType: verified.mime,
+      cacheControl: "900",
       upsert: false
     });
     if (uploadError) throw uploadError;
-    const kind = req.file.mimetype.startsWith("image/") ? "image" : (req.file.mimetype.startsWith("audio/") ? "voice" : "file");
     const { data: message, error } = await supabase.from("messages").insert({
       sender_id: req.session.userId,
       receiver_id: receiverId,
-      kind,
-      body: String(req.body.caption || "").slice(0, 500),
+      kind: verified.kind,
+      body: cleanText(req.body.caption, 500),
       file_url: storagePath,
-      file_name: String(req.file.originalname || "file").slice(0, 255),
-      mime_type: req.file.mimetype
+      file_name: cleanFileName(req.file.originalname),
+      mime_type: verified.mime
     }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,created_at").single();
     if (error) throw error;
     const outgoing = await signedMessage({ ...message, sender_name: req.session.username });
@@ -455,7 +749,12 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   } catch (error) {
     if (storagePath) await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]).catch(() => {});
     console.error(error);
-    res.status(400).json({ error: error.message || "Upload failed." });
+    const safeMessages = new Set([
+      "The file content does not match an allowed type.",
+      "This file type is not allowed.",
+      "Text files must use UTF-8 encoding."
+    ]);
+    res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Upload failed." });
   }
 });
 
@@ -479,11 +778,17 @@ io.on("connection", async socket => {
 
   socket.on("privateMessage", async payload => {
     try {
+      if (!eventAllowed(socket, "message", 30, 10 * 1000)) {
+        return socket.emit("message:error", { error: "You are sending messages too quickly." });
+      }
+      if (!payload || typeof payload !== "object" || typeof payload.body !== "string" || payload.body.length > 2000) {
+        return socket.emit("message:error", { error: "Invalid message." });
+      }
       const receiverId = Number(payload.receiverId);
-      const body = String(payload.body || "").trim().slice(0, 2000);
-      if (!receiverId || !body) return;
+      const body = cleanText(payload.body, 2000);
+      if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || !body) return;
       const receiver = await getUserById(receiverId, "id,status");
-      if (!receiver || receiver.status !== "approved") return;
+      if (!receiver || receiver.status !== "approved") return socket.emit("message:error", { error: "Receiver is unavailable." });
       const { data: message, error } = await supabase.from("messages").insert({
         sender_id: userId,
         receiver_id: receiverId,
@@ -499,13 +804,21 @@ io.on("connection", async socket => {
   });
 
   socket.on("typing", payload => {
+    if (!eventAllowed(socket, "typing", 25, 10 * 1000) || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
-    if (receiverId && receiverId !== userId) io.to(`user:${receiverId}`).emit("typing", { userId, username, isTyping: Boolean(payload.isTyping) });
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && receiverId !== userId && onlineUsers.has(receiverId)) {
+      io.to(`user:${receiverId}`).emit("typing", { userId, username, isTyping: payload.isTyping === true });
+    }
   });
 
   socket.on("call:start", payload => {
+    if (!CALLS_ENABLED || !eventAllowed(socket, "call", 10, 60 * 1000) || !payload || typeof payload !== "object") {
+      return socket.emit("call:unavailable", {});
+    }
     const receiverId = Number(payload.receiverId);
-    if (!receiverId || receiverId === userId || !onlineUsers.has(receiverId)) return socket.emit("call:unavailable", { receiverId });
+    if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || receiverId === userId || !onlineUsers.has(receiverId)
+      || !validDescription(payload.offer, "offer")) return socket.emit("call:unavailable", { receiverId });
+    openCallPair(userId, receiverId);
     io.to(`user:${receiverId}`).emit("call:incoming", {
       callerId: userId,
       callerName: username,
@@ -515,47 +828,80 @@ io.on("connection", async socket => {
   });
 
   socket.on("call:answer", payload => {
+    if (!CALLS_ENABLED || !eventAllowed(socket, "call", 40, 60 * 1000) || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
-    if (receiverId) io.to(`user:${receiverId}`).emit("call:answered", { userId, answer: payload.answer });
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validDescription(payload.answer, "answer")) {
+      io.to(`user:${receiverId}`).emit("call:answered", { userId, answer: payload.answer });
+    }
   });
   socket.on("call:ice", payload => {
+    if (!CALLS_ENABLED || !eventAllowed(socket, "ice", 300, 60 * 1000) || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
-    if (receiverId && payload.candidate) io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validIceCandidate(payload.candidate)) {
+      io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
+    }
   });
   socket.on("call:reject", payload => {
+    if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
-    if (receiverId) io.to(`user:${receiverId}`).emit("call:rejected", { userId });
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
+      closeCallPair(userId, receiverId);
+      io.to(`user:${receiverId}`).emit("call:rejected", { userId });
+    }
   });
   socket.on("call:end", payload => {
+    if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
-    if (receiverId) io.to(`user:${receiverId}`).emit("call:ended", { userId });
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
+      closeCallPair(userId, receiverId);
+      io.to(`user:${receiverId}`).emit("call:ended", { userId });
+    }
   });
   socket.on("disconnect", () => {
+    closeUserCallPairs(userId);
     if (removeOnlineSocket(userId, socket.id)) io.emit("presence", { userId, online: false });
   });
 });
 
 app.use((error, req, res, next) => {
   console.error(error);
-  res.status(400).json({ error: error.message || "Request failed." });
+  if (error instanceof multer.MulterError) {
+    const message = error.code === "LIMIT_FILE_SIZE" ? "File is larger than 12 MB." : "The upload request is invalid.";
+    return res.status(400).json({ error: message });
+  }
+  if (error?.type === "entity.too.large") return res.status(413).json({ error: "Request is too large." });
+  res.status(400).json({ error: "Request failed." });
 });
 
 async function start() {
   console.log("Starting ConnectChat Pro with Supabase storage...");
   const { error: databaseError } = await supabase.from("users").select("id,status,is_admin", { head: true, count: "exact" });
   if (databaseError) throw new Error(`Supabase database is not ready: ${databaseError.message}`);
+  const { error: sessionTableError } = await supabase.from("app_sessions").select("sid", { head: true, count: "exact" });
+  if (sessionTableError) throw new Error("Security migration is required. Run security-migration.sql in the Supabase SQL Editor before deploying this release.");
+  const { error: cleanupError } = await supabase.from("app_sessions").delete().lt("expires_at", new Date().toISOString());
+  if (cleanupError) console.error("Could not clean expired sessions:", cleanupError.message);
   const { data: bucket, error: bucketError } = await supabase.storage.getBucket(STORAGE_BUCKET);
   if (bucketError && !String(bucketError.message).toLowerCase().includes("not found")) throw bucketError;
   if (!bucket) {
     const { error } = await supabase.storage.createBucket(STORAGE_BUCKET, {
       public: false,
-      fileSizeLimit: 12 * 1024 * 1024,
+      fileSizeLimit: MAX_UPLOAD_BYTES,
       allowedMimeTypes
     });
     if (error) throw error;
   }
   server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
 }
+
+function shutdown(signal) {
+  console.log(`${signal} received. Closing server...`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10 * 1000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 start().catch(error => {
   console.error(error);

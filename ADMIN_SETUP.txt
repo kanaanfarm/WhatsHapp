@@ -1,0 +1,44 @@
+CONNECTCHAT PRO - ADMINISTRATOR SETUP
+=====================================
+
+Administrator username: Abokanaan
+
+BEFORE DEPLOYING THE ADMIN UPDATE
+---------------------------------
+1. On the current ConnectChat site, register the exact username Abokanaan.
+2. Save its password and recovery code privately.
+3. Open Supabase > SQL Editor > New query.
+4. Paste and run the complete admin-migration.sql file.
+5. The result must show Abokanaan / approved / true.
+
+DEPLOY
+------
+Upload these updated files to GitHub:
+
+Repository root:
+  server.js
+  admin-migration.sql
+  supabase-schema.sql
+  security-migration.sql
+  package.json
+  package-lock.json
+
+Inside public:
+  index.html
+  app.js
+  style.css
+  sw.js
+
+Render redeploys automatically.
+
+USE
+---
+1. Log in as Abokanaan.
+2. Click Manage users.
+3. New accounts appear as Pending.
+4. Click Approve to allow login.
+5. Block immediately prevents access.
+6. Delete permanently removes the user, messages, and associated stored files.
+
+The Abokanaan administrator account is protected from being blocked or deleted
+inside the app. Keep its password and recovery code private.

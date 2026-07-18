@@ -6,5 +6,7 @@
   "background_color": "#eef2f7",
   "theme_color": "#182132",
   "description": "Private chat for mobile and PC",
-  "icons": []
+  "icons": [
+    {"src":"/logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
 }
