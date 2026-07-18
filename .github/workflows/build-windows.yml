@@ -5,7 +5,7 @@ on:
       app_url:
         description: Public HTTPS chat URL
         required: true
-        default: https://chat.example.com
+        default: https://connectchat-pro-kanaan.onrender.com
 jobs:
   build:
     runs-on: windows-latest
