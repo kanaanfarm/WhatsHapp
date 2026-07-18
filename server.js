@@ -72,13 +72,39 @@ function removeOnlineSocket(userId, socketId) {
   return true;
 }
 
-function auth(req, res, next) {
+async function auth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await getUserById(req.session.userId, "id,username,avatar,status,is_admin");
+    if (!user) return res.status(401).json({ error: "Account not found" });
+    if (user.status !== "approved") {
+      return res.status(403).json({
+        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval.",
+        code: String(user.status || "pending").toUpperCase()
+      });
+    }
+    req.currentUser = user;
+    req.session.username = user.username;
+    next();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not verify account." });
+  }
+}
+
+function adminOnly(req, res, next) {
+  if (!req.currentUser?.is_admin) return res.status(403).json({ error: "Administrator access is required." });
   next();
 }
 
 function safeUser(row) {
-  return { id: Number(row.id), username: row.username, avatar: row.avatar || null };
+  return {
+    id: Number(row.id),
+    username: row.username,
+    avatar: row.avatar || null,
+    status: row.status || "approved",
+    isAdmin: Boolean(row.is_admin)
+  };
 }
 
 function normalizeRecoveryCode(value) {
@@ -134,15 +160,20 @@ app.post("/api/register", async (req, res) => {
     const { data, error } = await supabase.from("users").insert({
       username,
       password_hash: passwordHash,
-      recovery_hash: recoveryHash(recoveryCode)
-    }).select("id,username,avatar").single();
+      recovery_hash: recoveryHash(recoveryCode),
+      status: "pending",
+      is_admin: false
+    }).select("id,username,avatar,status,is_admin").single();
     if (error) {
       if (error.code === "23505") return res.status(409).json({ error: "Username already exists." });
       throw error;
     }
-    req.session.userId = Number(data.id);
-    req.session.username = data.username;
-    res.json({ ...safeUser(data), recoveryCode });
+    res.status(201).json({
+      ...safeUser(data),
+      recoveryCode,
+      pending: true,
+      message: "Account created. Wait for administrator approval before logging in."
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Registration failed." });
@@ -153,10 +184,16 @@ app.post("/api/login", async (req, res) => {
   try {
     const username = String(req.body.username || "").trim();
     const password = String(req.body.password || "");
-    const { data: user, error } = await supabase.from("users").select("id,username,avatar,password_hash").eq("username", username).maybeSingle();
+    const { data: user, error } = await supabase.from("users").select("id,username,avatar,password_hash,status,is_admin").eq("username", username).maybeSingle();
     if (error) throw error;
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: "Invalid username or password." });
+    }
+    if (user.status !== "approved") {
+      return res.status(403).json({
+        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval.",
+        code: String(user.status || "pending").toUpperCase()
+      });
     }
     req.session.userId = Number(user.id);
     req.session.username = user.username;
@@ -167,7 +204,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-app.post("/api/logout", auth, (req, res) => req.session.destroy(() => res.json({ ok: true })));
+app.post("/api/logout", (req, res) => req.session.destroy(() => res.json({ ok: true })));
 
 app.post("/api/recovery-code", auth, async (req, res) => {
   try {
@@ -217,8 +254,13 @@ app.post("/api/recover/password", async (req, res) => {
 app.get("/api/me", async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
   try {
-    const user = await getUserById(req.session.userId);
+    const user = await getUserById(req.session.userId, "id,username,avatar,status,is_admin");
     if (!user) return res.status(401).json({ error: "Account not found" });
+    if (user.status !== "approved") {
+      return res.status(403).json({
+        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval."
+      });
+    }
     res.json(safeUser(user));
   } catch (error) {
     console.error(error);
@@ -243,11 +285,88 @@ app.get("/api/call-config", auth, (_, res) => {
   res.json({ iceServers, turnConfigured: Boolean(process.env.TURN_URL) });
 });
 
+app.get("/api/admin/users", auth, adminOnly, async (_, res) => {
+  try {
+    const { data, error } = await supabase.from("users")
+      .select("id,username,status,is_admin,created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json((data || []).map(user => ({
+      id: Number(user.id),
+      username: user.username,
+      status: user.status,
+      isAdmin: Boolean(user.is_admin),
+      createdAt: user.created_at,
+      online: onlineUsers.has(Number(user.id))
+    })));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not load administrator users." });
+  }
+});
+
+app.post("/api/admin/users/:userId/status", auth, adminOnly, async (req, res) => {
+  try {
+    const userId = Number(req.params.userId);
+    const status = String(req.body.status || "").toLowerCase();
+    if (!userId || !["approved", "blocked"].includes(status)) return res.status(400).json({ error: "Invalid user status." });
+    if (userId === Number(req.currentUser.id)) return res.status(400).json({ error: "You cannot change your own administrator status." });
+    const target = await getUserById(userId, "id,is_admin");
+    if (!target) return res.status(404).json({ error: "User not found." });
+    if (target.is_admin) return res.status(400).json({ error: "Another administrator cannot be changed here." });
+    const { error } = await supabase.from("users").update({ status }).eq("id", userId);
+    if (error) throw error;
+    if (status !== "approved") {
+      io.in(`user:${userId}`).disconnectSockets(true);
+      onlineUsers.delete(userId);
+      io.emit("presence", { userId, online: false });
+    }
+    io.emit("users:changed");
+    res.json({ ok: true, status });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not change user status." });
+  }
+});
+
+app.delete("/api/admin/users/:userId", auth, adminOnly, async (req, res) => {
+  try {
+    const userId = Number(req.params.userId);
+    if (!userId) return res.status(400).json({ error: "Invalid user." });
+    if (userId === Number(req.currentUser.id)) return res.status(400).json({ error: "You cannot delete your own administrator account." });
+    const target = await getUserById(userId, "id,is_admin");
+    if (!target) return res.status(404).json({ error: "User not found." });
+    if (target.is_admin) return res.status(400).json({ error: "Another administrator cannot be deleted here." });
+
+    const { data: files, error: fileError } = await supabase.from("messages")
+      .select("file_url")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .not("file_url", "is", null);
+    if (fileError) throw fileError;
+    const storagePaths = [...new Set((files || []).map(row => row.file_url).filter(Boolean))];
+    for (let i = 0; i < storagePaths.length; i += 100) {
+      const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(storagePaths.slice(i, i + 100));
+      if (error) console.error("Could not remove deleted user files:", error.message);
+    }
+
+    io.in(`user:${userId}`).disconnectSockets(true);
+    onlineUsers.delete(userId);
+    const { error } = await supabase.from("users").delete().eq("id", userId);
+    if (error) throw error;
+    io.emit("presence", { userId, online: false });
+    io.emit("users:changed");
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not delete user." });
+  }
+});
+
 app.get("/api/users", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
     const [{ data: users, error: userError }, { data: messages, error: messageError }] = await Promise.all([
-      supabase.from("users").select("id,username,avatar").order("username", { ascending: true }),
+      supabase.from("users").select("id,username,avatar").eq("status", "approved").order("username", { ascending: true }),
       supabase.from("messages").select("id,sender_id,receiver_id,kind,body").or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).order("id", { ascending: false }).limit(2000)
     ]);
     if (userError) throw userError;
@@ -284,6 +403,8 @@ app.get("/api/messages/:userId", auth, async (req, res) => {
     const userId = Number(req.session.userId);
     const otherId = Number(req.params.userId);
     if (!otherId) return res.status(400).json({ error: "Invalid user." });
+    const otherUser = await getUserById(otherId, "id,status");
+    if (!otherUser || otherUser.status !== "approved") return res.status(404).json({ error: "Approved user not found." });
     const { data, error } = await supabase.from("messages")
       .select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,created_at")
       .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
@@ -308,8 +429,8 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   try {
     const receiverId = Number(req.body.receiverId);
     if (!req.file || !receiverId) return res.status(400).json({ error: "Missing file or receiver." });
-    const receiver = await getUserById(receiverId, "id");
-    if (!receiver) return res.status(404).json({ error: "Receiver not found." });
+    const receiver = await getUserById(receiverId, "id,status");
+    if (!receiver || receiver.status !== "approved") return res.status(404).json({ error: "Approved receiver not found." });
     const extension = path.extname(req.file.originalname || "").slice(0, 12).toLowerCase();
     storagePath = `${req.session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
     const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
@@ -338,22 +459,31 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   }
 });
 
-io.on("connection", socket => {
+io.on("connection", async socket => {
   const sess = socket.request.session;
   if (!sess || !sess.userId) return socket.disconnect(true);
   const userId = Number(sess.userId);
-  const username = sess.username;
+  let socketUser;
+  try {
+    socketUser = await getUserById(userId, "id,username,status");
+  } catch (error) {
+    console.error("Socket account verification failed:", error);
+    return socket.disconnect(true);
+  }
+  if (!socketUser || socketUser.status !== "approved") return socket.disconnect(true);
+  const username = socketUser.username;
   socket.join(`user:${userId}`);
   addOnlineSocket(userId, socket.id);
   io.emit("presence", { userId, online: true });
+  socket.emit("presence:snapshot", { userIds: [...onlineUsers.keys()] });
 
   socket.on("privateMessage", async payload => {
     try {
       const receiverId = Number(payload.receiverId);
       const body = String(payload.body || "").trim().slice(0, 2000);
       if (!receiverId || !body) return;
-      const receiver = await getUserById(receiverId, "id");
-      if (!receiver) return;
+      const receiver = await getUserById(receiverId, "id,status");
+      if (!receiver || receiver.status !== "approved") return;
       const { data: message, error } = await supabase.from("messages").insert({
         sender_id: userId,
         receiver_id: receiverId,
@@ -412,7 +542,7 @@ app.use((error, req, res, next) => {
 
 async function start() {
   console.log("Starting ConnectChat Pro with Supabase storage...");
-  const { error: databaseError } = await supabase.from("users").select("id", { head: true, count: "exact" });
+  const { error: databaseError } = await supabase.from("users").select("id,status,is_admin", { head: true, count: "exact" });
   if (databaseError) throw new Error(`Supabase database is not ready: ${databaseError.message}`);
   const { data: bucket, error: bucketError } = await supabase.storage.getBucket(STORAGE_BUCKET);
   if (bucketError && !String(bucketError.message).toLowerCase().includes("not found")) throw bucketError;
