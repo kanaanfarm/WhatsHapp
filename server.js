@@ -26,6 +26,12 @@ const BCRYPT_ROUNDS = 12;
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: IS_PRODUCTION,
+  path: "/"
+};
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
@@ -153,6 +159,14 @@ function requireAppRequest(req, res, next) {
 }
 app.use("/api", requireAppRequest);
 
+// This endpoint intentionally runs before express-session. It lets the client
+// remove a cookie created by an older release even when that stored session can
+// no longer be read by the current session store.
+app.post("/api/session-reset", (req, res) => {
+  res.clearCookie("connectchat.sid", SESSION_COOKIE_OPTIONS);
+  res.json({ ok: true });
+});
+
 function storedSessionId(sid) {
   return crypto.createHash("sha256").update(String(sid)).digest("hex");
 }
@@ -166,13 +180,19 @@ class SupabaseSessionStore extends session.Store {
   get(sid, callback) {
     this.client.from("app_sessions").select("sess,expires_at").eq("sid", storedSessionId(sid)).maybeSingle()
       .then(({ data, error }) => {
-        if (error) return callback(error);
+        if (error) {
+          console.error("Could not read saved session; starting a clean session:", error.message);
+          return callback(null, null);
+        }
         if (!data) return callback(null, null);
         if (new Date(data.expires_at).getTime() <= Date.now()) {
           return this.destroy(sid, destroyError => callback(destroyError || null, null));
         }
         callback(null, data.sess || null);
-      }).catch(callback);
+      }).catch(error => {
+        console.error("Could not read saved session; starting a clean session:", error.message);
+        callback(null, null);
+      });
   }
 
   set(sid, sess, callback = () => {}) {
@@ -213,10 +233,7 @@ const sessionMiddleware = session({
   proxy: IS_PRODUCTION,
   cookie: {
     maxAge: SESSION_MAX_AGE,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: IS_PRODUCTION,
-    path: "/"
+    ...SESSION_COOKIE_OPTIONS
   }
 });
 
@@ -485,7 +502,7 @@ app.post("/api/logout", (req, res) => {
   const userId = Number(req.session.userId);
   req.session.destroy(() => {
     if (userId) io.in(`user:${userId}`).disconnectSockets(true);
-    res.clearCookie("connectchat.sid", { httpOnly: true, sameSite: "lax", secure: IS_PRODUCTION, path: "/" });
+    res.clearCookie("connectchat.sid", SESSION_COOKIE_OPTIONS);
     res.json({ ok: true });
   });
 });
