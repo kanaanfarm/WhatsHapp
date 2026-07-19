@@ -80,7 +80,9 @@ On iPhone Safari, use Share > Add to Home Screen.
 
 IMPORTANT LIMITATIONS
 ---------------------
-Version 1.2.1 adds a strong pilot security baseline and automatically recovers
+Version 1.3.0 adds permanent sender-controlled message and attachment deletion,
+including removal from private Supabase Storage and immediate updates for both
+participants. It also keeps the strong pilot security baseline and recovers
 from stale browser sessions created by an older release. Before commercial or
 large-scale deployment it still requires:
 - HTTPS and a real domain
@@ -96,6 +98,6 @@ large-scale deployment it still requires:
 
 SECURITY UPDATE
 ---------------
-Before deploying 1.2.1, follow SECURITY_SETUP.txt and run
+Before deploying 1.3.0, follow SECURITY_SETUP.txt and run
 security-migration.sql in Supabase. The server intentionally refuses to start
 until the secure session table exists.

@@ -70,3 +70,6 @@ alter table public.app_sessions enable row level security;
 
 -- The Node.js server uses the private service-role key and performs all
 -- account and message authorization. No browser-access policies are required.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table public.app_sessions to service_role;
+revoke all on table public.app_sessions from anon, authenticated;

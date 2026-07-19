@@ -1,5 +1,5 @@
 -- CONNECTCHAT PRO SECURITY MIGRATION
--- Run once in Supabase > SQL Editor before deploying version 1.2.1.
+-- Run once in Supabase > SQL Editor before deploying version 1.3.0.
 -- Safe to run again. It does not delete users, messages, or uploaded files.
 
 create table if not exists public.app_sessions (
@@ -17,6 +17,8 @@ alter table public.app_sessions enable row level security;
 
 -- The Node server uses the private service-role key. No browser policies are
 -- created, so anon/authenticated browser clients cannot read session records.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table public.app_sessions to service_role;
 revoke all on table public.app_sessions from anon, authenticated;
 
 select 'ConnectChat security migration completed' as result;

@@ -734,6 +734,49 @@ app.get("/api/messages/:userId", auth, async (req, res) => {
   }
 });
 
+app.delete("/api/messages/:messageId", auth, async (req, res) => {
+  try {
+    const messageId = Number(req.params.messageId);
+    if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+      return res.status(400).json({ error: "Invalid message." });
+    }
+
+    const { data: message, error: findError } = await supabase.from("messages")
+      .select("id,sender_id,receiver_id,file_url")
+      .eq("id", messageId).maybeSingle();
+    if (findError) throw findError;
+    if (!message) return res.status(404).json({ error: "Message not found." });
+
+    const currentUserId = Number(req.currentUser.id);
+    if (Number(message.sender_id) !== currentUserId && !req.currentUser.is_admin) {
+      return res.status(403).json({ error: "You can delete only messages that you sent." });
+    }
+
+    // Remove the private storage object before deleting its database record so
+    // a successful response never leaves a billable orphaned attachment.
+    if (message.file_url) {
+      const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([message.file_url]);
+      if (storageError) throw storageError;
+    }
+
+    const { data: deleted, error: deleteError } = await supabase.from("messages")
+      .delete().eq("id", messageId).select("id").maybeSingle();
+    if (deleteError) throw deleteError;
+    if (!deleted) return res.status(404).json({ error: "Message was already deleted." });
+
+    const event = {
+      messageId,
+      senderId: Number(message.sender_id),
+      receiverId: Number(message.receiver_id)
+    };
+    io.to(`user:${event.senderId}`).to(`user:${event.receiverId}`).emit("message:deleted", event);
+    res.json({ ok: true, ...event });
+  } catch (error) {
+    console.error("Message deletion failed:", error);
+    res.status(500).json({ error: "Message or attachment could not be deleted." });
+  }
+});
+
 app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   let storagePath;
   try {
