@@ -7,7 +7,7 @@
   <title>ConnectChat Pro</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -55,6 +55,7 @@
 
       <div class="sidebar-actions">
         <button id="adminBtn" class="admin-btn hidden">Manage users</button>
+        <button id="statusBtn" class="status-btn">Status</button>
         <button id="installBtn" class="install-btn hidden">Install app</button>
         <button id="recoveryBtn" class="install-btn">Recovery code</button>
         <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -122,6 +123,29 @@
     </div>
   </section>
 
+  <section id="statusOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card status-dialog">
+      <button id="closeStatusBtn" class="dialog-close" aria-label="Close">×</button>
+      <div class="status-title-row">
+        <div>
+          <h2>24-hour Status</h2>
+          <p class="dialog-intro">Share text, a photo, or a short video. It disappears after 24 hours.</p>
+        </div>
+        <button id="refreshStatusBtn" class="secondary-btn status-refresh">Refresh</button>
+      </div>
+      <div class="status-create">
+        <textarea id="statusText" maxlength="500" placeholder="Write a status or an optional media caption"></textarea>
+        <div class="status-create-actions">
+          <label class="status-file-label" for="statusFile">Choose photo/video</label>
+          <input id="statusFile" type="file" accept="image/*,video/mp4,video/webm,video/quicktime">
+          <button id="postStatusBtn" class="primary">Post status</button>
+        </div>
+        <div id="statusResult" class="dialog-result"></div>
+      </div>
+      <div id="statusesList" class="statuses-list"></div>
+    </div>
+  </section>
+
   <section id="recoveryOverlay" class="dialog-overlay hidden">
     <div class="dialog-card">
       <button id="closeRecoveryBtn" class="dialog-close" aria-label="Close">×</button>
@@ -166,6 +190,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-let authMode="login", me=null, users=[], activeUser=null, socket=null;
+let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let peer=null, localStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let callsEnabled=true;
@@ -105,6 +105,74 @@ $("resetPasswordBtn").onclick=async()=>{
   }catch(e){$("recoveryResult").textContent=e.message}
 };
 
+function statusTimeLeft(expiresAt){
+  const remaining=Math.max(0,new Date(expiresAt).getTime()-Date.now());
+  const hours=Math.floor(remaining/3600000);
+  const minutes=Math.max(1,Math.ceil((remaining%3600000)/60000));
+  return hours?`${hours}h ${minutes}m left`:`${minutes}m left`;
+}
+
+async function loadStatuses(){
+  $("statusResult").textContent="";
+  $("statusesList").innerHTML='<div class="status-empty">Loading statuses…</div>';
+  try{statuses=await api("/api/statuses");renderStatuses()}
+  catch(error){$("statusesList").innerHTML="";$("statusResult").textContent=error.message}
+}
+
+function renderStatuses(){
+  $("statusesList").innerHTML="";
+  if(!statuses.length){$("statusesList").innerHTML='<div class="status-empty">No active statuses. Post the first one.</div>';return}
+  statuses.forEach(status=>{
+    const card=document.createElement("article");
+    card.className=`status-card ${status.viewed&&!status.isOwn?"viewed":""}`;
+    const fileUrl=escapeHtml(safeFileUrl(status.file_url));
+    let content="";
+    if(status.kind==="text")content=`<div class="status-text">${escapeHtml(status.body||"")}</div>`;
+    if(status.kind==="image"&&fileUrl)content=`<img class="status-media" src="${fileUrl}" alt="${escapeHtml(status.username)} status">`;
+    if(status.kind==="video"&&fileUrl)content=`<video class="status-media" src="${fileUrl}" controls playsinline preload="metadata"></video>`;
+    const caption=status.kind!=="text"&&status.body?`<div class="status-caption">${escapeHtml(status.body)}</div>`:"";
+    const details=status.isOwn?`${statusTimeLeft(status.expires_at)} · ${Number(status.viewCount||0)} view${Number(status.viewCount||0)===1?"":"s"}`:`${statusTimeLeft(status.expires_at)}${status.viewed?" · Viewed":""}`;
+    card.innerHTML=`<div class="status-card-head"><div class="avatar ${status.isOwn?"saved-avatar":""}">${status.isOwn?"★":escapeHtml(initials(status.username))}</div><div><strong>${escapeHtml(status.isOwn?`${status.username} (You)`:status.username)}</strong><span>${details}</span></div>${status.isOwn||me.isAdmin?'<button type="button" class="status-delete">Delete</button>':""}</div>${content||'<div class="status-empty">Media unavailable</div>'}${caption}`;
+    const deleteButton=card.querySelector(".status-delete");
+    if(deleteButton)deleteButton.onclick=()=>deleteStatus(status,deleteButton);
+    $("statusesList").appendChild(card);
+    if(!status.isOwn&&!status.viewed){
+      status.viewed=true;
+      api(`/api/statuses/${status.id}/view`,{method:"POST",body:"{}"}).catch(()=>{});
+    }
+  });
+}
+
+async function postStatus(){
+  const text=$("statusText").value.trim();
+  const file=$("statusFile").files[0];
+  if(!text&&!file){$("statusResult").textContent="Write text or choose a photo/video.";return}
+  if(file&&file.size>12*1024*1024){$("statusResult").textContent="Status file must be 12 MB or smaller.";return}
+  const button=$("postStatusBtn");
+  try{
+    button.disabled=true;button.textContent="Posting…";$("statusResult").textContent="";
+    if(file){
+      const form=new FormData();form.append("statusFile",file);form.append("caption",text);
+      await api("/api/statuses/upload",{method:"POST",body:form});
+    }else await api("/api/statuses/text",{method:"POST",body:JSON.stringify({body:text})});
+    $("statusText").value="";$("statusFile").value="";$("statusResult").textContent="Status posted for 24 hours.";
+    await loadStatuses();
+  }catch(error){$("statusResult").textContent=error.message}
+  finally{button.disabled=false;button.textContent="Post status"}
+}
+
+async function deleteStatus(status,button){
+  if(!confirm("Permanently delete this status and its stored media?"))return;
+  try{button.disabled=true;await api(`/api/statuses/${status.id}`,{method:"DELETE"});await loadStatuses();toast("Status deleted.")}
+  catch(error){button.disabled=false;toast(error.message)}
+}
+
+$("statusBtn").onclick=()=>{$("statusOverlay").classList.remove("hidden");loadStatuses()};
+$("closeStatusBtn").onclick=()=>$("statusOverlay").classList.add("hidden");
+$("refreshStatusBtn").onclick=loadStatuses;
+$("postStatusBtn").onclick=postStatus;
+$("statusOverlay").onclick=e=>{if(e.target===$("statusOverlay"))$("statusOverlay").classList.add("hidden")};
+
 async function startApp(){
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
   $("meName").textContent="@"+me.username;
@@ -120,17 +188,21 @@ function connectSocket(){
   socket=io();
   socket.on("connect",refreshUsers);
   socket.on("privateMessage",msg=>{
-    const relevant=activeUser&&(msg.sender_id===activeUser.id||msg.receiver_id===activeUser.id);
-    if(relevant)addMessage(msg);
+    const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
+    if(relevant){
+      addMessage(msg);
+      if(Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)===Number(activeUser.id))socket.emit("message:read",{messageIds:[msg.id]});
+    }
     refreshUsers();
   });
+  socket.on("message:status",updateMessageReceipt);
   socket.on("message:deleted",payload=>{
     removeMessage(payload?.messageId);
     refreshUsers();
   });
   socket.on("presence",p=>{
     const u=users.find(x=>x.id===p.userId);
-    if(u){u.online=p.online;renderUsers();updateHeader()}else refreshUsers()
+    if(u){u.online=p.online;if(p.lastSeenAt)u.lastSeenAt=p.lastSeenAt;renderUsers();updateHeader()}else refreshUsers()
   });
   socket.on("presence:snapshot",p=>{
     const activeIds=new Set((p.userIds||[]).map(Number));
@@ -138,6 +210,9 @@ function connectSocket(){
     renderUsers();updateHeader();
   });
   socket.on("users:changed",()=>{refreshUsers();if(!$("adminOverlay").classList.contains("hidden"))loadAdminUsers()});
+  socket.on("status:changed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
+  socket.on("status:deleted",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
+  socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("typing",p=>{
     if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
   });
@@ -182,6 +257,15 @@ function time(v){
   const value=String(v||"");
   const date=new Date(value.includes("T")?value:value.replace(" ","T")+"Z");
   return Number.isNaN(date.getTime())?"":date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+}
+function lastSeenText(value){
+  if(!value)return "Offline";
+  const date=new Date(value);if(Number.isNaN(date.getTime()))return "Offline";
+  const seconds=Math.max(0,Math.floor((Date.now()-date.getTime())/1000));
+  if(seconds<60)return "Last seen just now";
+  if(seconds<3600)return `Last seen ${Math.floor(seconds/60)} min ago`;
+  if(seconds<86400)return `Last seen ${Math.floor(seconds/3600)} hr ago`;
+  return `Last seen ${date.toLocaleDateString()} ${date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`;
 }
 
 function renderUsers(){
@@ -309,7 +393,7 @@ $("cameraToggleBtn").onclick=()=>{
 function updateHeader(){
   if(!activeUser)return;
   $("chatName").textContent=activeUser.displayName||activeUser.username;
-  $("chatStatus").textContent=activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":"Offline");
+  $("chatStatus").textContent=activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt));
   $("activeAvatar").textContent=activeUser.isSelf?"★":initials(activeUser.username);
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
@@ -328,16 +412,30 @@ function messageContent(msg){
   if(msg.kind!=="text")return `<span>Attachment unavailable</span>${caption}`;
   return escapeHtml(msg.body||"");
 }
+function receiptInfo(value){
+  const readAt=value.readAt||value.read_at;
+  const deliveredAt=value.deliveredAt||value.delivered_at;
+  if(readAt)return {text:"✓✓ Read",className:"receipt read"};
+  if(deliveredAt)return {text:"✓✓ Delivered",className:"receipt"};
+  return {text:"✓ Sent",className:"receipt"};
+}
+function updateMessageReceipt(payload){
+  const id=Number(payload?.messageId);if(!Number.isSafeInteger(id)||id<=0)return;
+  const row=[...$("messages").querySelectorAll(".msg")].find(item=>Number(item.dataset.messageId)===id);
+  const receipt=row?.querySelector(".receipt");if(!receipt)return;
+  const info=receiptInfo(payload);receipt.textContent=info.text;receipt.className=info.className;
+}
 function addMessage(msg){
   const own=Number(msg.sender_id)===Number(me.id);
   const canDelete=own||me.isAdmin;
+  const receipt=receiptInfo(msg);
   if($("messages").classList.contains("empty-state")){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   }
   const row=document.createElement("div");
   row.className=`msg ${own?"own":"other"}`;
   row.dataset.messageId=String(msg.id);
-  row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
+  row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
   const deleteButton=row.querySelector(".message-delete");
   if(deleteButton)deleteButton.onclick=()=>deleteMessage(msg,deleteButton);
   $("messages").appendChild(row);$("messages").scrollTop=$("messages").scrollHeight;
