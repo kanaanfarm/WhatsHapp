@@ -45,7 +45,8 @@ button,input{font:inherit}.hidden{display:none!important}
 .messages{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
 .empty-state{display:grid;place-items:center;text-align:center;color:var(--muted)}
 .msg{max-width:72%;display:flex;flex-direction:column}.msg.own{align-self:flex-end}.msg.other{align-self:flex-start}
-.meta{font-size:11px;color:var(--muted);margin:0 4px 4px}.msg.own .meta{text-align:right}
+.meta{font-size:11px;color:var(--muted);margin:0 4px 4px;display:flex;align-items:center;gap:8px}.msg.own .meta{justify-content:flex-end;text-align:right}
+.message-delete{border:0;background:transparent;color:var(--danger);padding:1px 3px;cursor:pointer;font-size:11px;font-weight:700}.message-delete:hover{text-decoration:underline}.message-delete:disabled{opacity:.45;cursor:wait}
 .bubble{background:var(--panel);padding:10px 12px;border-radius:17px;box-shadow:0 5px 16px rgba(18,28,51,.06);word-wrap:break-word;overflow:hidden}
 .msg.own .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:5px}.msg.other .bubble{border-bottom-left-radius:5px}
 .chat-image{display:block;max-width:320px;width:100%;border-radius:12px;cursor:pointer}

@@ -124,6 +124,10 @@ function connectSocket(){
     if(relevant)addMessage(msg);
     refreshUsers();
   });
+  socket.on("message:deleted",payload=>{
+    removeMessage(payload?.messageId);
+    refreshUsers();
+  });
   socket.on("presence",p=>{
     const u=users.find(x=>x.id===p.userId);
     if(u){u.online=p.online;renderUsers();updateHeader()}else refreshUsers()
@@ -325,11 +329,41 @@ function messageContent(msg){
   return escapeHtml(msg.body||"");
 }
 function addMessage(msg){
-  const own=msg.sender_id===me.id;
+  const own=Number(msg.sender_id)===Number(me.id);
+  const canDelete=own||me.isAdmin;
+  if($("messages").classList.contains("empty-state")){
+    $("messages").classList.remove("empty-state");$("messages").innerHTML="";
+  }
   const row=document.createElement("div");
   row.className=`msg ${own?"own":"other"}`;
-  row.innerHTML=`<div class="meta">${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</div><div class="bubble">${messageContent(msg)}</div>`;
+  row.dataset.messageId=String(msg.id);
+  row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
+  const deleteButton=row.querySelector(".message-delete");
+  if(deleteButton)deleteButton.onclick=()=>deleteMessage(msg,deleteButton);
   $("messages").appendChild(row);$("messages").scrollTop=$("messages").scrollHeight;
+}
+
+function removeMessage(messageId){
+  const id=Number(messageId);
+  if(!Number.isSafeInteger(id)||id<=0)return;
+  const row=[...$("messages").querySelectorAll(".msg")].find(item=>Number(item.dataset.messageId)===id);
+  if(row)row.remove();
+  if(activeUser&&!$("messages").querySelector(".msg")){
+    $("messages").className="messages empty-state";
+    $("messages").innerHTML="<div><h3>No messages</h3><p>Send a message or attachment to begin.</p></div>";
+  }
+}
+
+async function deleteMessage(msg,button){
+  const description=msg.kind==="text"?"this message":"this attachment and its stored file";
+  if(!confirm(`Permanently delete ${description} for everyone?`))return;
+  try{
+    button.disabled=true;
+    await api(`/api/messages/${msg.id}`,{method:"DELETE"});
+    removeMessage(msg.id);await refreshUsers();toast("Message deleted.");
+  }catch(error){
+    button.disabled=false;toast(error.message);
+  }
 }
 
 function send(){
