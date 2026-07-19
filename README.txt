@@ -18,6 +18,9 @@ FEATURES
 - Persistent Supabase PostgreSQL message storage
 - Private Supabase file storage with expiring signed links
 - Online/offline status
+- Last-seen time after a user goes offline
+- Sent, delivered, and read message indicators
+- 24-hour text, photo, and video Status posts with owner view counts
 - Typing indicator
 - Send and paste photos
 - Take a photo from a mobile camera
@@ -80,7 +83,9 @@ On iPhone Safari, use Share > Add to Home Screen.
 
 IMPORTANT LIMITATIONS
 ---------------------
-Version 1.3.0 adds permanent sender-controlled message and attachment deletion,
+Version 1.4.0 adds 24-hour Status posts, online/last-seen information, and
+sent/delivered/read message indicators. It retains permanent sender-controlled
+message and attachment deletion,
 including removal from private Supabase Storage and immediate updates for both
 participants. It also keeps the strong pilot security baseline and recovers
 from stale browser sessions created by an older release. Before commercial or
@@ -98,6 +103,6 @@ large-scale deployment it still requires:
 
 SECURITY UPDATE
 ---------------
-Before deploying 1.3.0, follow SECURITY_SETUP.txt and run
-security-migration.sql in Supabase. The server intentionally refuses to start
-until the secure session table exists.
+Before deploying 1.4.0, follow SECURITY_SETUP.txt and run both
+security-migration.sql and social-migration.sql in Supabase. The server
+intentionally refuses to start until both migrations are complete.

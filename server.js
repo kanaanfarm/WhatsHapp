@@ -25,6 +25,7 @@ const PASSWORD_MIN_LENGTH = 10;
 const BCRYPT_ROUNDS = 12;
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
+const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -71,7 +72,7 @@ const io = new Server(server, {
 
 const allowedMimeTypes = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
-  "audio/webm", "video/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
+  "audio/webm", "video/webm", "video/mp4", "video/quicktime", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
   "application/pdf", "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -143,6 +144,13 @@ const uploadLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Upload limit reached. Please try again later." }
+});
+const statusLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Status posting limit reached. Please try again later." }
 });
 app.use("/api", apiLimiter);
 app.use("/api/login", loginLimiter);
@@ -392,6 +400,60 @@ async function signedMessage(message) {
 
 async function signedMessages(messages) {
   return Promise.all((messages || []).map(signedMessage));
+}
+
+async function signedStatus(status) {
+  if (!status || !status.file_url) return status;
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(status.file_url, SIGNED_URL_SECONDS);
+  if (error) console.error("Could not sign status file URL:", error.message);
+  return { ...status, file_url: data?.signedUrl || null };
+}
+
+async function cleanupExpiredStatuses() {
+  const now = new Date().toISOString();
+  const { data: expired, error } = await supabase.from("user_statuses")
+    .select("id,file_url").lte("expires_at", now).limit(500);
+  if (error) throw error;
+  const removableIds = [];
+  for (const status of expired || []) {
+    if (status.file_url) {
+      const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([status.file_url]);
+      if (storageError) {
+        console.error("Could not remove expired status file:", storageError.message);
+        continue;
+      }
+    }
+    removableIds.push(Number(status.id));
+  }
+  if (removableIds.length) {
+    const { error: deleteError } = await supabase.from("user_statuses").delete().in("id", removableIds);
+    if (deleteError) throw deleteError;
+  }
+}
+
+function messageStatusPayload(message) {
+  return {
+    messageId: Number(message.id),
+    deliveredAt: message.delivered_at || null,
+    readAt: message.read_at || null
+  };
+}
+
+function emitMessageStatus(message) {
+  io.to(`user:${Number(message.sender_id)}`).emit("message:status", messageStatusPayload(message));
+}
+
+async function markPendingMessagesDelivered(receiverId) {
+  const deliveredAt = new Date().toISOString();
+  const { data: pending, error: findError } = await supabase.from("messages")
+    .select("id,sender_id,receiver_id,read_at")
+    .eq("receiver_id", receiverId).is("delivered_at", null).limit(2000);
+  if (findError) throw findError;
+  const ids = (pending || []).map(message => Number(message.id));
+  if (!ids.length) return;
+  const { error: updateError } = await supabase.from("messages").update({ delivered_at: deliveredAt }).in("id", ids);
+  if (updateError) throw updateError;
+  for (const message of pending) emitMessageStatus({ ...message, delivered_at: deliveredAt });
 }
 
 const upload = multer({
@@ -647,12 +709,15 @@ app.delete("/api/admin/users/:userId", auth, adminOnly, async (req, res) => {
     if (!target) return res.status(404).json({ error: "User not found." });
     if (target.is_admin) return res.status(400).json({ error: "Another administrator cannot be deleted here." });
 
-    const { data: files, error: fileError } = await supabase.from("messages")
-      .select("file_url")
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-      .not("file_url", "is", null);
-    if (fileError) throw fileError;
-    const storagePaths = [...new Set((files || []).map(row => row.file_url).filter(Boolean))];
+    const [messageFilesResult, statusFilesResult] = await Promise.all([
+      supabase.from("messages").select("file_url")
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).not("file_url", "is", null),
+      supabase.from("user_statuses").select("file_url").eq("user_id", userId).not("file_url", "is", null)
+    ]);
+    if (messageFilesResult.error) throw messageFilesResult.error;
+    if (statusFilesResult.error) throw statusFilesResult.error;
+    const storagePaths = [...new Set([...(messageFilesResult.data || []), ...(statusFilesResult.data || [])]
+      .map(row => row.file_url).filter(Boolean))];
     for (let i = 0; i < storagePaths.length; i += 100) {
       const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(storagePaths.slice(i, i + 100));
       if (error) console.error("Could not remove deleted user files:", error.message);
@@ -676,7 +741,7 @@ app.get("/api/users", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
     const [{ data: users, error: userError }, { data: messages, error: messageError }] = await Promise.all([
-      supabase.from("users").select("id,username,avatar").eq("status", "approved").order("username", { ascending: true }),
+      supabase.from("users").select("id,username,avatar,last_seen_at").eq("status", "approved").order("username", { ascending: true }),
       supabase.from("messages").select("id,sender_id,receiver_id,kind,body").or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).order("id", { ascending: false }).limit(2000)
     ]);
     if (userError) throw userError;
@@ -697,6 +762,7 @@ app.get("/api/users", auth, async (req, res) => {
         isSelf,
         displayName: isSelf ? `${user.username} (You)` : user.username,
         online: isSelf || onlineUsers.has(id),
+        lastSeenAt: user.last_seen_at || null,
         lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation")
       };
     });
@@ -716,7 +782,7 @@ app.get("/api/messages/:userId", auth, async (req, res) => {
     const otherUser = await getUserById(otherId, "id,status");
     if (!otherUser || otherUser.status !== "approved") return res.status(404).json({ error: "Approved user not found." });
     const { data, error } = await supabase.from("messages")
-      .select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,created_at")
+      .select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,delivered_at,read_at,created_at")
       .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
       .order("id", { ascending: false }).limit(1000);
     if (error) throw error;
@@ -726,6 +792,23 @@ app.get("/api/messages/:userId", auth, async (req, res) => {
       : { data: [], error: null };
     if (senderError) throw senderError;
     const names = new Map((senders || []).map(user => [Number(user.id), user.username]));
+    const readAt = new Date().toISOString();
+    const incomingUnread = (data || []).filter(message => Number(message.receiver_id) === userId && !message.read_at);
+    const undeliveredIds = incomingUnread.filter(message => !message.delivered_at).map(message => Number(message.id));
+    const unreadIds = incomingUnread.map(message => Number(message.id));
+    if (undeliveredIds.length) {
+      const { error: deliveredError } = await supabase.from("messages").update({ delivered_at: readAt }).in("id", undeliveredIds);
+      if (deliveredError) throw deliveredError;
+    }
+    if (unreadIds.length) {
+      const { error: readError } = await supabase.from("messages").update({ read_at: readAt }).in("id", unreadIds);
+      if (readError) throw readError;
+      for (const message of incomingUnread) {
+        message.delivered_at ||= readAt;
+        message.read_at = readAt;
+        emitMessageStatus(message);
+      }
+    }
     const messages = (data || []).reverse().map(message => ({ ...message, sender_name: names.get(Number(message.sender_id)) || "User" }));
     res.json(await signedMessages(messages));
   } catch (error) {
@@ -777,6 +860,158 @@ app.delete("/api/messages/:messageId", auth, async (req, res) => {
   }
 });
 
+app.get("/api/statuses", auth, async (req, res) => {
+  try {
+    await cleanupExpiredStatuses();
+    const now = new Date().toISOString();
+    const { data: statuses, error: statusError } = await supabase.from("user_statuses")
+      .select("id,user_id,kind,body,file_url,file_name,mime_type,created_at,expires_at")
+      .gt("expires_at", now).order("created_at", { ascending: false }).limit(200);
+    if (statusError) throw statusError;
+    const statusIds = (statuses || []).map(status => Number(status.id));
+    const userIds = [...new Set((statuses || []).map(status => Number(status.user_id)))];
+    const [{ data: statusUsers, error: userError }, viewResult] = await Promise.all([
+      userIds.length
+        ? supabase.from("users").select("id,username").in("id", userIds).eq("status", "approved")
+        : Promise.resolve({ data: [], error: null }),
+      statusIds.length
+        ? supabase.from("status_views").select("status_id,viewer_id").in("status_id", statusIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+    if (userError) throw userError;
+    if (viewResult.error) throw viewResult.error;
+    const names = new Map((statusUsers || []).map(user => [Number(user.id), user.username]));
+    const approvedIds = new Set(names.keys());
+    const viewerId = Number(req.currentUser.id);
+    const viewed = new Set((viewResult.data || []).filter(row => Number(row.viewer_id) === viewerId).map(row => Number(row.status_id)));
+    const viewCounts = new Map();
+    for (const row of viewResult.data || []) {
+      const id = Number(row.status_id);
+      viewCounts.set(id, (viewCounts.get(id) || 0) + 1);
+    }
+    const result = await Promise.all((statuses || []).filter(status => approvedIds.has(Number(status.user_id))).map(async status => {
+      const userId = Number(status.user_id);
+      const isOwn = userId === viewerId;
+      return signedStatus({
+        ...status,
+        user_id: userId,
+        username: names.get(userId) || "User",
+        isOwn,
+        viewed: isOwn || viewed.has(Number(status.id)),
+        viewCount: isOwn ? (viewCounts.get(Number(status.id)) || 0) : undefined
+      });
+    }));
+    res.json(result);
+  } catch (error) {
+    console.error("Could not load statuses:", error);
+    res.status(500).json({ error: "Could not load statuses." });
+  }
+});
+
+app.post("/api/statuses/text", statusLimiter, auth, async (req, res) => {
+  try {
+    const body = cleanText(req.body.body, 500);
+    if (!body) return res.status(400).json({ error: "Enter status text." });
+    const expiresAt = new Date(Date.now() + STATUS_LIFETIME_MS).toISOString();
+    const { data: status, error } = await supabase.from("user_statuses").insert({
+      user_id: req.currentUser.id,
+      kind: "text",
+      body,
+      expires_at: expiresAt
+    }).select("id,user_id,kind,body,file_url,file_name,mime_type,created_at,expires_at").single();
+    if (error) throw error;
+    io.emit("status:changed", { userId: Number(req.currentUser.id) });
+    res.status(201).json({ ...status, username: req.currentUser.username, isOwn: true, viewed: true, viewCount: 0 });
+  } catch (error) {
+    console.error("Could not post text status:", error);
+    res.status(500).json({ error: "Status could not be posted." });
+  }
+});
+
+app.post("/api/statuses/upload", statusLimiter, auth, upload.single("statusFile"), async (req, res) => {
+  let storagePath;
+  try {
+    if (!req.file) return res.status(400).json({ error: "Choose a photo or video." });
+    const verified = await verifyUpload(req.file);
+    const kind = verified.mime.startsWith("image/") ? "image" : (verified.mime.startsWith("video/") ? "video" : null);
+    if (!kind) return res.status(400).json({ error: "Status supports photos and videos only." });
+    const extension = verified.ext ? `.${verified.ext}` : "";
+    storagePath = `statuses/${req.currentUser.id}/${Date.now()}-${crypto.randomUUID()}${extension}`;
+    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
+      contentType: verified.mime,
+      cacheControl: "900",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const expiresAt = new Date(Date.now() + STATUS_LIFETIME_MS).toISOString();
+    const { data: status, error } = await supabase.from("user_statuses").insert({
+      user_id: req.currentUser.id,
+      kind,
+      body: cleanText(req.body.caption, 300),
+      file_url: storagePath,
+      file_name: cleanFileName(req.file.originalname),
+      mime_type: verified.mime,
+      expires_at: expiresAt
+    }).select("id,user_id,kind,body,file_url,file_name,mime_type,created_at,expires_at").single();
+    if (error) throw error;
+    io.emit("status:changed", { userId: Number(req.currentUser.id) });
+    res.status(201).json(await signedStatus({ ...status, username: req.currentUser.username, isOwn: true, viewed: true, viewCount: 0 }));
+  } catch (error) {
+    if (storagePath) await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]).catch(() => {});
+    console.error("Could not post media status:", error);
+    res.status(400).json({ error: "Photo or video status could not be posted." });
+  }
+});
+
+app.post("/api/statuses/:statusId/view", auth, async (req, res) => {
+  try {
+    const statusId = Number(req.params.statusId);
+    if (!Number.isSafeInteger(statusId) || statusId <= 0) return res.status(400).json({ error: "Invalid status." });
+    const { data: status, error: findError } = await supabase.from("user_statuses")
+      .select("id,user_id,expires_at").eq("id", statusId).maybeSingle();
+    if (findError) throw findError;
+    if (!status || new Date(status.expires_at).getTime() <= Date.now()) return res.status(404).json({ error: "Status expired." });
+    const viewerId = Number(req.currentUser.id);
+    if (Number(status.user_id) !== viewerId) {
+      const { error } = await supabase.from("status_views").upsert({ status_id: statusId, viewer_id: viewerId }, {
+        onConflict: "status_id,viewer_id",
+        ignoreDuplicates: true
+      });
+      if (error) throw error;
+      io.to(`user:${Number(status.user_id)}`).emit("status:viewed", { statusId });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Could not mark status viewed:", error);
+    res.status(500).json({ error: "Status view could not be saved." });
+  }
+});
+
+app.delete("/api/statuses/:statusId", auth, async (req, res) => {
+  try {
+    const statusId = Number(req.params.statusId);
+    if (!Number.isSafeInteger(statusId) || statusId <= 0) return res.status(400).json({ error: "Invalid status." });
+    const { data: status, error: findError } = await supabase.from("user_statuses")
+      .select("id,user_id,file_url").eq("id", statusId).maybeSingle();
+    if (findError) throw findError;
+    if (!status) return res.status(404).json({ error: "Status not found." });
+    if (Number(status.user_id) !== Number(req.currentUser.id) && !req.currentUser.is_admin) {
+      return res.status(403).json({ error: "You cannot delete this status." });
+    }
+    if (status.file_url) {
+      const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([status.file_url]);
+      if (storageError) throw storageError;
+    }
+    const { error: deleteError } = await supabase.from("user_statuses").delete().eq("id", statusId);
+    if (deleteError) throw deleteError;
+    io.emit("status:deleted", { statusId, userId: Number(status.user_id) });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Could not delete status:", error);
+    res.status(500).json({ error: "Status could not be deleted." });
+  }
+});
+
 app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   let storagePath;
   try {
@@ -793,6 +1028,9 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
       upsert: false
     });
     if (uploadError) throw uploadError;
+    const receiptTime = new Date().toISOString();
+    const deliveredAt = receiverId === Number(req.session.userId) || onlineUsers.has(receiverId) ? receiptTime : null;
+    const readAt = receiverId === Number(req.session.userId) ? receiptTime : null;
     const { data: message, error } = await supabase.from("messages").insert({
       sender_id: req.session.userId,
       receiver_id: receiverId,
@@ -800,8 +1038,10 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
       body: cleanText(req.body.caption, 500),
       file_url: storagePath,
       file_name: cleanFileName(req.file.originalname),
-      mime_type: verified.mime
-    }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,created_at").single();
+      mime_type: verified.mime,
+      delivered_at: deliveredAt,
+      read_at: readAt
+    }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,delivered_at,read_at,created_at").single();
     if (error) throw error;
     const outgoing = await signedMessage({ ...message, sender_name: req.session.username });
     io.to(`user:${req.session.userId}`).to(`user:${receiverId}`).emit("privateMessage", outgoing);
@@ -835,6 +1075,7 @@ io.on("connection", async socket => {
   addOnlineSocket(userId, socket.id);
   io.emit("presence", { userId, online: true });
   socket.emit("presence:snapshot", { userIds: [...onlineUsers.keys()] });
+  markPendingMessagesDelivered(userId).catch(error => console.error("Could not mark pending messages delivered:", error));
 
   socket.on("privateMessage", async payload => {
     try {
@@ -849,17 +1090,48 @@ io.on("connection", async socket => {
       if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || !body) return;
       const receiver = await getUserById(receiverId, "id,status");
       if (!receiver || receiver.status !== "approved") return socket.emit("message:error", { error: "Receiver is unavailable." });
+      const receiptTime = new Date().toISOString();
+      const deliveredAt = receiverId === userId || onlineUsers.has(receiverId) ? receiptTime : null;
+      const readAt = receiverId === userId ? receiptTime : null;
       const { data: message, error } = await supabase.from("messages").insert({
         sender_id: userId,
         receiver_id: receiverId,
         kind: "text",
-        body
-      }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,created_at").single();
+        body,
+        delivered_at: deliveredAt,
+        read_at: readAt
+      }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,delivered_at,read_at,created_at").single();
       if (error) throw error;
       io.to(`user:${userId}`).to(`user:${receiverId}`).emit("privateMessage", { ...message, sender_name: username });
     } catch (error) {
       console.error("Message failed:", error);
       socket.emit("message:error", { error: "Message could not be sent." });
+    }
+  });
+
+  socket.on("message:read", async payload => {
+    try {
+      if (!eventAllowed(socket, "read", 60, 10 * 1000) || !payload || typeof payload !== "object") return;
+      const messageIds = [...new Set((Array.isArray(payload.messageIds) ? payload.messageIds : [])
+        .map(Number).filter(id => Number.isSafeInteger(id) && id > 0))].slice(0, 100);
+      if (!messageIds.length) return;
+      const { data: messages, error: findError } = await supabase.from("messages")
+        .select("id,sender_id,receiver_id,delivered_at,read_at")
+        .in("id", messageIds).eq("receiver_id", userId);
+      if (findError) throw findError;
+      const unread = (messages || []).filter(message => !message.read_at);
+      if (!unread.length) return;
+      const readAt = new Date().toISOString();
+      const undeliveredIds = unread.filter(message => !message.delivered_at).map(message => Number(message.id));
+      if (undeliveredIds.length) {
+        const { error } = await supabase.from("messages").update({ delivered_at: readAt }).in("id", undeliveredIds);
+        if (error) throw error;
+      }
+      const { error: readError } = await supabase.from("messages").update({ read_at: readAt }).in("id", unread.map(message => Number(message.id)));
+      if (readError) throw readError;
+      for (const message of unread) emitMessageStatus({ ...message, delivered_at: message.delivered_at || readAt, read_at: readAt });
+    } catch (error) {
+      console.error("Could not mark messages read:", error);
     }
   });
 
@@ -919,7 +1191,13 @@ io.on("connection", async socket => {
   });
   socket.on("disconnect", () => {
     closeUserCallPairs(userId);
-    if (removeOnlineSocket(userId, socket.id)) io.emit("presence", { userId, online: false });
+    if (removeOnlineSocket(userId, socket.id)) {
+      const lastSeenAt = new Date().toISOString();
+      supabase.from("users").update({ last_seen_at: lastSeenAt }).eq("id", userId)
+        .then(({ error }) => { if (error) console.error("Could not update last seen:", error.message); })
+        .catch(error => console.error("Could not update last seen:", error));
+      io.emit("presence", { userId, online: false, lastSeenAt });
+    }
   });
 });
 
@@ -939,6 +1217,15 @@ async function start() {
   if (databaseError) throw new Error(`Supabase database is not ready: ${databaseError.message}`);
   const { error: sessionTableError } = await supabase.from("app_sessions").select("sid", { head: true, count: "exact" });
   if (sessionTableError) throw new Error("Security migration is required. Run security-migration.sql in the Supabase SQL Editor before deploying this release.");
+  const socialChecks = await Promise.all([
+    supabase.from("users").select("last_seen_at", { head: true, count: "exact" }),
+    supabase.from("messages").select("delivered_at,read_at", { head: true, count: "exact" }),
+    supabase.from("user_statuses").select("id", { head: true, count: "exact" }),
+    supabase.from("status_views").select("status_id", { head: true, count: "exact" })
+  ]);
+  if (socialChecks.some(result => result.error)) {
+    throw new Error("Social migration is required. Run social-migration.sql in the Supabase SQL Editor before deploying this release.");
+  }
   const { error: cleanupError } = await supabase.from("app_sessions").delete().lt("expires_at", new Date().toISOString());
   if (cleanupError) console.error("Could not clean expired sessions:", cleanupError.message);
   const { data: bucket, error: bucketError } = await supabase.storage.getBucket(STORAGE_BUCKET);
@@ -950,7 +1237,15 @@ async function start() {
       allowedMimeTypes
     });
     if (error) throw error;
+  } else {
+    const { error } = await supabase.storage.updateBucket(STORAGE_BUCKET, {
+      public: false,
+      fileSizeLimit: MAX_UPLOAD_BYTES,
+      allowedMimeTypes
+    });
+    if (error) throw error;
   }
+  await cleanupExpiredStatuses();
   server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
 }
 

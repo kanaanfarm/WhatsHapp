@@ -1,5 +1,5 @@
 -- CONNECTCHAT PRO SECURITY MIGRATION
--- Run once in Supabase > SQL Editor before deploying version 1.3.0.
+-- Run once in Supabase > SQL Editor before deploying version 1.4.0.
 -- Safe to run again. It does not delete users, messages, or uploaded files.
 
 create table if not exists public.app_sessions (

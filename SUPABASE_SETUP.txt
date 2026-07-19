@@ -16,7 +16,7 @@ CONNECTCHAT PRO - FREE PERSISTENT STORAGE SETUP
 7. Upload the updated package.json, package-lock.json, server.js and public
    files to GitHub. Render will redeploy automatically.
 
-SECURITY VERSION 1.3.0
+SECURITY AND SOCIAL VERSION 1.4.0
 ----------------------
 For an existing database, also run security-migration.sql before deploying.
 This creates the private server-session table and does not delete any account,

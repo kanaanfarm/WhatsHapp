@@ -1,4 +1,4 @@
-CONNECTCHAT PRO 1.3.0 - SECURITY UPDATE
+CONNECTCHAT PRO 1.4.0 - SECURITY AND SOCIAL UPDATE
 =======================================
 
 IMPORTANT: DO THIS BEFORE DEPLOYING
@@ -7,6 +7,8 @@ IMPORTANT: DO THIS BEFORE DEPLOYING
 2. Paste the complete contents of security-migration.sql.
 3. Click Run.
 4. Confirm the result says: ConnectChat security migration completed.
+5. Open another new query and paste the complete contents of social-migration.sql.
+6. Click Run and confirm: ConnectChat social migration completed.
 
 RENDER ENVIRONMENT
 ------------------
@@ -23,11 +25,11 @@ new-format recovery codes.
 
 DEPLOYMENT ORDER
 ----------------
-1. Run security-migration.sql in Supabase.
+1. Run security-migration.sql and social-migration.sql in Supabase.
 2. Add PUBLIC_ORIGIN and CALLS_ENABLED in Render Environment.
 3. Upload the new package files to GitHub.
 4. Let Render deploy, or use Manual Deploy > Deploy latest commit.
-5. Test login, messaging, upload, logout, and administrator approval.
+5. Test login, messaging, receipts, Status, last seen, upload, logout, and administrator approval.
 6. Rebuild the Windows installer from GitHub Actions.
 
 WHAT THIS UPDATE PROTECTS

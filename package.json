@@ -1,6 +1,6 @@
 {
   "name": "connectchat-pro",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Cross-platform chat PWA with private messaging, images, camera uploads, and voice notes",
   "main": "server.js",

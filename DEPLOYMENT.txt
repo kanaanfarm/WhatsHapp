@@ -27,7 +27,7 @@ IMPORTANT
   be served over HTTPS.
 - STUN-only calls are not reliable across all mobile operators and firewalls.
 - This package is suitable for controlled pilot/small-team use on one server.
-- Supabase-backed sessions, abuse limits, and secure message deletion are included in version 1.3.0.
+- Supabase-backed sessions, abuse limits, secure deletion, Status, last seen, and message receipts are included in version 1.4.0.
 - Before commercial or large-scale use, add email/phone verification,
   moderation, malware scanning, monitoring, backups, and a professional review.
 
