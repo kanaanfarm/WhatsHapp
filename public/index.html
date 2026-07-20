@@ -64,13 +64,14 @@
 
     <main id="chatPanel" class="chat">
       <header class="chat-head">
-        <button id="backBtn" class="back-btn">←</button>
+        <button id="backBtn" class="back-btn" title="Return to conversations">☰ <span>Chats</span></button>
         <div class="active-avatar" id="activeAvatar">?</div>
         <div>
           <h2 id="chatName">Select a user</h2>
           <span id="chatStatus">Start a private conversation</span>
         </div>
         <div class="call-actions">
+          <button id="clearAiBtn" class="ai-clear-btn hidden" title="Delete all AI chat history">Delete AI Chat</button>
           <button id="audioCallBtn" class="header-btn" title="Audio call" disabled>☎</button>
           <button id="videoCallBtn" class="header-btn" title="Video call" disabled>📹</button>
         </div>

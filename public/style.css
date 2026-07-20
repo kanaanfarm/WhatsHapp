@@ -41,8 +41,8 @@ button,input{font:inherit}.hidden{display:none!important}
 .chat{display:grid;grid-template-rows:auto 1fr auto auto auto;background:var(--soft);min-width:0}
 .chat-head{height:78px;padding:0 22px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
 .chat-head h2{margin:0;font-size:18px}.chat-head span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
-.call-actions{margin-left:auto;display:flex;gap:8px}.header-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:50%;background:var(--soft);cursor:pointer}.header-btn:disabled{opacity:.4;cursor:not-allowed}
-.back-btn{display:none;border:0;background:transparent;font-size:24px;cursor:pointer}
+.call-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.ai-clear-btn{border:1px solid rgba(229,62,62,.35);background:rgba(229,62,62,.08);color:var(--danger);font-weight:700;border-radius:10px;padding:9px 11px;cursor:pointer}.ai-clear-btn:hover{background:rgba(229,62,62,.14)}.header-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:50%;background:var(--soft);cursor:pointer}.header-btn:disabled{opacity:.4;cursor:not-allowed}
+.back-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--soft);padding:9px 11px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}.back-btn:hover{border-color:var(--accent)}
 .messages{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
 .empty-state{display:grid;place-items:center;text-align:center;color:var(--muted)}
 .msg{max-width:72%;display:flex;flex-direction:column}.msg.own{align-self:flex-end}.msg.other{align-self:flex-start}
@@ -93,7 +93,7 @@ button,input{font:inherit}.hidden{display:none!important}
   .sidebar.mobile-hidden{display:none}
   .chat{position:absolute;inset:0;z-index:4}
   .chat.mobile-hidden{display:none}
-  .back-btn{display:block}
+  .back-btn{display:inline-flex}.back-btn span{display:none}
   .chat-head{padding:0 12px}.call-actions{gap:4px}.header-btn{width:38px;height:38px}
   .messages{padding:14px}
   .msg{max-width:88%}

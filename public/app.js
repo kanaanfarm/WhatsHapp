@@ -250,7 +250,7 @@ async function refreshUsers(){
 function resetConversation(){
   $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
   $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
-  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
+  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;$("clearAiBtn").classList.add("hidden");
 }
 
 function initials(name){return name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
@@ -402,6 +402,7 @@ function updateHeader(){
   $("chatName").textContent=activeUser.displayName||activeUser.username;
   $("chatStatus").textContent=activeUser.isAI?"AI assistant · Arabic & English":(activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt)));
   $("activeAvatar").textContent=activeUser.isAI?"AI":(activeUser.isSelf?"★":initials(activeUser.username));
+  $("clearAiBtn").classList.toggle("hidden",!activeUser.isAI);
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
 }
@@ -434,7 +435,7 @@ function updateMessageReceipt(payload){
 }
 function addMessage(msg){
   const own=Number(msg.sender_id)===Number(me.id);
-  const canDelete=!msg.ai&&(own||me.isAdmin);
+  const canDelete=Boolean(msg.ai)||(own||me.isAdmin);
   const receipt=receiptInfo(msg);
   if($("messages").classList.contains("empty-state")){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -444,14 +445,13 @@ function addMessage(msg){
   row.dataset.messageId=String(msg.id);
   row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
   const deleteButton=row.querySelector(".message-delete");
-  if(deleteButton)deleteButton.onclick=()=>deleteMessage(msg,deleteButton);
+  if(deleteButton)deleteButton.onclick=()=>msg.ai?deleteAiMessage(msg):deleteMessage(msg,deleteButton);
   $("messages").appendChild(row);$("messages").scrollTop=$("messages").scrollHeight;
 }
 
 function removeMessage(messageId){
-  const id=Number(messageId);
-  if(!Number.isSafeInteger(id)||id<=0)return;
-  const row=[...$("messages").querySelectorAll(".msg")].find(item=>Number(item.dataset.messageId)===id);
+  const key=String(messageId);
+  const row=[...$("messages").querySelectorAll(".msg")].find(item=>String(item.dataset.messageId)===key);
   if(row)row.remove();
   if(activeUser&&!$("messages").querySelector(".msg")){
     $("messages").className="messages empty-state";
@@ -470,6 +470,24 @@ async function deleteMessage(msg,button){
     button.disabled=false;toast(error.message);
   }
 }
+
+
+function deleteAiMessage(msg){
+  const items=loadAiHistory().filter(item=>String(item.id)!==String(msg.id));
+  saveAiHistory(items);
+  removeMessage(msg.id);
+  if(!items.length)showAiWelcome();
+  toast("AI message deleted.");
+}
+
+function clearAiChat(){
+  if(!activeUser?.isAI)return;
+  if(!confirm("Delete the complete ConnectChat AI conversation from this browser?"))return;
+  localStorage.removeItem(AI_HISTORY_KEY);
+  showAiWelcome();
+  toast("AI chat deleted.");
+}
+$("clearAiBtn").onclick=clearAiChat;
 
 function loadAiHistory(){
   try{return JSON.parse(localStorage.getItem(AI_HISTORY_KEY)||"[]").filter(x=>x&&typeof x.body==="string").slice(-40)}catch{return []}
@@ -561,7 +579,13 @@ $("recordBtn").onclick=async()=>{
 };
 
 $("backBtn").onclick=()=>{
-  if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
+  if(window.innerWidth<=760){
+    $("chatPanel").classList.add("mobile-hidden");
+    $("sidebar").classList.remove("mobile-hidden");
+  }else{
+    $("userSearch").focus();
+    $("sidebar").scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
 };
 $("logoutBtn").onclick=async()=>{if(socket)socket.disconnect();await api("/api/logout",{method:"POST"});location.reload()};
 $("recoveryBtn").onclick=async()=>{
