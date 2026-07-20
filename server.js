@@ -1,4 +1,4 @@
-CONNECTCHAT AI - FREE DEMO MODE
+// CONNECTCHAT AI - FREE DEMO MODE
 ================================
 
 The included configuration supports a free Demo Mode. No OpenAI API key or payment is required.
