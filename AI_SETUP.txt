@@ -1,31 +1,30 @@
-CONNECTCHAT AI SETUP
-====================
+CONNECTCHAT AI - FREE DEMO MODE
+================================
 
-1. Open your hosting service environment variables.
-2. Add:
-   AI_ENABLED=true
-   OPENAI_API_KEY=your_private_OpenAI_API_key
-   OPENAI_MODEL=gpt-4.1-mini
-3. Restart or redeploy the server.
-4. Log in. "ConnectChat AI" will appear at the top of the contacts list.
+The included configuration supports a free Demo Mode. No OpenAI API key or payment is required.
 
-SECURITY
---------
-- Never put OPENAI_API_KEY in public/app.js, index.html, GitHub, or screenshots.
-- The key is used only by server.js.
-- AI requests require a logged-in and approved ConnectChat account.
-- The server applies an AI rate limit.
+RENDER ENVIRONMENT VARIABLES FOR FREE TESTING
+---------------------------------------------
+AI_DEMO_MODE=true
+AI_ENABLED=false
 
-CURRENT AI FEATURES
+Do not add OPENAI_API_KEY during free testing.
+
+WHAT DEMO MODE DOES
 -------------------
-- Text questions and answers
-- Arabic and English
-- Short conversation memory saved in the user's browser
-- MEP/HVAC/construction and general assistance
+- Shows ConnectChat AI at the top of the users list.
+- Lets approved logged-in users open the AI conversation.
+- Tests sending, receiving, loading indicators, Arabic and English replies.
+- Uses simulated built-in replies. It is not a real ChatGPT model.
+- Does not charge anything.
 
-NOT INCLUDED IN THIS RELEASE
-----------------------------
-- AI analysis of uploaded files, images, or voice notes
-- Cloud-synced AI conversation history
+ENABLE REAL AI LATER
+--------------------
+After you are satisfied with the application, create an API key and change Render variables to:
 
-These can be added later after the basic AI text service is tested and the API billing limit is configured.
+AI_DEMO_MODE=false
+AI_ENABLED=true
+OPENAI_API_KEY=your_private_api_key
+OPENAI_MODEL=gpt-4.1-mini
+
+Never place a real API key in GitHub or public browser files.
