@@ -2,6 +2,8 @@ let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let peer=null, localStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let callsEnabled=true;
+let aiBusy=false;
+const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const $=id=>document.getElementById(id);
 
 function toast(text){
@@ -275,9 +277,9 @@ function renderUsers(){
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
     const name=u.displayName||u.username;
-    const avatar=u.isSelf?"★":initials(u.username);
+    const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
     const preview=u.isSelf&&!u.lastPreview?"Your private space":(u.lastPreview||"Start a conversation");
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
   });
 }
@@ -286,9 +288,14 @@ $("userSearch").oninput=renderUsers;
 async function selectUser(u){
   activeUser=u;renderUsers();updateHeader();
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
-  $("audioCallBtn").disabled=!callsEnabled||u.isSelf;$("videoCallBtn").disabled=!callsEnabled||u.isSelf;
+  $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
-  const history=await api(`/api/messages/${u.id}`);history.forEach(addMessage);
+  if(u.isAI){
+    loadAiHistory().forEach(addMessage);
+    if(!$("messages").children.length)showAiWelcome();
+  }else{
+    const history=await api(`/api/messages/${u.id}`);history.forEach(addMessage);
+  }
   if(window.innerWidth<=760){$("sidebar").classList.add("mobile-hidden");$("chatPanel").classList.remove("mobile-hidden")}
   $("messageInput").focus();
 }
@@ -393,10 +400,10 @@ $("cameraToggleBtn").onclick=()=>{
 function updateHeader(){
   if(!activeUser)return;
   $("chatName").textContent=activeUser.displayName||activeUser.username;
-  $("chatStatus").textContent=activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt));
-  $("activeAvatar").textContent=activeUser.isSelf?"★":initials(activeUser.username);
-  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
-  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||!callsEnabled);
+  $("chatStatus").textContent=activeUser.isAI?"AI assistant · Arabic & English":(activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt)));
+  $("activeAvatar").textContent=activeUser.isAI?"AI":(activeUser.isSelf?"★":initials(activeUser.username));
+  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
+  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
 }
 
 function safeFileUrl(value){
@@ -427,7 +434,7 @@ function updateMessageReceipt(payload){
 }
 function addMessage(msg){
   const own=Number(msg.sender_id)===Number(me.id);
-  const canDelete=own||me.isAdmin;
+  const canDelete=!msg.ai&&(own||me.isAdmin);
   const receipt=receiptInfo(msg);
   if($("messages").classList.contains("empty-state")){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -464,18 +471,41 @@ async function deleteMessage(msg,button){
   }
 }
 
+function loadAiHistory(){
+  try{return JSON.parse(localStorage.getItem(AI_HISTORY_KEY)||"[]").filter(x=>x&&typeof x.body==="string").slice(-40)}catch{return []}
+}
+function saveAiHistory(items){localStorage.setItem(AI_HISTORY_KEY,JSON.stringify(items.slice(-40)))}
+function aiMessage(role,body){
+  return {id:`ai-${Date.now()}-${Math.random()}`,sender_id:role==="user"?me.id:-1,sender_name:role==="user"?me.username:"ConnectChat AI",kind:"text",body,created_at:new Date().toISOString(),ai:true};
+}
+function showAiWelcome(){
+  $("messages").className="messages empty-state";
+  $("messages").innerHTML="<div><h3>ConnectChat AI</h3><p>Ask a question in Arabic or English. Your AI history is saved only in this browser.</p></div>";
+}
+async function sendAi(body){
+  if(aiBusy)return;
+  aiBusy=true;$("sendBtn").disabled=true;$("messageInput").disabled=true;$("typingText").textContent="ConnectChat AI is thinking…";
+  const items=loadAiHistory();const userMsg=aiMessage("user",body);items.push(userMsg);saveAiHistory(items);addMessage(userMsg);
+  try{
+    const history=items.slice(0,-1).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history})});
+    const reply=aiMessage("assistant",data.answer);items.push(reply);saveAiHistory(items);addMessage(reply);
+  }catch(error){toast(error.message)}
+  finally{aiBusy=false;$("sendBtn").disabled=false;$("messageInput").disabled=false;$("typingText").textContent="";$("messageInput").focus()}
+}
 function send(){
   const body=$("messageInput").value.trim();
   if(!body||!activeUser)return;
-  socket.emit("privateMessage",{receiverId:activeUser.id,body});
   $("messageInput").value="";updateComposer();
+  if(activeUser.isAI){sendAi(body);return}
+  socket.emit("privateMessage",{receiverId:activeUser.id,body});
   socket.emit("typing",{receiverId:activeUser.id,isTyping:false});
 }
 $("sendBtn").onclick=send;
 $("messageInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}};
 $("messageInput").oninput=()=>{
   updateComposer();
-  if(!activeUser)return;
+  if(!activeUser||activeUser.isAI)return;
   socket.emit("typing",{receiverId:activeUser.id,isTyping:true});
   clearTimeout(typingTimer);typingTimer=setTimeout(()=>socket.emit("typing",{receiverId:activeUser.id,isTyping:false}),700);
 };
@@ -483,6 +513,7 @@ function updateComposer(){$("messageInput").closest(".composer").classList.toggl
 
 async function uploadFile(file,kind){
   if(!activeUser)return toast("Select a user first.");
+  if(activeUser.isAI)return toast("AI file analysis is not enabled in this version.");
   const fd=new FormData();fd.append("file",file);fd.append("receiverId",activeUser.id);fd.append("kind",kind);
   $("uploadStatus").classList.remove("hidden");
   try{await api("/api/upload",{method:"POST",body:fd});toast(kind==="voice"?"Voice sent":"File sent")}
@@ -510,6 +541,7 @@ $("messageInput").addEventListener("paste",e=>{
 
 $("recordBtn").onclick=async()=>{
   if(!activeUser)return toast("Select a user first.");
+  if(activeUser.isAI)return toast("AI file analysis is not enabled in this version.");
   if(isRecording){mediaRecorder.stop();return}
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});

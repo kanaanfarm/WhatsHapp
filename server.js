@@ -27,6 +27,10 @@ const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
+const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
+const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
+const AI_ENABLED = process.env.AI_ENABLED !== "false" && Boolean(OPENAI_API_KEY);
+const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are ConnectChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax",
@@ -144,6 +148,13 @@ const uploadLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Upload limit reached. Please try again later." }
+});
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 12,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "AI message limit reached. Please wait one minute." }
 });
 const statusLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -737,6 +748,67 @@ app.delete("/api/admin/users/:userId", auth, adminOnly, async (req, res) => {
   }
 });
 
+function extractOpenAIText(data) {
+  if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const parts = [];
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (content?.type === "output_text" && typeof content.text === "string") parts.push(content.text);
+      else if (typeof content?.text === "string") parts.push(content.text);
+    }
+  }
+  return parts.join("\n").trim();
+}
+
+app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
+  try {
+    if (!AI_ENABLED) return res.status(503).json({ error: "ConnectChat AI is not configured. Add OPENAI_API_KEY on the server." });
+    const message = cleanText(req.body?.message, 4000);
+    if (!message) return res.status(400).json({ error: "Please enter a message." });
+    const rawHistory = Array.isArray(req.body?.history) ? req.body.history.slice(-12) : [];
+    const history = rawHistory.map(item => ({
+      role: item?.role === "assistant" ? "assistant" : "user",
+      content: cleanText(item?.content, 4000)
+    })).filter(item => item.content);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    let response;
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          instructions: AI_SYSTEM_PROMPT,
+          input: [...history, { role: "user", content: message }],
+          max_output_tokens: 1200
+        }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("OpenAI API error:", response.status, data?.error?.message || "Unknown error");
+      const publicMessage = response.status === 429
+        ? "AI usage limit reached. Please try again shortly."
+        : "ConnectChat AI could not answer right now.";
+      return res.status(502).json({ error: publicMessage });
+    }
+    const answer = extractOpenAIText(data);
+    if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
+    res.json({ answer, model: OPENAI_MODEL });
+  } catch (error) {
+    if (error?.name === "AbortError") return res.status(504).json({ error: "ConnectChat AI took too long to respond." });
+    console.error("AI chat failed:", error);
+    res.status(500).json({ error: "ConnectChat AI could not answer right now." });
+  }
+});
+
 app.get("/api/users", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
@@ -766,7 +838,17 @@ app.get("/api/users", auth, async (req, res) => {
         lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation")
       };
     });
-    result.sort((a, b) => Number(b.isSelf) - Number(a.isSelf) || a.username.localeCompare(b.username));
+    if (AI_ENABLED) result.unshift({
+      id: -1,
+      username: "ConnectChat AI",
+      displayName: "ConnectChat AI",
+      isAI: true,
+      isSelf: false,
+      online: true,
+      lastSeenAt: null,
+      lastPreview: "Ask anything in Arabic or English"
+    });
+    result.sort((a, b) => Number(b.isAI) - Number(a.isAI) || Number(b.isSelf) - Number(a.isSelf) || a.username.localeCompare(b.username));
     res.json(result);
   } catch (error) {
     console.error(error);

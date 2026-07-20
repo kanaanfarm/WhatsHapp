@@ -107,3 +107,4 @@ button,input{font:inherit}.hidden{display:none!important}
   .admin-title-row{display:block}.admin-refresh{margin-top:8px}.admin-user{align-items:flex-start;flex-direction:column}.admin-actions{width:100%;justify-content:flex-start}.admin-actions button{flex:1}.protected-account{padding:4px 0}
   .status-title-row{display:block}.status-refresh{margin-top:8px}.status-create-actions{grid-template-columns:1fr}.status-create-actions .primary{width:100%}.status-file-label{text-align:center}
 }
+.ai-avatar{background:linear-gradient(135deg,#5b6cff,#7f56d9)!important;color:#fff!important;font-size:12px;font-weight:900;letter-spacing:.03em}

@@ -1,0 +1,31 @@
+CONNECTCHAT AI SETUP
+====================
+
+1. Open your hosting service environment variables.
+2. Add:
+   AI_ENABLED=true
+   OPENAI_API_KEY=your_private_OpenAI_API_key
+   OPENAI_MODEL=gpt-4.1-mini
+3. Restart or redeploy the server.
+4. Log in. "ConnectChat AI" will appear at the top of the contacts list.
+
+SECURITY
+--------
+- Never put OPENAI_API_KEY in public/app.js, index.html, GitHub, or screenshots.
+- The key is used only by server.js.
+- AI requests require a logged-in and approved ConnectChat account.
+- The server applies an AI rate limit.
+
+CURRENT AI FEATURES
+-------------------
+- Text questions and answers
+- Arabic and English
+- Short conversation memory saved in the user's browser
+- MEP/HVAC/construction and general assistance
+
+NOT INCLUDED IN THIS RELEASE
+----------------------------
+- AI analysis of uploaded files, images, or voice notes
+- Cloud-synced AI conversation history
+
+These can be added later after the basic AI text service is tested and the API billing limit is configured.
