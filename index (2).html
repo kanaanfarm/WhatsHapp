@@ -1,0 +1,34 @@
+services:
+  app:
+    build: ..
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-connectchat-files}
+      CALLS_ENABLED: ${CALLS_ENABLED:-false}
+      TURN_URL: ${TURN_URL}
+      TURN_USERNAME: ${TURN_USERNAME}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL}
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+
+networks:
+  web:
+
+volumes:
+  caddy_data:
+  caddy_config:

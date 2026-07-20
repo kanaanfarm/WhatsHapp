@@ -1,24 +1,29 @@
--- CONNECTCHAT PRO SECURITY MIGRATION
--- Run once in Supabase > SQL Editor before deploying version 1.4.0.
--- Safe to run again. It does not delete users, messages, or uploaded files.
+-- ConnectChat Pro: administrator approval upgrade
+-- Safe to run more than once in the Supabase SQL Editor.
 
-create table if not exists public.app_sessions (
-  sid text primary key,
-  sess jsonb not null,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+alter table public.users
+  add column if not exists status text not null default 'approved';
 
-create index if not exists app_sessions_expires_idx
-  on public.app_sessions(expires_at);
+alter table public.users
+  add column if not exists is_admin boolean not null default false;
 
-alter table public.app_sessions enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'users_status_check'
+      and conrelid = 'public.users'::regclass
+  ) then
+    alter table public.users
+      add constraint users_status_check
+      check (status in ('pending', 'approved', 'blocked'));
+  end if;
+end $$;
 
--- The Node server uses the private service-role key. No browser policies are
--- created, so anon/authenticated browser clients cannot read session records.
-grant usage on schema public to service_role;
-grant select, insert, update, delete on table public.app_sessions to service_role;
-revoke all on table public.app_sessions from anon, authenticated;
+update public.users
+set status = 'approved', is_admin = true
+where lower(username::text) = lower('Abokanaan');
 
-select 'ConnectChat security migration completed' as result;
+select id, username, status, is_admin, created_at
+from public.users
+order by created_at;

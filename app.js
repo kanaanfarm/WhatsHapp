@@ -1,8 +1,14 @@
-const CACHE="connectchat-pro-v2";
-const ASSETS=["/","/index.html","/style.css","/app.js","/manifest.json"];
-self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
-self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
-self.addEventListener("fetch",e=>{
-  if(e.request.method!=="GET")return;
-  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
-});
+SESSION_SECRET=replace-with-a-long-random-secret
+PUBLIC_ORIGIN=https://chat.example.com
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=replace-with-your-private-service-role-key
+SUPABASE_BUCKET=connectchat-files
+CALLS_ENABLED=false
+TURN_URL=turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp
+TURN_USERNAME=replace-me
+TURN_CREDENTIAL=replace-me
+
+AI_DEMO_MODE=true
+AI_ENABLED=false
+OPENAI_API_KEY=replace-with-your-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
