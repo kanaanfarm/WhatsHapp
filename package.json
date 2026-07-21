@@ -1,8 +1,8 @@
 {
-  "name": "connectchat-pro-v3",
+  "name": "connectchat-pro-v4",
   "version": "3.0.0-phase1",
   "private": true,
-  "description": "ConnectChat Pro v3 Phase 1: secure real-time chat, AI-ready workspace, status, calls and cross-platform clients",
+  "description": "ConnectChat Pro v4 Enterprise: secure real-time chat, AI-ready workspace, status, calls and cross-platform clients",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -271,6 +271,20 @@ function lastSeenText(value){
   return `Last seen ${date.toLocaleDateString()} ${date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`;
 }
 
+function updateWorkspaceOverview(){
+  if(!me)return;
+  const humanContacts=users.filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup);
+  const online=humanContacts.filter(u=>u.online).length;
+  const unread=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
+  if($("workspaceProfileAvatar"))$("workspaceProfileAvatar").textContent=initials(me.username);
+  if($("workspaceProfileName"))$("workspaceProfileName").textContent=me.username;
+  if($("workspaceProfileRole"))$("workspaceProfileRole").textContent=me.isAdmin?"Administrator":"Workspace member";
+  if($("workspaceContactCount"))$("workspaceContactCount").textContent=String(humanContacts.length);
+  if($("workspaceOnlineCount"))$("workspaceOnlineCount").textContent=String(online);
+  if($("workspaceUnreadCount"))$("workspaceUnreadCount").textContent=String(unread);
+  if($("workspaceCallStatus"))$("workspaceCallStatus").textContent=callsEnabled?"Ready":"Off";
+}
+
 function renderUsers(){
   const q=$("userSearch").value.toLowerCase();
   const filtered=users.filter(u=>{
@@ -285,15 +299,16 @@ function renderUsers(){
   filtered.forEach(u=>{
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
-    const name=u.displayName||u.username;
+    const name=u.isSelf?"Saved Messages":(u.displayName||u.username);
     const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
-    const preview=u.isSelf&&!u.lastPreview?"Your private conversation":(u.lastPreview||"Start a conversation");
+    const preview=u.isSelf&&!u.lastPreview?"Notes and messages to yourself":(u.lastPreview||"Start a conversation");
     const unread=Number(u.unreadCount||u.unread_count||0);
     const stamp=u.lastMessageAt||u.last_message_at;
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}${u.isSelf?" (You)":""}</strong><span>${escapeHtml(preview)}</span></div><div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
   });
   renderQuickContacts();
+  updateWorkspaceOverview();
   const total=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
   if($("railUnread")){ $("railUnread").textContent=String(Math.min(total,99)); $("railUnread").classList.toggle("hidden",!total); }
 }
@@ -708,7 +723,7 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
 (async()=>{try{me=await api("/api/me");await startApp()}catch{}})();
 
 
-// ConnectChat Pro v3 Phase 1 workspace controls
+// ConnectChat Pro v4 enterprise workspace controls
 (()=>{
   const root=document.documentElement;
   const accents=["violet","blue","emerald","rose"];
