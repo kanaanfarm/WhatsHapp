@@ -1,5 +1,6 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
+const typingUsers=new Map();
 let peer=null, localStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let callsEnabled=true;
 let aiBusy=false;
@@ -190,11 +191,24 @@ function connectSocket(){
   socket=io();
   socket.on("connect",refreshUsers);
   socket.on("privateMessage",msg=>{
-    const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
+    const otherId=Number(msg.sender_id)===Number(me.id)?Number(msg.receiver_id):Number(msg.sender_id);
+    const item=users.find(u=>Number(u.id)===otherId);
+    if(item){
+      item.lastPreview=msg.kind&&msg.kind!=="text"?`[${msg.kind}]`:(msg.body||"Message");
+      item.lastMessageAt=msg.created_at||new Date().toISOString();
+      item.lastSenderId=Number(msg.sender_id);
+    }
+    const relevant=activeUser&&Number(activeUser.id)===otherId;
     if(relevant){
       addMessage(msg);
-      if(Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)===Number(activeUser.id))socket.emit("message:read",{messageIds:[msg.id]});
+      if(Number(msg.receiver_id)===Number(me.id)){
+        if(item)item.unreadCount=0;
+        socket.emit("message:read",{messageIds:[msg.id]});
+      }
+    }else if(Number(msg.receiver_id)===Number(me.id)&&item){
+      item.unreadCount=(Number(item.unreadCount)||0)+1;
     }
+    renderUsers();
     refreshUsers();
   });
   socket.on("message:status",updateMessageReceipt);
@@ -216,7 +230,10 @@ function connectSocket(){
   socket.on("status:deleted",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("typing",p=>{
-    if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
+    const id=Number(p.userId);
+    if(p.isTyping)typingUsers.set(id,p.username||"User");else typingUsers.delete(id);
+    if(activeUser&&id===Number(activeUser.id))$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
+    renderUsers();
   });
   socket.on("call:incoming",showIncomingCall);
   socket.on("call:answered",async p=>{
@@ -250,7 +267,7 @@ async function refreshUsers(){
 function resetConversation(){
   $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
   $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
-  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;$("clearAiBtn").classList.add("hidden");
+  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
 }
 
 function initials(name){return name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
@@ -260,6 +277,23 @@ function time(v){
   const date=new Date(value.includes("T")?value:value.replace(" ","T")+"Z");
   return Number.isNaN(date.getTime())?"":date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 }
+function conversationTime(value){
+  if(!value)return "";
+  const date=new Date(value);if(Number.isNaN(date.getTime()))return "";
+  const now=new Date();
+  const sameDay=date.toDateString()===now.toDateString();
+  if(sameDay)return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
+  if(date.toDateString()===yesterday.toDateString())return "Yesterday";
+  return date.toLocaleDateString([],{month:"short",day:"numeric"});
+}
+function conversationPreview(user){
+  if(typingUsers.has(Number(user.id)))return `${typingUsers.get(Number(user.id))} is typing…`;
+  const base=user.isSelf&&!user.lastPreview?"Your private space":(user.lastPreview||"Start a conversation");
+  if(user.lastSenderId&&Number(user.lastSenderId)===Number(me.id)&&!user.isSelf)return `You: ${base}`;
+  return base;
+}
+
 function lastSeenText(value){
   if(!value)return "Offline";
   const date=new Date(value);if(Number.isNaN(date.getTime()))return "Offline";
@@ -273,20 +307,29 @@ function lastSeenText(value){
 function renderUsers(){
   const q=$("userSearch").value.toLowerCase();
   $("usersList").innerHTML="";
-  users.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
+  const sorted=[...users].sort((a,b)=>{
+    if(a.isSelf!==b.isSelf)return Number(b.isSelf)-Number(a.isSelf);
+    if(a.isAI!==b.isAI)return Number(b.isAI)-Number(a.isAI);
+    return new Date(b.lastMessageAt||0)-new Date(a.lastMessageAt||0)||(a.username||"").localeCompare(b.username||"");
+  });
+  sorted.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
     const d=document.createElement("div");
-    d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
+    d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""} ${Number(u.unreadCount)>0?"has-unread":""}`;
     const name=u.displayName||u.username;
     const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
-    const preview=u.isSelf&&!u.lastPreview?"Your private space":(u.lastPreview||"Start a conversation");
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
+    const preview=conversationPreview(u);
+    const stamp=conversationTime(u.lastMessageAt);
+    const unread=Math.min(99,Number(u.unreadCount)||0);
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><div class="user-line"><strong>${escapeHtml(name)}</strong>${stamp?`<time>${escapeHtml(stamp)}</time>`:""}</div><span class="conversation-preview ${typingUsers.has(Number(u.id))?"typing-preview":""}">${escapeHtml(preview)}</span></div><div class="user-tail">${unread?`<b class="unread-badge">${unread}</b>`:""}<div class="dot ${u.online?"online":""}"></div></div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
   });
 }
 $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
-  activeUser=u;renderUsers();updateHeader();
+  activeUser=u;
+  const local=users.find(item=>Number(item.id)===Number(u.id));if(local)local.unreadCount=0;
+  renderUsers();updateHeader();
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -402,7 +445,6 @@ function updateHeader(){
   $("chatName").textContent=activeUser.displayName||activeUser.username;
   $("chatStatus").textContent=activeUser.isAI?"AI assistant · Arabic & English":(activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt)));
   $("activeAvatar").textContent=activeUser.isAI?"AI":(activeUser.isSelf?"★":initials(activeUser.username));
-  $("clearAiBtn").classList.toggle("hidden",!activeUser.isAI);
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
 }
@@ -435,7 +477,7 @@ function updateMessageReceipt(payload){
 }
 function addMessage(msg){
   const own=Number(msg.sender_id)===Number(me.id);
-  const canDelete=Boolean(msg.ai)||(own||me.isAdmin);
+  const canDelete=!msg.ai&&(own||me.isAdmin);
   const receipt=receiptInfo(msg);
   if($("messages").classList.contains("empty-state")){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -445,13 +487,14 @@ function addMessage(msg){
   row.dataset.messageId=String(msg.id);
   row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
   const deleteButton=row.querySelector(".message-delete");
-  if(deleteButton)deleteButton.onclick=()=>msg.ai?deleteAiMessage(msg):deleteMessage(msg,deleteButton);
+  if(deleteButton)deleteButton.onclick=()=>deleteMessage(msg,deleteButton);
   $("messages").appendChild(row);$("messages").scrollTop=$("messages").scrollHeight;
 }
 
 function removeMessage(messageId){
-  const key=String(messageId);
-  const row=[...$("messages").querySelectorAll(".msg")].find(item=>String(item.dataset.messageId)===key);
+  const id=Number(messageId);
+  if(!Number.isSafeInteger(id)||id<=0)return;
+  const row=[...$("messages").querySelectorAll(".msg")].find(item=>Number(item.dataset.messageId)===id);
   if(row)row.remove();
   if(activeUser&&!$("messages").querySelector(".msg")){
     $("messages").className="messages empty-state";
@@ -470,24 +513,6 @@ async function deleteMessage(msg,button){
     button.disabled=false;toast(error.message);
   }
 }
-
-
-function deleteAiMessage(msg){
-  const items=loadAiHistory().filter(item=>String(item.id)!==String(msg.id));
-  saveAiHistory(items);
-  removeMessage(msg.id);
-  if(!items.length)showAiWelcome();
-  toast("AI message deleted.");
-}
-
-function clearAiChat(){
-  if(!activeUser?.isAI)return;
-  if(!confirm("Delete the complete ConnectChat AI conversation from this browser?"))return;
-  localStorage.removeItem(AI_HISTORY_KEY);
-  showAiWelcome();
-  toast("AI chat deleted.");
-}
-$("clearAiBtn").onclick=clearAiChat;
 
 function loadAiHistory(){
   try{return JSON.parse(localStorage.getItem(AI_HISTORY_KEY)||"[]").filter(x=>x&&typeof x.body==="string").slice(-40)}catch{return []}
@@ -579,13 +604,7 @@ $("recordBtn").onclick=async()=>{
 };
 
 $("backBtn").onclick=()=>{
-  if(window.innerWidth<=760){
-    $("chatPanel").classList.add("mobile-hidden");
-    $("sidebar").classList.remove("mobile-hidden");
-  }else{
-    $("userSearch").focus();
-    $("sidebar").scrollIntoView({behavior:"smooth",block:"nearest"});
-  }
+  if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
 };
 $("logoutBtn").onclick=async()=>{if(socket)socket.disconnect();await api("/api/logout",{method:"POST"});location.reload()};
 $("recoveryBtn").onclick=async()=>{
@@ -631,3 +650,27 @@ $("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.promp
 
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 (async()=>{try{me=await api("/api/me");await startApp()}catch{}})();
+
+
+// ConnectChat Pro v3 Phase 1 workspace controls
+(()=>{
+  const root=document.documentElement;
+  const accents=["violet","blue","emerald","rose"];
+  const savedTheme=localStorage.getItem("cc-theme")||"light";
+  const savedAccent=localStorage.getItem("cc-accent")||"violet";
+  root.dataset.theme=savedTheme;root.dataset.accent=savedAccent;
+  const themeBtn=$("themeBtn"),accentBtn=$("accentBtn");
+  if(themeBtn)themeBtn.onclick=()=>{const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem("cc-theme",next);toast(`${next[0].toUpperCase()+next.slice(1)} theme enabled.`)};
+  if(accentBtn)accentBtn.onclick=()=>{const current=accents.indexOf(root.dataset.accent);const next=accents[(current+1)%accents.length];root.dataset.accent=next;localStorage.setItem("cc-accent",next);toast(`${next[0].toUpperCase()+next.slice(1)} accent enabled.`)};
+  document.querySelectorAll("[data-coming]").forEach(button=>button.addEventListener("click",()=>toast(`${button.dataset.coming} is prepared for the next phase.`)));
+  document.querySelectorAll(".workspace-tab").forEach(button=>button.addEventListener("click",()=>{
+    if(button.dataset.coming)return;
+    document.querySelectorAll(".workspace-tab").forEach(x=>x.classList.remove("active"));button.classList.add("active");
+  }));
+  document.querySelectorAll("[data-smart]").forEach(button=>button.addEventListener("click",()=>{
+    if(!activeUser){toast("Select a conversation first.");return}
+    const prompts={summary:"Summarize this conversation",tasks:"Create action items from this conversation",translate:"Translate the latest message"};
+    if(activeUser.isAI){$("messageInput").value=prompts[button.dataset.smart];updateComposer();$("messageInput").focus();}
+    else toast("Smart actions will use Ollama in the AI integration phase.");
+  }));
+})();

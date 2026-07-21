@@ -1,0 +1,15 @@
+ConnectChat Pro - Conversation Activity Update
+
+Implemented:
+- Latest message preview in the conversation list
+- Latest message time (time today, Yesterday, or date)
+- Unread-message badge
+- Automatic conversation sorting by latest activity
+- Live typing preview in the conversation list
+- "You:" prefix for the latest outgoing message
+- Instant sidebar update when a message is sent or received
+- Unread counter clears when the conversation is opened
+- Service-worker cache updated to v13
+
+Deployment note:
+Set all secrets in the hosting provider environment variables. Do not upload a local .env file publicly.

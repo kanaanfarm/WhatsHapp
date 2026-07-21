@@ -1,195 +1,40 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#182132">
-  <title>ConnectChat Pro</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=21">
-</head>
-<body>
-  <section id="authView" class="auth-view">
-    <div class="auth-card">
-      <img class="brand-logo" src="logo.svg" alt="ConnectChat Pro">
-      <h1>ConnectChat Pro</h1>
-      <p id="authSubtitle">Welcome back. Sign in to continue.</p>
+CONNECTCHAT PRO - INTERNET DEPLOYMENT CHECKLIST
+================================================
 
-      <form id="authForm" novalidate>
-        <div class="tabs">
-          <button type="button" id="loginTab" class="active">Login</button>
-          <button type="button" id="registerTab">Register</button>
-        </div>
+This release includes one-to-one audio/video calling. To use it between UAE,
+Lebanon, and other countries, deploy one server on the public Internet.
 
-        <label class="auth-label" for="authUsername">Username</label>
-        <input id="authUsername" placeholder="Enter your username" maxlength="30" autocomplete="username" required>
-        <label class="auth-label" for="authPassword">Password</label>
-        <div class="password-field">
-          <input id="authPassword" type="password" placeholder="Enter your password" minlength="10" maxlength="128" autocomplete="current-password" required>
-          <button id="togglePasswordBtn" type="button" aria-label="Show password">Show</button>
-        </div>
-        <button id="authSubmit" type="submit" class="primary">Login</button>
-        <button id="forgotBtn" type="button" class="text-btn">Forgot username or password?</button>
-        <div id="authError" class="error" role="alert"></div>
-      </form>
-    </div>
-  </section>
+REQUIRED
+--------
+1. A Linux server/container running Node.js 22 LTS.
+2. A domain name, for example chat.yourcompany.com.
+3. HTTPS using a reverse proxy such as Caddy or Nginx.
+4. WebSocket forwarding for Socket.IO.
+5. A TURN service for reliable audio/video calls.
+6. A Supabase project for persistent messages and uploaded files.
+7. The security-migration.sql script applied in Supabase.
 
-  <section id="appView" class="app hidden">
-    <aside id="sidebar" class="sidebar">
-      <div class="sidebar-head">
-        <img class="brand-logo small" src="logo.svg" alt="">
-        <div>
-          <strong>ConnectChat</strong>
-          <span id="meName"></span>
-        </div>
-      </div>
+ENVIRONMENT
+-----------
+Set NODE_ENV=production, PUBLIC_ORIGIN, a stable random SESSION_SECRET of at
+least 32 characters, the Supabase variables, and the TURN variables shown in
+.env.example. Set CALLS_ENABLED=false when live calls should be disabled. Do
+not commit real secrets.
 
-      <div class="search-box">
-        <input id="userSearch" placeholder="Search users">
-      </div>
+IMPORTANT
+---------
+- Camera/microphone access works on localhost for testing, but public use must
+  be served over HTTPS.
+- STUN-only calls are not reliable across all mobile operators and firewalls.
+- This package is suitable for controlled pilot/small-team use on one server.
+- Supabase-backed sessions, abuse limits, secure deletion, Status, last seen, and message receipts are included in version 1.4.0.
+- Before commercial or large-scale use, add email/phone verification,
+  moderation, malware scanning, monitoring, backups, and a professional review.
 
-      <div class="section-label">Conversations</div>
-      <div id="usersList" class="users-list"></div>
-
-      <div class="sidebar-actions">
-        <button id="adminBtn" class="admin-btn hidden">Manage users</button>
-        <button id="statusBtn" class="status-btn">Status</button>
-        <button id="installBtn" class="install-btn hidden">Install app</button>
-        <button id="recoveryBtn" class="install-btn">Recovery code</button>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
-      </div>
-    </aside>
-
-    <main id="chatPanel" class="chat">
-      <header class="chat-head">
-        <button id="backBtn" class="back-btn">←</button>
-        <div class="active-avatar" id="activeAvatar">?</div>
-        <div>
-          <h2 id="chatName">Select a user</h2>
-          <span id="chatStatus">Start a private conversation</span>
-        </div>
-        <div class="call-actions">
-          <button id="audioCallBtn" class="header-btn" title="Audio call" disabled>☎</button>
-          <button id="videoCallBtn" class="header-btn" title="Video call" disabled>📹</button>
-        </div>
-      </header>
-
-      <div id="messages" class="messages empty-state">
-        <div>
-          <h3>Your messages</h3>
-          <p>Select a user to start chatting.</p>
-        </div>
-      </div>
-
-      <div id="typingText" class="typing"></div>
-      <div id="uploadStatus" class="upload-status hidden">Uploading…</div>
-
-      <footer class="composer">
-        <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" hidden>
-        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
-
-        <button id="attachBtn" class="circle-btn" title="Attach photo or file">＋</button>
-        <button id="cameraBtn" class="circle-btn" title="Take photo">📷</button>
-        <input id="messageInput" placeholder="Type or paste a photo..." disabled>
-        <button id="recordBtn" class="circle-btn record-btn" title="Record voice">🎤</button>
-        <button id="sendBtn" class="send-btn" disabled>Send</button>
-      </footer>
-    </main>
-  </section>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <section id="callOverlay" class="call-overlay hidden">
-    <div class="call-card">
-      <div class="call-title">
-        <div>
-          <h2 id="callName">Call</h2>
-          <span id="callStatus">Connecting…</span>
-        </div>
-      </div>
-      <div id="videoStage" class="video-stage">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay playsinline muted></video>
-      </div>
-      <div class="call-controls">
-        <button id="acceptCallBtn" class="accept-call hidden">Accept</button>
-        <button id="declineCallBtn" class="decline-call hidden">Decline</button>
-        <button id="muteBtn" class="call-control hidden">🎤 Mute</button>
-        <button id="cameraToggleBtn" class="call-control hidden">📹 Camera</button>
-        <button id="endCallBtn" class="end-call hidden">End call</button>
-      </div>
-    </div>
-  </section>
-
-  <section id="statusOverlay" class="dialog-overlay hidden">
-    <div class="dialog-card status-dialog">
-      <button id="closeStatusBtn" class="dialog-close" aria-label="Close">×</button>
-      <div class="status-title-row">
-        <div>
-          <h2>24-hour Status</h2>
-          <p class="dialog-intro">Share text, a photo, or a short video. It disappears after 24 hours.</p>
-        </div>
-        <button id="refreshStatusBtn" class="secondary-btn status-refresh">Refresh</button>
-      </div>
-      <div class="status-create">
-        <textarea id="statusText" maxlength="500" placeholder="Write a status or an optional media caption"></textarea>
-        <div class="status-create-actions">
-          <label class="status-file-label" for="statusFile">Choose photo/video</label>
-          <input id="statusFile" type="file" accept="image/*,video/mp4,video/webm,video/quicktime">
-          <button id="postStatusBtn" class="primary">Post status</button>
-        </div>
-        <div id="statusResult" class="dialog-result"></div>
-      </div>
-      <div id="statusesList" class="statuses-list"></div>
-    </div>
-  </section>
-
-  <section id="recoveryOverlay" class="dialog-overlay hidden">
-    <div class="dialog-card">
-      <button id="closeRecoveryBtn" class="dialog-close" aria-label="Close">×</button>
-      <h2>Account recovery</h2>
-      <p id="recoveryIntro" class="dialog-intro">Use the private recovery code supplied when the account was created.</p>
-
-      <div id="savedCodePanel" class="hidden">
-        <p>Save this code somewhere private. It is shown only now.</p>
-        <div id="recoveryCodeText" class="recovery-code"></div>
-        <button id="copyRecoveryBtn" class="primary">Copy recovery code</button>
-      </div>
-
-      <div id="recoverFormPanel">
-        <label for="recoveryCodeInput">Recovery code</label>
-        <input id="recoveryCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off">
-        <div class="recovery-actions">
-          <button id="findUsernameBtn" class="secondary-btn">Find username</button>
-        </div>
-        <div class="divider"><span>or reset password</span></div>
-        <label for="newPasswordInput">New password</label>
-        <input id="newPasswordInput" type="password" placeholder="At least 10 characters" minlength="10" maxlength="128" autocomplete="new-password">
-        <button id="resetPasswordBtn" class="primary">Reset password</button>
-      </div>
-
-      <div id="recoveryResult" class="dialog-result"></div>
-    </div>
-  </section>
-
-  <section id="adminOverlay" class="dialog-overlay hidden">
-    <div class="dialog-card admin-dialog">
-      <button id="closeAdminBtn" class="dialog-close" aria-label="Close">×</button>
-      <div class="admin-title-row">
-        <div>
-          <h2>User administration</h2>
-          <p class="dialog-intro">Approve new accounts, block access, or permanently delete users.</p>
-        </div>
-        <button id="refreshAdminBtn" class="secondary-btn admin-refresh">Refresh</button>
-      </div>
-      <div id="adminUsersList" class="admin-users"></div>
-      <div id="adminResult" class="dialog-result"></div>
-    </div>
-  </section>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=21"></script>
-</body>
-</html>
+WINDOWS EXE AND ANDROID APK
+---------------------------
+The clients/desktop and clients/android folders contain the installer projects.
+The .github/workflows folder contains automatic builders. After the public HTTPS
+URL exists, run each workflow and enter that URL. The resulting EXE/APK appears
+as a downloadable build artifact. The Android workflow creates a test/debug APK;
+Google Play distribution requires a private signing key and a signed release.

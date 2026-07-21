@@ -1,44 +1,61 @@
-CONNECTCHAT PRO - ADMINISTRATOR SETUP
-=====================================
+CONNECTCHAT PRO 1.4.0 - SECURITY AND SOCIAL UPDATE
+=======================================
 
-Administrator username: Abokanaan
+IMPORTANT: DO THIS BEFORE DEPLOYING
+-----------------------------------
+1. Open Supabase > SQL Editor > New query.
+2. Paste the complete contents of security-migration.sql.
+3. Click Run.
+4. Confirm the result says: ConnectChat security migration completed.
+5. Open another new query and paste the complete contents of social-migration.sql.
+6. Click Run and confirm: ConnectChat social migration completed.
 
-BEFORE DEPLOYING THE ADMIN UPDATE
----------------------------------
-1. On the current ConnectChat site, register the exact username Abokanaan.
-2. Save its password and recovery code privately.
-3. Open Supabase > SQL Editor > New query.
-4. Paste and run the complete admin-migration.sql file.
-5. The result must show Abokanaan / approved / true.
+RENDER ENVIRONMENT
+------------------
+Keep the existing Supabase values and add/check:
 
-DEPLOY
-------
-Upload these updated files to GitHub:
+  NODE_ENV=production
+  PUBLIC_ORIGIN=https://connectchat-pro-kanaan.onrender.com
+  SESSION_SECRET=a-stable-random-secret-with-at-least-32-characters
+  CALLS_ENABLED=false
 
-Repository root:
-  server.js
-  admin-migration.sql
-  supabase-schema.sql
-  security-migration.sql
-  package.json
-  package-lock.json
+Set CALLS_ENABLED=true only where live Internet calling is allowed. Keep the
+same SESSION_SECRET permanently. Changing it signs everyone out and invalidates
+new-format recovery codes.
 
-Inside public:
-  index.html
-  app.js
-  style.css
-  sw.js
+DEPLOYMENT ORDER
+----------------
+1. Run security-migration.sql and social-migration.sql in Supabase.
+2. Add PUBLIC_ORIGIN and CALLS_ENABLED in Render Environment.
+3. Upload the new package files to GitHub.
+4. Let Render deploy, or use Manual Deploy > Deploy latest commit.
+5. Test login, messaging, receipts, Status, last seen, upload, logout, and administrator approval.
+6. Rebuild the Windows installer from GitHub Actions.
 
-Render redeploys automatically.
+WHAT THIS UPDATE PROTECTS
+-------------------------
+- Supabase-backed production sessions; no Express MemoryStore
+- Strong production secret validation and hardened session cookies
+- Login, registration, recovery, API, upload, message, and call rate limits
+- Login session regeneration and session revocation after password reset/block
+- Recovery-code rotation after password reset
+- File-content detection instead of trusting a browser-provided MIME type
+- Safer file names and a reduced upload allowlist
+- Security headers, Content Security Policy, anti-framing, and no-sniff headers
+- Same-origin request checks against browser request forgery
+- Validated and size-limited WebRTC signaling
+- Restricted Electron navigation and camera/microphone permissions
 
-USE
----
-1. Log in as Abokanaan.
-2. Click Manage users.
-3. New accounts appear as Pending.
-4. Click Approve to allow login.
-5. Block immediately prevents access.
-6. Delete permanently removes the user, messages, and associated stored files.
+LIMITS THAT STILL REQUIRE PROFESSIONAL SERVICES
+------------------------------------------------
+- Messages are not end-to-end encrypted.
+- Files are not scanned by an antivirus engine.
+- A professional penetration test has not been performed.
+- Reliable calling still requires a TURN service and legal approval.
+- Commercial use requires privacy terms, monitoring, backups, and incident plans.
 
-The Abokanaan administrator account is protected from being blocked or deleted
-inside the app. Keep its password and recovery code private.
+LOCAL OWNER DEVELOPMENT
+-----------------------
+START_CHAT.bat safely opens the hosted application and needs no Node.js.
+START_LOCAL_SERVER.bat is only for the owner/developer. It requires a private
+.env file. Never share .env or upload it to GitHub.

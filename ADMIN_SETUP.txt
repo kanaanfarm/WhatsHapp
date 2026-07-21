@@ -1,110 +1,44 @@
-*{box-sizing:border-box}
-:root{
-  --bg:#eef2f7;--panel:#fff;--soft:#f6f8fb;--text:#182033;--muted:#7b8799;
-  --border:#e2e8f0;--accent:#5b6cff;--accent2:#7f56d9;--success:#22b573;
-  --danger:#df4b56;--dark:#182132
-}
-html,body{height:100%}
-body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
-button,input{font:inherit}.hidden{display:none!important}
-.auth-view{min-height:100%;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at top left,rgba(91,108,255,.18),transparent 35%),radial-gradient(circle at bottom right,rgba(127,86,217,.15),transparent 30%),var(--bg)}
-.auth-card{width:min(440px,100%);background:var(--panel);padding:34px;border:1px solid rgba(255,255,255,.7);border-radius:26px;box-shadow:0 25px 60px rgba(24,32,51,.14)}
-.brand-logo{display:block;width:68px;height:68px;object-fit:contain}.brand-logo.small{width:44px;height:44px;flex:0 0 44px}
-.auth-card h1{margin:18px 0 6px}.auth-card p{margin:0 0 22px;color:var(--muted)}
-.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--soft);border-radius:13px;padding:4px;margin-bottom:16px}
-.tabs button{border:0;background:transparent;padding:10px;border-radius:10px;cursor:pointer}.tabs button.active{background:var(--panel);font-weight:700;box-shadow:0 4px 12px rgba(24,32,51,.07)}
-.auth-card input,.search-box input,.composer input{width:100%;border:1px solid var(--border);background:var(--soft);padding:13px 14px;border-radius:13px;outline:none}
-.auth-card input{margin-bottom:12px}.auth-card input:focus,.search-box input:focus,.composer input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.1)}
-.auth-label{display:block;font-size:12px;font-weight:700;margin:0 0 6px;color:#4a5568}.password-field{position:relative}.password-field input{padding-right:65px}.password-field button{position:absolute;right:7px;top:7px;border:0;background:transparent;color:var(--accent);font-weight:700;font-size:12px;padding:7px;cursor:pointer}
-.primary,.send-btn{border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:13px;padding:13px 18px;cursor:pointer}
-.primary{width:100%;margin-top:4px}.primary:disabled{opacity:.65;cursor:wait}.error{color:var(--danger);font-size:13px;min-height:20px;margin-top:10px;text-align:center}
-.text-btn{display:block;margin:12px auto 0;border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:13px}
-.app{height:100%;display:grid;grid-template-columns:320px minmax(0,1fr)}
-.sidebar{background:var(--dark);color:#fff;display:flex;flex-direction:column;min-height:0}
-.sidebar-head{display:flex;gap:12px;align-items:center;padding:20px;border-bottom:1px solid rgba(255,255,255,.08)}
-.sidebar-head span{display:block;color:#aeb7c7;font-size:12px;margin-top:4px}
-.search-box{padding:16px}.search-box input{background:#232f43;border-color:#344056;color:#fff}
-.section-label{padding:0 18px 10px;color:#9eabba;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
-.users-list{overflow:auto;flex:1;padding:0 10px 10px}
-.user-item{display:flex;align-items:center;gap:11px;padding:11px;border-radius:13px;cursor:pointer}
-.user-item:hover,.user-item.active{background:rgba(255,255,255,.08)}
-.avatar,.active-avatar{display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#ff855d,#ff4e87);color:#fff;font-weight:700}
-.saved-avatar{background:linear-gradient(135deg,var(--accent),var(--accent2))}
-.avatar{width:42px;height:42px}.active-avatar{width:44px;height:44px}
-.user-info{min-width:0;flex:1}.user-info strong{display:block}.user-info span{display:block;color:#aeb7c7;font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dot{width:9px;height:9px;border-radius:50%;background:#5e6a7d}.dot.online{background:var(--success)}
-.sidebar-actions{padding:12px 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sidebar-actions button{border:1px solid rgba(255,255,255,.15);background:transparent;color:#fff;padding:10px;border-radius:12px;cursor:pointer}
-.install-btn{background:rgba(91,108,255,.2)!important}
-.status-btn{grid-column:1/-1;background:rgba(127,86,217,.25)!important;border-color:rgba(168,139,250,.45)!important;font-weight:700}
-.admin-btn{grid-column:1/-1;background:rgba(34,181,115,.2)!important;border-color:rgba(34,181,115,.45)!important;font-weight:700}
-.chat{display:grid;grid-template-rows:auto 1fr auto auto auto;background:var(--soft);min-width:0}
-.chat-head{height:78px;padding:0 22px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-.chat-head h2{margin:0;font-size:18px}.chat-head span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
-.call-actions{margin-left:auto;display:flex;gap:8px}.header-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:50%;background:var(--soft);cursor:pointer}.header-btn:disabled{opacity:.4;cursor:not-allowed}
-.back-btn{display:none;border:0;background:transparent;font-size:24px;cursor:pointer}
-.messages{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-.empty-state{display:grid;place-items:center;text-align:center;color:var(--muted)}
-.msg{max-width:72%;display:flex;flex-direction:column}.msg.own{align-self:flex-end}.msg.other{align-self:flex-start}
-.meta{font-size:11px;color:var(--muted);margin:0 4px 4px;display:flex;align-items:center;gap:8px}.msg.own .meta{justify-content:flex-end;text-align:right}
-.message-delete{border:0;background:transparent;color:var(--danger);padding:1px 3px;cursor:pointer;font-size:11px;font-weight:700}.message-delete:hover{text-decoration:underline}.message-delete:disabled{opacity:.45;cursor:wait}
-.receipt{font-weight:700}.receipt.read{color:#4fc3f7}
-.bubble{background:var(--panel);padding:10px 12px;border-radius:17px;box-shadow:0 5px 16px rgba(18,28,51,.06);word-wrap:break-word;overflow:hidden}
-.msg.own .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:5px}.msg.other .bubble{border-bottom-left-radius:5px}
-.chat-image{display:block;max-width:320px;width:100%;border-radius:12px;cursor:pointer}
-.voice-note{width:min(320px,65vw);display:block}
-.file-link{color:inherit;font-weight:700;text-decoration:none}
-.caption{margin-top:7px;line-height:1.4}
-.typing,.upload-status{min-height:24px;padding:0 22px 6px;color:var(--muted);font-size:12px}
-.composer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:8px;background:var(--panel);border-top:1px solid var(--border);padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
-.composer input{margin:0}.composer button:disabled,.composer input:disabled{opacity:.55;cursor:not-allowed}
-.circle-btn{width:44px;height:44px;border:1px solid var(--border);background:var(--soft);border-radius:50%;cursor:pointer}
-.record-btn.recording{background:var(--danger);color:#fff;animation:pulse 1s infinite}
-@keyframes pulse{50%{transform:scale(1.08)}}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:11px 16px;border-radius:12px;z-index:30;box-shadow:0 12px 30px rgba(0,0,0,.2)}
-.call-overlay{position:fixed;inset:0;background:rgba(7,12,24,.92);z-index:40;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden}
-.call-card{width:min(980px,calc(100vw - 36px));height:min(720px,calc(100vh - 36px));min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;color:#fff;overflow:hidden}
-.call-title{text-align:center;padding:10px}.call-title h2{margin:0 0 5px}.call-title span{color:#bdc7d8}
-.video-stage{position:relative;min-width:0;min-height:0;border-radius:24px;overflow:hidden;background:#111827;display:grid;place-items:center}
-#remoteVideo{display:block;width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;background:#111827}
-#localVideo{position:absolute;right:18px;bottom:18px;width:min(220px,28%);aspect-ratio:4/3;object-fit:cover;border-radius:15px;border:2px solid rgba(255,255,255,.7);background:#263246}
-.video-stage.audio-only:before{content:'☎';font-size:90px;position:absolute;z-index:1}.video-stage.audio-only video{opacity:0}
-.call-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px}.call-controls button{border:0;border-radius:999px;padding:13px 20px;color:#fff;font-weight:700;cursor:pointer}
-.accept-call{background:var(--success)}.decline-call,.end-call{background:var(--danger)}.call-control{background:#364258}
-.dialog-overlay{position:fixed;inset:0;background:rgba(7,12,24,.72);z-index:50;display:grid;place-items:center;padding:18px;overflow:auto}
-.dialog-card{position:relative;width:min(480px,100%);background:var(--panel);color:var(--text);padding:30px;border-radius:24px;box-shadow:0 25px 70px rgba(0,0,0,.3)}
-.dialog-card h2{margin:0 38px 6px 0}.dialog-intro{color:var(--muted);line-height:1.45}.dialog-close{position:absolute;top:15px;right:16px;width:36px;height:36px;border:0;border-radius:50%;font-size:25px;background:var(--soft);cursor:pointer}
-.dialog-card label{display:block;font-size:13px;font-weight:700;margin:14px 0 6px}.dialog-card input{width:100%;border:1px solid var(--border);background:var(--soft);padding:13px 14px;border-radius:13px;outline:none}.dialog-card input:focus{border-color:var(--accent)}
-.recovery-code{font-family:Consolas,monospace;font-weight:800;font-size:18px;letter-spacing:.04em;text-align:center;background:var(--soft);border:1px dashed var(--accent);padding:16px 10px;border-radius:13px;margin:12px 0;overflow-wrap:anywhere}
-.recovery-actions{display:flex;gap:8px}.secondary-btn{width:100%;border:1px solid var(--border);background:var(--soft);color:var(--text);font-weight:700;border-radius:13px;padding:12px;cursor:pointer}.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:18px 0 0}.divider:before,.divider:after{content:"";height:1px;background:var(--border);flex:1}.dialog-result{min-height:22px;margin-top:12px;font-weight:700;color:var(--accent);line-height:1.4}
-.admin-dialog{width:min(760px,100%);max-height:min(760px,calc(100vh - 36px));display:flex;flex-direction:column}
-.admin-title-row{display:flex;align-items:flex-start;gap:18px;padding-right:38px}.admin-title-row>div{flex:1}.admin-title-row h2{margin-right:0}
-.admin-refresh{width:auto;white-space:nowrap;padding:9px 14px}.admin-users{min-height:110px;overflow:auto;display:flex;flex-direction:column;gap:9px;margin-top:14px;padding-right:3px}
-.admin-loading{padding:30px;text-align:center;color:var(--muted)}.admin-user{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:15px;padding:12px;background:var(--soft)}
-.admin-user-main{display:flex;align-items:center;gap:11px;min-width:0;flex:1}.admin-user-main>div:last-child{min-width:0}.admin-user-main strong{display:block}.admin-user-main span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
-.admin-tag{display:inline!important;background:rgba(91,108,255,.12);color:var(--accent)!important;border-radius:999px;padding:3px 7px;margin:0 0 0 4px!important;font-size:10px!important}
-.status-pill{font-style:normal;font-weight:700}.status-approved{color:var(--success)}.status-pending{color:#c88719}.status-blocked{color:var(--danger)}
-.admin-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.admin-actions button{border:1px solid var(--border);background:var(--panel);padding:8px 10px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700}.admin-actions button:disabled{opacity:.45;cursor:not-allowed}.admin-actions .warn{color:#a96c00}.admin-actions .danger{color:var(--danger)}.protected-account{color:var(--muted);font-size:12px}
-.status-dialog{width:min(820px,100%);max-height:min(850px,calc(100vh - 36px));display:flex;flex-direction:column}.status-title-row{display:flex;align-items:flex-start;gap:18px;padding-right:38px}.status-title-row>div{flex:1}.status-title-row h2{margin-right:0}.status-refresh{width:auto;white-space:nowrap;padding:9px 14px}.status-create{border:1px solid var(--border);background:var(--soft);border-radius:16px;padding:12px;margin:14px 0}.status-create textarea{width:100%;min-height:82px;resize:vertical;border:1px solid var(--border);background:var(--panel);color:var(--text);padding:12px;border-radius:12px;font:inherit;outline:none}.status-create textarea:focus{border-color:var(--accent)}.status-create-actions{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:9px}.status-create-actions input[type=file]{min-width:0;max-width:100%;font-size:12px}.status-file-label{display:inline-block!important;margin:0!important;border:1px solid var(--border);background:var(--panel);padding:10px 12px;border-radius:10px;cursor:pointer;white-space:nowrap}.status-create-actions .primary{width:auto;margin:0}.statuses-list{overflow:auto;display:flex;flex-direction:column;gap:11px;min-height:140px}.status-card{border:1px solid var(--border);background:var(--soft);border-radius:16px;padding:12px}.status-card.viewed{opacity:.78}.status-card-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}.status-card-head>div:nth-child(2){min-width:0;flex:1}.status-card-head strong{display:block}.status-card-head span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.status-delete{border:0;background:transparent;color:var(--danger);font-weight:700;cursor:pointer}.status-text{font-size:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;background:linear-gradient(135deg,rgba(91,108,255,.14),rgba(127,86,217,.14));padding:18px;border-radius:13px}.status-media{display:block;width:100%;max-height:430px;object-fit:contain;background:#111827;border-radius:13px}.status-caption{margin:9px 3px 0;white-space:pre-wrap;overflow-wrap:anywhere}.status-empty{text-align:center;color:var(--muted);padding:32px}
-@media(max-width:760px){
-  .auth-view{padding:14px}.auth-card{padding:26px 22px;border-radius:22px}.brand-logo{width:60px;height:60px}
-  .app{grid-template-columns:1fr}
-  .sidebar{position:absolute;inset:0;z-index:5}
-  .sidebar.mobile-hidden{display:none}
-  .chat{position:absolute;inset:0;z-index:4}
-  .chat.mobile-hidden{display:none}
-  .back-btn{display:block}
-  .chat-head{padding:0 12px}.call-actions{gap:4px}.header-btn{width:38px;height:38px}
-  .messages{padding:14px}
-  .msg{max-width:88%}
-  .composer{grid-template-columns:auto auto minmax(0,1fr) auto}
-  .send-btn{grid-column:4}
-  .record-btn{grid-column:4;grid-row:1}
-  .send-btn{display:none}
-  .composer.has-text .record-btn{display:none}
-  .composer.has-text .send-btn{display:block}
-  .call-overlay{padding:10px}.call-card{width:calc(100vw - 20px);height:calc(100vh - 20px)}.video-stage{border-radius:18px}#localVideo{width:32%;right:10px;bottom:10px}
-  .admin-title-row{display:block}.admin-refresh{margin-top:8px}.admin-user{align-items:flex-start;flex-direction:column}.admin-actions{width:100%;justify-content:flex-start}.admin-actions button{flex:1}.protected-account{padding:4px 0}
-  .status-title-row{display:block}.status-refresh{margin-top:8px}.status-create-actions{grid-template-columns:1fr}.status-create-actions .primary{width:100%}.status-file-label{text-align:center}
-}
-.ai-avatar{background:linear-gradient(135deg,#5b6cff,#7f56d9)!important;color:#fff!important;font-size:12px;font-weight:900;letter-spacing:.03em}
+CONNECTCHAT PRO - ADMINISTRATOR SETUP
+=====================================
+
+Administrator username: Abokanaan
+
+BEFORE DEPLOYING THE ADMIN UPDATE
+---------------------------------
+1. On the current ConnectChat site, register the exact username Abokanaan.
+2. Save its password and recovery code privately.
+3. Open Supabase > SQL Editor > New query.
+4. Paste and run the complete admin-migration.sql file.
+5. The result must show Abokanaan / approved / true.
+
+DEPLOY
+------
+Upload these updated files to GitHub:
+
+Repository root:
+  server.js
+  admin-migration.sql
+  supabase-schema.sql
+  security-migration.sql
+  package.json
+  package-lock.json
+
+Inside public:
+  index.html
+  app.js
+  style.css
+  sw.js
+
+Render redeploys automatically.
+
+USE
+---
+1. Log in as Abokanaan.
+2. Click Manage users.
+3. New accounts appear as Pending.
+4. Click Approve to allow login.
+5. Block immediately prevents access.
+6. Delete permanently removes the user, messages, and associated stored files.
+
+The Abokanaan administrator account is protected from being blocked or deleted
+inside the app. Keep its password and recovery code private.
