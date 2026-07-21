@@ -70,7 +70,7 @@ button,input{font:inherit}.hidden{display:none!important}
 #localVideo{position:absolute;right:18px;bottom:18px;width:min(220px,28%);aspect-ratio:4/3;object-fit:cover;border-radius:15px;border:2px solid rgba(255,255,255,.7);background:#263246}
 .video-stage.audio-only:before{content:'☎';font-size:90px;position:absolute;z-index:1}.video-stage.audio-only video{opacity:0}
 .call-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px}.call-controls button{border:0;border-radius:999px;padding:13px 20px;color:#fff;font-weight:700;cursor:pointer}
-.accept-call{background:var(--success)}.decline-call,.end-call{background:var(--danger)}.call-control{background:#364258}
+.accept-call{background:var(--success)}.decline-call,.end-call{background:var(--danger)}.call-control{background:#364258}.call-control:disabled{opacity:.45;cursor:not-allowed}.video-stage.local-sharing #localVideo{object-fit:contain;background:#05070b}.video-stage.remote-sharing:after{content:"SCREEN SHARING";position:absolute;left:14px;top:14px;padding:7px 10px;border-radius:999px;background:rgba(0,0,0,.62);font-size:11px;font-weight:800;letter-spacing:.08em;z-index:3}
 .dialog-overlay{position:fixed;inset:0;background:rgba(7,12,24,.72);z-index:50;display:grid;place-items:center;padding:18px;overflow:auto}
 .dialog-card{position:relative;width:min(480px,100%);background:var(--panel);color:var(--text);padding:30px;border-radius:24px;box-shadow:0 25px 70px rgba(0,0,0,.3)}
 .dialog-card h2{margin:0 38px 6px 0}.dialog-intro{color:var(--muted);line-height:1.45}.dialog-close{position:absolute;top:15px;right:16px;width:36px;height:36px;border:0;border-radius:50%;font-size:25px;background:var(--soft);cursor:pointer}

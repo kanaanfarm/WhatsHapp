@@ -1,7 +1,7 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 const typingUsers=new Map();
-let peer=null, localStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let peer=null, localStream=null, screenStream=null, cameraTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let callsEnabled=true;
 let aiBusy=false;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
@@ -249,6 +249,11 @@ function connectSocket(){
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
+  socket.on("call:screen-state",p=>{
+    if(p.userId!==callPeerId)return;
+    $("videoStage").classList.toggle("remote-sharing",p.sharing===true);
+    $("callStatus").textContent=p.sharing===true?"Screen sharing":"Connected";
+  });
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
@@ -379,6 +384,7 @@ function showCallUi(name,status,mode,incoming=false){
   $("declineCallBtn").classList.toggle("hidden",!incoming);
   $("muteBtn").classList.toggle("hidden",incoming);
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
+  $("screenShareBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
 
@@ -388,7 +394,7 @@ async function startCall(mode){
   try{
     callPeerId=activeUser.id;callMode=mode;
     showCallUi(activeUser.username,"Calling…",mode);
-    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;
+    localStream=await getMedia(mode);cameraTrack=localStream.getVideoTracks()[0]||null;$("localVideo").srcObject=localStream;
     peer=await createPeer(callPeerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -407,7 +413,7 @@ async function acceptIncomingCall(){
   pendingCall=null;
   try{
     showCallUi(data.callerName,"Connecting…",data.mode);
-    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;
+    localStream=await getMedia(data.mode);cameraTrack=localStream.getVideoTracks()[0]||null;$("localVideo").srcObject=localStream;
     peer=await createPeer(data.callerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     await peer.setRemoteDescription(data.offer);
@@ -420,8 +426,13 @@ async function acceptIncomingCall(){
 function finishCall(message="Call ended",notify=true){
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
+  if(screenStream){screenStream.getTracks().forEach(t=>{t.onended=null;t.stop()});screenStream=null}
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+  cameraTrack=null;
   $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
+  $("videoStage").classList.remove("local-sharing","remote-sharing");
+  $("screenShareBtn").textContent="🖥 Share screen";
+  $("cameraToggleBtn").disabled=false;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
   setTimeout(()=>$("callOverlay").classList.add("hidden"),500);
@@ -437,9 +448,48 @@ $("muteBtn").onclick=()=>{
   track.enabled=!track.enabled;$("muteBtn").textContent=track.enabled?"🎤 Mute":"🔇 Unmute";
 };
 $("cameraToggleBtn").onclick=()=>{
-  const track=localStream?.getVideoTracks()[0];if(!track)return;
+  const track=cameraTrack||localStream?.getVideoTracks()[0];if(!track)return;
   track.enabled=!track.enabled;$("cameraToggleBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera";
 };
+
+async function stopScreenShare(notify=true){
+  if(!screenStream)return;
+  const sender=peer?.getSenders().find(item=>item.track?.kind==="video");
+  try{if(sender&&cameraTrack)await sender.replaceTrack(cameraTrack)}catch(e){console.warn("Could not restore camera",e)}
+  screenStream.getTracks().forEach(track=>{track.onended=null;track.stop()});
+  screenStream=null;
+  if(localStream)$("localVideo").srcObject=localStream;
+  $("videoStage").classList.remove("local-sharing");
+  $("screenShareBtn").textContent="🖥 Share screen";
+  $("cameraToggleBtn").disabled=false;
+  $("callStatus").textContent="Connected";
+  if(notify&&callPeerId&&socket)socket.emit("call:screen-state",{receiverId:callPeerId,sharing:false});
+}
+
+async function toggleScreenShare(){
+  if(screenStream)return stopScreenShare();
+  if(!peer||callMode!=="video")return toast("Start a video call before sharing your screen.");
+  if(!navigator.mediaDevices?.getDisplayMedia)return toast("Screen sharing is not supported by this browser.");
+  try{
+    const stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:false});
+    const screenTrack=stream.getVideoTracks()[0];
+    const sender=peer.getSenders().find(item=>item.track?.kind==="video");
+    if(!screenTrack||!sender){stream.getTracks().forEach(track=>track.stop());throw new Error("No video sender")};
+    await sender.replaceTrack(screenTrack);
+    screenStream=stream;
+    $("localVideo").srcObject=screenStream;
+    $("videoStage").classList.add("local-sharing");
+    $("screenShareBtn").textContent="⏹ Stop sharing";
+    $("cameraToggleBtn").disabled=true;
+    $("callStatus").textContent="You are sharing your screen";
+    socket.emit("call:screen-state",{receiverId:callPeerId,sharing:true});
+    screenTrack.onended=()=>stopScreenShare();
+  }catch(e){
+    if(e?.name!=="NotAllowedError")toast("Screen sharing could not start.");
+  }
+}
+
+$("screenShareBtn").onclick=toggleScreenShare;
 function updateHeader(){
   if(!activeUser)return;
   $("chatName").textContent=activeUser.displayName||activeUser.username;

@@ -1,5 +1,5 @@
-const CACHE="connectchat-pro-v13";
-const ASSETS=["/","/index.html","/style.css?v=22","/app.js?v=22","/manifest.json","/logo.svg"];
+const CACHE="connectchat-pro-v40";
+const ASSETS=["/","/index.html","/style.css?v=40","/app.js?v=40","/manifest.json","/logo.svg"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener("fetch",e=>{

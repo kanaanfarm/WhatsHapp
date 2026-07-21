@@ -118,7 +118,7 @@ app.use(helmet({
   }
 }));
 app.use((req, res, next) => {
-  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), payment=()");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()");
   if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   next();
 });
@@ -826,18 +826,14 @@ app.get("/api/users", auth, async (req, res) => {
     const userId = Number(req.session.userId);
     const [{ data: users, error: userError }, { data: messages, error: messageError }] = await Promise.all([
       supabase.from("users").select("id,username,avatar,last_seen_at").eq("status", "approved").order("username", { ascending: true }),
-      supabase.from("messages").select("id,sender_id,receiver_id,kind,body,read_at,created_at").or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).order("id", { ascending: false }).limit(2000)
+      supabase.from("messages").select("id,sender_id,receiver_id,kind,body").or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).order("id", { ascending: false }).limit(2000)
     ]);
     if (userError) throw userError;
     if (messageError) throw messageError;
     const latest = new Map();
-    const unread = new Map();
     for (const message of messages || []) {
       const otherId = Number(message.sender_id) === userId ? Number(message.receiver_id) : Number(message.sender_id);
       if (!latest.has(otherId)) latest.set(otherId, message);
-      if (Number(message.receiver_id) === userId && !message.read_at) {
-        unread.set(otherId, (unread.get(otherId) || 0) + 1);
-      }
     }
     const result = (users || []).map(user => {
       const id = Number(user.id);
@@ -851,10 +847,7 @@ app.get("/api/users", auth, async (req, res) => {
         displayName: isSelf ? `${user.username} (You)` : user.username,
         online: isSelf || onlineUsers.has(id),
         lastSeenAt: user.last_seen_at || null,
-        lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation"),
-        lastMessageAt: last?.created_at || null,
-        lastSenderId: last ? Number(last.sender_id) : null,
-        unreadCount: isSelf ? 0 : (unread.get(id) || 0)
+        lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation")
       };
     });
     if (AI_ENABLED) result.unshift({
@@ -867,13 +860,7 @@ app.get("/api/users", auth, async (req, res) => {
       lastSeenAt: null,
       lastPreview: "Ask anything in Arabic or English"
     });
-    result.sort((a, b) => {
-      if (a.isSelf !== b.isSelf) return Number(b.isSelf) - Number(a.isSelf);
-      if (a.isAI !== b.isAI) return Number(b.isAI) - Number(a.isAI);
-      const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
-      const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
-      return bTime - aTime || a.username.localeCompare(b.username);
-    });
+    result.sort((a, b) => Number(b.isAI) - Number(a.isAI) || Number(b.isSelf) - Number(a.isSelf) || a.username.localeCompare(b.username));
     res.json(result);
   } catch (error) {
     console.error(error);
@@ -1278,6 +1265,13 @@ io.on("connection", async socket => {
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validIceCandidate(payload.candidate)) {
       io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
+    }
+  });
+  socket.on("call:screen-state", payload => {
+    if (!CALLS_ENABLED || !eventAllowed(socket, "call-screen", 60, 60 * 1000) || !payload || typeof payload !== "object") return;
+    const receiverId = Number(payload.receiverId);
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
+      io.to(`user:${receiverId}`).emit("call:screen-state", { userId, sharing: payload.sharing === true });
     }
   });
   socket.on("call:reject", payload => {
