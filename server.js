@@ -1267,14 +1267,6 @@ io.on("connection", async socket => {
       io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
     }
   });
-  socket.on("call:screen-status", payload => {
-    if (!CALLS_ENABLED || !payload || typeof payload !== "object") return;
-    const receiverId = Number(payload.receiverId);
-    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
-      io.to(`user:${receiverId}`).emit("call:screen-status", { userId, sharing: payload.sharing === true });
-    }
-  });
-
   socket.on("call:reject", payload => {
     if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);

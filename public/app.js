@@ -1,6 +1,7 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
-let peer=null, localStream=null, screenStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let currentUserFilter="all";
 let callsEnabled=true;
 let aiBusy=false;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
@@ -177,12 +178,11 @@ $("statusOverlay").onclick=e=>{if(e.target===$("statusOverlay"))$("statusOverlay
 
 async function startApp(){
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
-  $("meName").textContent="@"+me.username;
+  if($("railInitials"))$("railInitials").textContent=initials(me.username);
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
-  if($("railMe"))$("railMe").textContent=initials(me.username);
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
 }
 
@@ -233,7 +233,6 @@ function connectSocket(){
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
-  socket.on("call:screen-status",p=>{if(p.userId===callPeerId)$("callStatus").textContent=p.sharing?"Viewing shared screen":"Connected"});
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
@@ -274,15 +273,57 @@ function lastSeenText(value){
 
 function renderUsers(){
   const q=$("userSearch").value.toLowerCase();
+  const filtered=users.filter(u=>{
+    const matches=(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q);
+    if(!matches)return false;
+    if(currentUserFilter==="unread")return Number(u.unreadCount||u.unread_count||0)>0;
+    if(currentUserFilter==="groups")return Boolean(u.isGroup);
+    if(currentUserFilter==="pinned")return Boolean(u.pinned);
+    return true;
+  });
   $("usersList").innerHTML="";
-  users.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
+  filtered.forEach(u=>{
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
     const name=u.displayName||u.username;
     const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
-    const preview=u.isSelf&&!u.lastPreview?"Your private space":(u.lastPreview||"Start a conversation");
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
+    const preview=u.isSelf&&!u.lastPreview?"Your private conversation":(u.lastPreview||"Start a conversation");
+    const unread=Number(u.unreadCount||u.unread_count||0);
+    const stamp=u.lastMessageAt||u.last_message_at;
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}${u.isSelf?" (You)":""}</strong><span>${escapeHtml(preview)}</span></div><div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
+  });
+  renderQuickContacts();
+  const total=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
+  if($("railUnread")){ $("railUnread").textContent=String(Math.min(total,99)); $("railUnread").classList.toggle("hidden",!total); }
+}
+function renderQuickContacts(){
+  const box=$("quickContacts");
+  if(!box)return;
+  box.innerHTML="";
+
+  // Show only real approved human accounts returned by the server.
+  // Demo names and placeholder contacts are never rendered here.
+  const realContacts=users
+    .filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup)
+    .sort((a,b)=>{
+      if(Boolean(a.online)!==Boolean(b.online))return a.online?-1:1;
+      const aTime=new Date(a.lastMessageAt||a.last_message_at||0).getTime();
+      const bTime=new Date(b.lastMessageAt||b.last_message_at||0).getTime();
+      return bTime-aTime;
+    })
+    .slice(0,4);
+
+  box.classList.toggle("hidden",realContacts.length===0);
+  realContacts.forEach(u=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="quick-contact";
+    const name=u.displayName||u.username;
+    b.title=`Open chat with ${name}`;
+    b.innerHTML=`<span class="avatar">${initials(name)}</span><small>${escapeHtml(name.split(" ")[0])}</small><i class="quick-status ${u.online?"online":""}" aria-label="${u.online?"Online":"Offline"}"></i>`;
+    b.onclick=()=>selectUser(u);
+    box.appendChild(b);
   });
 }
 $("userSearch").oninput=renderUsers;
@@ -339,7 +380,6 @@ function showCallUi(name,status,mode,incoming=false){
   $("muteBtn").classList.toggle("hidden",incoming);
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
-  $("shareScreenBtn").textContent="🖥 Share screen";
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
 
@@ -378,47 +418,49 @@ async function acceptIncomingCall(){
   }catch(e){socket.emit("call:reject",{receiverId:data.callerId});finishCall("Call failed",false);toast("Camera and microphone permission is required.")}
 }
 
+async function toggleScreenShare(){
+  if(!peer||callMode!=="video")return toast("Start a video call first.");
+  const button=$("shareScreenBtn");
+  if(screenStream){ stopScreenShare(); return; }
+  try{
+    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:true});
+    const screenTrack=screenStream.getVideoTracks()[0];
+    const sender=peer.getSenders().find(x=>x.track&&x.track.kind==="video");
+    if(!sender)throw new Error("Video sender is unavailable");
+    cameraVideoTrack=sender.track;
+    await sender.replaceTrack(screenTrack);
+    $("localVideo").srcObject=screenStream;
+    $("videoStage").classList.add("screen-sharing");
+    button.textContent="⏹ Stop sharing";button.classList.add("share-active");
+    $("callStatus").textContent="Sharing screen";
+    screenTrack.onended=()=>stopScreenShare();
+  }catch(error){
+    if(error.name!=="NotAllowedError")toast("Screen sharing could not start.");
+    screenStream=null;
+  }
+}
+async function stopScreenShare(){
+  if(!screenStream)return;
+  const sender=peer?.getSenders().find(x=>x.track&&x.track.kind==="video");
+  const returnTrack=cameraVideoTrack||localStream?.getVideoTracks()[0];
+  try{if(sender&&returnTrack)await sender.replaceTrack(returnTrack)}catch{}
+  screenStream.getTracks().forEach(t=>t.stop());screenStream=null;
+  $("localVideo").srcObject=localStream;
+  $("videoStage").classList.remove("screen-sharing");
+  $("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");
+  $("callStatus").textContent="Connected";
+}
+
 function finishCall(message="Call ended",notify=true){
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
-  if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
+  if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+  cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing")
   $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
   setTimeout(()=>$("callOverlay").classList.add("hidden"),500);
-}
-
-
-async function stopScreenShare(notify=true){
-  if(!screenStream)return;
-  const sender=peer?.getSenders().find(s=>s.track?.kind==="video");
-  const cameraTrack=localStream?.getVideoTracks()[0];
-  try{if(sender&&cameraTrack)await sender.replaceTrack(cameraTrack)}catch(e){console.warn("Could not restore camera",e)}
-  screenStream.getTracks().forEach(t=>{t.onended=null;t.stop()});screenStream=null;
-  if(localStream)$("localVideo").srcObject=localStream;
-  $("shareScreenBtn").textContent="🖥 Share screen";
-  $("callStatus").textContent="Connected";
-  if(notify&&socket&&callPeerId)socket.emit("call:screen-status",{receiverId:callPeerId,sharing:false});
-}
-async function toggleScreenShare(){
-  if(screenStream)return stopScreenShare();
-  if(!peer||callMode!=="video")return toast("Start a video call before sharing your screen.");
-  try{
-    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:true});
-    const screenTrack=screenStream.getVideoTracks()[0];
-    const sender=peer.getSenders().find(s=>s.track?.kind==="video");
-    if(!sender||!screenTrack)throw new Error("No video sender");
-    await sender.replaceTrack(screenTrack);
-    $("localVideo").srcObject=screenStream;
-    $("shareScreenBtn").textContent="⏹ Stop sharing";
-    $("callStatus").textContent="You are sharing your screen";
-    socket.emit("call:screen-status",{receiverId:callPeerId,sharing:true});
-    screenTrack.onended=()=>stopScreenShare();
-  }catch(e){
-    if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
-    if(e?.name!=="NotAllowedError")toast("Screen sharing could not start.");
-  }
 }
 
 $("videoCallBtn").onclick=()=>startCall("video");
@@ -426,11 +468,11 @@ $("audioCallBtn").onclick=()=>startCall("audio");
 $("acceptCallBtn").onclick=acceptIncomingCall;
 $("declineCallBtn").onclick=()=>{if(callPeerId)socket.emit("call:reject",{receiverId:callPeerId});finishCall("Call declined",false)};
 $("endCallBtn").onclick=()=>finishCall();
-$("shareScreenBtn").onclick=toggleScreenShare;
 $("muteBtn").onclick=()=>{
   const track=localStream?.getAudioTracks()[0];if(!track)return;
   track.enabled=!track.enabled;$("muteBtn").textContent=track.enabled?"🎤 Mute":"🔇 Unmute";
 };
+$("shareScreenBtn").onclick=toggleScreenShare;
 $("cameraToggleBtn").onclick=()=>{
   const track=localStream?.getVideoTracks()[0];if(!track)return;
   track.enabled=!track.enabled;$("cameraToggleBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera";
@@ -640,6 +682,25 @@ $("closeAdminBtn").onclick=()=>$("adminOverlay").classList.add("hidden");
 $("refreshAdminBtn").onclick=loadAdminUsers;
 $("adminOverlay").onclick=e=>{if(e.target===$("adminOverlay"))$("adminOverlay").classList.add("hidden")};
 
+document.querySelectorAll(".chat-filter").forEach(button=>button.onclick=()=>{
+  document.querySelectorAll(".chat-filter").forEach(x=>x.classList.remove("active"));button.classList.add("active");
+  currentUserFilter=button.dataset.filter||"all";renderUsers();
+});
+if($("refreshUsersBtn"))$("refreshUsersBtn").onclick=refreshUsers;
+if($("newChatBtn"))$("newChatBtn").onclick=()=>{$("userSearch").focus();toast("Search and select a user to start a new conversation.")};
+if($("searchChatBtn"))$("searchChatBtn").onclick=()=>{const term=prompt("Search visible messages for:");if(!term)return;const found=[...$("messages").querySelectorAll(".bubble")].find(x=>x.textContent.toLowerCase().includes(term.toLowerCase()));if(found){found.scrollIntoView({behavior:"smooth",block:"center"});found.classList.add("search-hit");setTimeout(()=>found.classList.remove("search-hit"),1600)}else toast("No matching visible message.")};
+if($("moreChatBtn"))$("moreChatBtn").onclick=()=>toast("Conversation options: attachments, status and delete controls are available in the workspace.");
+document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onclick=()=>{
+  document.querySelectorAll(".rail-item[data-section]").forEach(x=>x.classList.remove("active"));button.classList.add("active");
+  const section=button.dataset.section;
+  if(section==="chats"){$("workspaceHeading").textContent="Messages";currentUserFilter="all";renderUsers();return}
+  if(section==="ai"){$("workspaceHeading").textContent="AI Assistant";const ai=users.find(u=>u.isAI);if(ai)selectUser(ai);else toast("AI is not configured on this server.");return}
+  if(section==="calls"){$("workspaceHeading").textContent="Calls";toast("Select an online user and use the phone or video button.");return}
+  if(section==="files"){$("workspaceHeading").textContent="Files";toast("Open a conversation to view and share its files.");return}
+  if(section==="settings"){$("workspaceHeading").textContent="Settings";toast("Theme, accent, status, recovery and account controls are available.");return}
+  $("workspaceHeading").textContent=section[0].toUpperCase()+section.slice(1);toast(`${section[0].toUpperCase()+section.slice(1)} workspace is ready for its database module.`);
+});
+
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden")});
 $("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").classList.add("hidden")};
 
@@ -668,41 +729,4 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
     if(activeUser.isAI){$("messageInput").value=prompts[button.dataset.smart];updateComposer();$("messageInput").focus();}
     else toast("Smart actions will use Ollama in the AI integration phase.");
   }));
-})();
-
-
-// ConnectChat Pro v4 workspace navigation helpers
-if($("railThemeBtn"))$("railThemeBtn").onclick=()=>$("themeBtn").click();
-if($("railAccentBtn"))$("railAccentBtn").onclick=()=>$("accentBtn").click();
-if($("newChatBtn"))$("newChatBtn").onclick=()=>{$("userSearch").focus();toast("Search and select a user to start a new conversation.")};
-if($("quickAdd"))$("quickAdd").onclick=()=>{$("userSearch").focus();toast("Choose a user from the conversation list.")};
-
-
-// v4.1 workspace navigation polish
-(() => {
-  const heading = document.getElementById('workspaceHeading');
-  document.querySelectorAll('.rail-item[data-section], .rail-item[data-coming]').forEach((button) => {
-    button.addEventListener('click', () => {
-      document.querySelectorAll('.rail-item').forEach((item) => item.classList.remove('active'));
-      button.classList.add('active');
-      const name = button.dataset.section || button.dataset.coming || 'Messages';
-      if (heading) heading.textContent = name === 'Chats' ? 'Messages' : name;
-      if (name !== 'Chats' && typeof showToast === 'function') showToast(`${name} workspace is ready for the next module.`);
-    });
-  });
-  document.querySelectorAll('.insight-tabs button').forEach((button) => {
-    button.addEventListener('click', () => {
-      document.querySelectorAll('.insight-tabs button').forEach((item) => item.classList.remove('active'));
-      button.classList.add('active');
-    });
-  });
-  const searchButton = document.getElementById('chatSearchBtn');
-  if (searchButton) searchButton.addEventListener('click', () => {
-    const input = document.getElementById('messageInput');
-    if (input && !input.disabled) input.focus();
-  });
-  const menuButton = document.getElementById('chatMenuBtn');
-  if (menuButton) menuButton.addEventListener('click', () => {
-    if (typeof showToast === 'function') showToast('Conversation options');
-  });
 })();
