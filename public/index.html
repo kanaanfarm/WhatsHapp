@@ -69,7 +69,19 @@
         <button id="statusBtn" class="status-btn">Status</button>
         <button id="installBtn" class="install-btn hidden">Install app</button>
         <button id="recoveryBtn" class="install-btn">Recovery code</button>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
+      </div>
+      <div class="account-dock" aria-label="Current account">
+        <button id="accountMenuBtn" class="account-summary" type="button" aria-expanded="false">
+          <span id="accountAvatar" class="account-avatar">ME</span>
+          <span class="account-copy"><b id="accountName">Account</b><small id="accountRole">Member</small></span>
+          <span class="account-chevron">⌃</span>
+        </button>
+        <div id="accountMenu" class="account-menu hidden">
+          <button id="profileBtn" type="button">👤 Profile</button>
+          <button id="accountSettingsBtn" type="button">⚙ Settings</button>
+          <button id="switchAccountBtn" type="button">⇄ Switch account</button>
+        </div>
+        <button id="logoutBtn" class="logout-btn persistent-logout" type="button">↪ Logout</button>
       </div>
     </aside>
 
@@ -92,8 +104,16 @@
       <footer class="composer">
         <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" hidden>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
-        <button id="attachBtn" class="circle-btn" title="Attach photo or file">＋</button><button id="cameraBtn" class="circle-btn" title="Take photo">📷</button>
-        <input id="messageInput" placeholder="Write a message…" disabled><button id="recordBtn" class="circle-btn record-btn" title="Record voice">🎤</button><button id="sendBtn" class="send-btn" disabled>➤</button>
+        <button id="emojiBtn" class="circle-btn" type="button" title="Emoji">😊</button>
+        <button id="attachBtn" class="circle-btn" type="button" title="Attach photo or file">📎</button>
+        <button id="cameraBtn" class="circle-btn" type="button" title="Take photo">📷</button>
+        <div class="message-entry">
+          <div id="emojiPicker" class="emoji-picker hidden" aria-label="Emoji picker"></div>
+          <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Write a message…" disabled></textarea>
+          <small class="composer-hint">Enter to send · Shift+Enter for new line</small>
+        </div>
+        <button id="recordBtn" class="circle-btn record-btn" type="button" title="Record voice">🎤</button>
+        <button id="sendBtn" class="send-btn" type="button" title="Send" disabled>➤</button>
       </footer>
     </main>
 
@@ -207,6 +227,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=42"></script>
+  <script src="app.js?v=44"></script>
 </body>
 </html>

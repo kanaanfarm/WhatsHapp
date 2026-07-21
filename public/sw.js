@@ -1,5 +1,5 @@
-const CACHE="connectchat-pro-v43-real-contacts";
-const ASSETS=["/","/index.html","/style.css?v=42","/app.js?v=42","/manifest.json","/logo.svg"];
+const CACHE="connectchat-pro-v44-composer-account";
+const ASSETS=["/","/index.html","/style.css?v=44","/app.js?v=44","/manifest.json","/logo.svg"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener("activate",e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener("fetch",e=>{

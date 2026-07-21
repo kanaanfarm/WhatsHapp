@@ -279,6 +279,9 @@ function updateWorkspaceOverview(){
   if($("workspaceProfileAvatar"))$("workspaceProfileAvatar").textContent=initials(me.username);
   if($("workspaceProfileName"))$("workspaceProfileName").textContent=me.username;
   if($("workspaceProfileRole"))$("workspaceProfileRole").textContent=me.isAdmin?"Administrator":"Workspace member";
+  if($("accountAvatar"))$("accountAvatar").textContent=initials(me.username);
+  if($("accountName"))$("accountName").textContent=me.username;
+  if($("accountRole"))$("accountRole").textContent=me.isAdmin?"Administrator":"Workspace member";
   if($("workspaceContactCount"))$("workspaceContactCount").textContent=String(humanContacts.length);
   if($("workspaceOnlineCount"))$("workspaceOnlineCount").textContent=String(online);
   if($("workspaceUnreadCount"))$("workspaceUnreadCount").textContent=String(unread);
@@ -596,6 +599,27 @@ function send(){
   socket.emit("privateMessage",{receiverId:activeUser.id,body});
   socket.emit("typing",{receiverId:activeUser.id,isTyping:false});
 }
+
+const EMOJIS=["😀","😁","😂","🤣","😊","😍","🥰","😎","🤔","😢","😭","😡","👍","👎","👏","🙏","💪","✅","🎉","❤️","🔥","⭐","💯","👋","👌","🤝","📌","📎"];
+if($("emojiPicker")){
+  $("emojiPicker").innerHTML=EMOJIS.map(e=>`<button type="button" aria-label="${e}">${e}</button>`).join("");
+  $("emojiPicker").onclick=e=>{
+    const button=e.target.closest("button");if(!button)return;
+    const input=$("messageInput");
+    const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+    input.value=input.value.slice(0,start)+button.textContent+input.value.slice(end);
+    input.focus();input.selectionStart=input.selectionEnd=start+button.textContent.length;updateComposer();
+  };
+}
+if($("emojiBtn"))$("emojiBtn").onclick=()=>{
+  if(!activeUser)return toast("Select a user first.");
+  $("emojiPicker").classList.toggle("hidden");
+};
+document.addEventListener("click",e=>{
+  if($("emojiPicker")&&!e.target.closest("#emojiPicker")&&!e.target.closest("#emojiBtn"))$("emojiPicker").classList.add("hidden");
+  if($("accountMenu")&&!e.target.closest("#accountMenu")&&!e.target.closest("#accountMenuBtn"))$("accountMenu").classList.add("hidden");
+});
+
 $("sendBtn").onclick=send;
 $("messageInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}};
 $("messageInput").oninput=()=>{
@@ -604,7 +628,16 @@ $("messageInput").oninput=()=>{
   socket.emit("typing",{receiverId:activeUser.id,isTyping:true});
   clearTimeout(typingTimer);typingTimer=setTimeout(()=>socket.emit("typing",{receiverId:activeUser.id,isTyping:false}),700);
 };
-function updateComposer(){$("messageInput").closest(".composer").classList.toggle("has-text",Boolean($("messageInput").value.trim()))}
+function resizeMessageInput(){
+  const input=$("messageInput");
+  if(!input)return;
+  input.style.height="auto";
+  input.style.height=`${Math.min(input.scrollHeight,120)}px`;
+}
+function updateComposer(){
+  $("messageInput").closest(".composer").classList.toggle("has-text",Boolean($("messageInput").value.trim()));
+  resizeMessageInput();
+}
 
 async function uploadFile(file,kind){
   if(!activeUser)return toast("Select a user first.");
@@ -658,7 +691,23 @@ $("recordBtn").onclick=async()=>{
 $("backBtn").onclick=()=>{
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
 };
-$("logoutBtn").onclick=async()=>{if(socket)socket.disconnect();await api("/api/logout",{method:"POST"});location.reload()};
+async function logoutAndReturn(){
+  if(socket)socket.disconnect();
+  await api("/api/logout",{method:"POST"});
+  location.reload();
+}
+$("logoutBtn").onclick=logoutAndReturn;
+if($("switchAccountBtn"))$("switchAccountBtn").onclick=logoutAndReturn;
+if($("accountMenuBtn"))$("accountMenuBtn").onclick=()=>{
+  const menu=$("accountMenu");
+  const open=menu.classList.toggle("hidden")===false;
+  $("accountMenuBtn").setAttribute("aria-expanded",String(open));
+};
+if($("profileBtn"))$("profileBtn").onclick=()=>toast(`Signed in as ${me.username}`);
+if($("accountSettingsBtn"))$("accountSettingsBtn").onclick=()=>{
+  $("accountMenu").classList.add("hidden");
+  document.querySelector('[data-section="settings"]')?.click();
+};
 $("recoveryBtn").onclick=async()=>{
   if(!confirm("Generate a new recovery code? Any previous recovery code will stop working."))return;
   try{const data=await api("/api/recovery-code",{method:"POST"});showSavedRecovery(data.recoveryCode)}
