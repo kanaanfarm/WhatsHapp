@@ -118,7 +118,7 @@ app.use(helmet({
   }
 }));
 app.use((req, res, next) => {
-  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), payment=()");
   if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   next();
 });
@@ -1267,13 +1267,14 @@ io.on("connection", async socket => {
       io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
     }
   });
-  socket.on("call:screen-state", payload => {
-    if (!CALLS_ENABLED || !eventAllowed(socket, "call-screen", 60, 60 * 1000) || !payload || typeof payload !== "object") return;
+  socket.on("call:screen-status", payload => {
+    if (!CALLS_ENABLED || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
-      io.to(`user:${receiverId}`).emit("call:screen-state", { userId, sharing: payload.sharing === true });
+      io.to(`user:${receiverId}`).emit("call:screen-status", { userId, sharing: payload.sharing === true });
     }
   });
+
   socket.on("call:reject", payload => {
     if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);

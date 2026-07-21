@@ -1,7 +1,6 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
-const typingUsers=new Map();
-let peer=null, localStream=null, screenStream=null, cameraTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let peer=null, localStream=null, screenStream=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let callsEnabled=true;
 let aiBusy=false;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
@@ -183,6 +182,7 @@ async function startApp(){
   users=await api("/api/users");
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
+  if($("railMe"))$("railMe").textContent=initials(me.username);
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
 }
 
@@ -191,24 +191,11 @@ function connectSocket(){
   socket=io();
   socket.on("connect",refreshUsers);
   socket.on("privateMessage",msg=>{
-    const otherId=Number(msg.sender_id)===Number(me.id)?Number(msg.receiver_id):Number(msg.sender_id);
-    const item=users.find(u=>Number(u.id)===otherId);
-    if(item){
-      item.lastPreview=msg.kind&&msg.kind!=="text"?`[${msg.kind}]`:(msg.body||"Message");
-      item.lastMessageAt=msg.created_at||new Date().toISOString();
-      item.lastSenderId=Number(msg.sender_id);
-    }
-    const relevant=activeUser&&Number(activeUser.id)===otherId;
+    const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
     if(relevant){
       addMessage(msg);
-      if(Number(msg.receiver_id)===Number(me.id)){
-        if(item)item.unreadCount=0;
-        socket.emit("message:read",{messageIds:[msg.id]});
-      }
-    }else if(Number(msg.receiver_id)===Number(me.id)&&item){
-      item.unreadCount=(Number(item.unreadCount)||0)+1;
+      if(Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)===Number(activeUser.id))socket.emit("message:read",{messageIds:[msg.id]});
     }
-    renderUsers();
     refreshUsers();
   });
   socket.on("message:status",updateMessageReceipt);
@@ -230,10 +217,7 @@ function connectSocket(){
   socket.on("status:deleted",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("typing",p=>{
-    const id=Number(p.userId);
-    if(p.isTyping)typingUsers.set(id,p.username||"User");else typingUsers.delete(id);
-    if(activeUser&&id===Number(activeUser.id))$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
-    renderUsers();
+    if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
   });
   socket.on("call:incoming",showIncomingCall);
   socket.on("call:answered",async p=>{
@@ -249,11 +233,7 @@ function connectSocket(){
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
-  socket.on("call:screen-state",p=>{
-    if(p.userId!==callPeerId)return;
-    $("videoStage").classList.toggle("remote-sharing",p.sharing===true);
-    $("callStatus").textContent=p.sharing===true?"Screen sharing":"Connected";
-  });
+  socket.on("call:screen-status",p=>{if(p.userId===callPeerId)$("callStatus").textContent=p.sharing?"Viewing shared screen":"Connected"});
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
@@ -282,23 +262,6 @@ function time(v){
   const date=new Date(value.includes("T")?value:value.replace(" ","T")+"Z");
   return Number.isNaN(date.getTime())?"":date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 }
-function conversationTime(value){
-  if(!value)return "";
-  const date=new Date(value);if(Number.isNaN(date.getTime()))return "";
-  const now=new Date();
-  const sameDay=date.toDateString()===now.toDateString();
-  if(sameDay)return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-  const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
-  if(date.toDateString()===yesterday.toDateString())return "Yesterday";
-  return date.toLocaleDateString([],{month:"short",day:"numeric"});
-}
-function conversationPreview(user){
-  if(typingUsers.has(Number(user.id)))return `${typingUsers.get(Number(user.id))} is typing…`;
-  const base=user.isSelf&&!user.lastPreview?"Your private space":(user.lastPreview||"Start a conversation");
-  if(user.lastSenderId&&Number(user.lastSenderId)===Number(me.id)&&!user.isSelf)return `You: ${base}`;
-  return base;
-}
-
 function lastSeenText(value){
   if(!value)return "Offline";
   const date=new Date(value);if(Number.isNaN(date.getTime()))return "Offline";
@@ -312,29 +275,20 @@ function lastSeenText(value){
 function renderUsers(){
   const q=$("userSearch").value.toLowerCase();
   $("usersList").innerHTML="";
-  const sorted=[...users].sort((a,b)=>{
-    if(a.isSelf!==b.isSelf)return Number(b.isSelf)-Number(a.isSelf);
-    if(a.isAI!==b.isAI)return Number(b.isAI)-Number(a.isAI);
-    return new Date(b.lastMessageAt||0)-new Date(a.lastMessageAt||0)||(a.username||"").localeCompare(b.username||"");
-  });
-  sorted.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
+  users.filter(u=>(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q)).forEach(u=>{
     const d=document.createElement("div");
-    d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""} ${Number(u.unreadCount)>0?"has-unread":""}`;
+    d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
     const name=u.displayName||u.username;
     const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
-    const preview=conversationPreview(u);
-    const stamp=conversationTime(u.lastMessageAt);
-    const unread=Math.min(99,Number(u.unreadCount)||0);
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><div class="user-line"><strong>${escapeHtml(name)}</strong>${stamp?`<time>${escapeHtml(stamp)}</time>`:""}</div><span class="conversation-preview ${typingUsers.has(Number(u.id))?"typing-preview":""}">${escapeHtml(preview)}</span></div><div class="user-tail">${unread?`<b class="unread-badge">${unread}</b>`:""}<div class="dot ${u.online?"online":""}"></div></div>`;
+    const preview=u.isSelf&&!u.lastPreview?"Your private space":(u.lastPreview||"Start a conversation");
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="dot ${u.online?"online":""}"></div>`;
     d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
   });
 }
 $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
-  activeUser=u;
-  const local=users.find(item=>Number(item.id)===Number(u.id));if(local)local.unreadCount=0;
-  renderUsers();updateHeader();
+  activeUser=u;renderUsers();updateHeader();
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -384,7 +338,8 @@ function showCallUi(name,status,mode,incoming=false){
   $("declineCallBtn").classList.toggle("hidden",!incoming);
   $("muteBtn").classList.toggle("hidden",incoming);
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
-  $("screenShareBtn").classList.toggle("hidden",incoming||mode==="audio");
+  $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
+  $("shareScreenBtn").textContent="🖥 Share screen";
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
 
@@ -394,7 +349,7 @@ async function startCall(mode){
   try{
     callPeerId=activeUser.id;callMode=mode;
     showCallUi(activeUser.username,"Calling…",mode);
-    localStream=await getMedia(mode);cameraTrack=localStream.getVideoTracks()[0]||null;$("localVideo").srcObject=localStream;
+    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;
     peer=await createPeer(callPeerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -413,7 +368,7 @@ async function acceptIncomingCall(){
   pendingCall=null;
   try{
     showCallUi(data.callerName,"Connecting…",data.mode);
-    localStream=await getMedia(data.mode);cameraTrack=localStream.getVideoTracks()[0]||null;$("localVideo").srcObject=localStream;
+    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;
     peer=await createPeer(data.callerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     await peer.setRemoteDescription(data.offer);
@@ -426,16 +381,44 @@ async function acceptIncomingCall(){
 function finishCall(message="Call ended",notify=true){
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
-  if(screenStream){screenStream.getTracks().forEach(t=>{t.onended=null;t.stop()});screenStream=null}
+  if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
-  cameraTrack=null;
   $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
-  $("videoStage").classList.remove("local-sharing","remote-sharing");
-  $("screenShareBtn").textContent="🖥 Share screen";
-  $("cameraToggleBtn").disabled=false;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
   setTimeout(()=>$("callOverlay").classList.add("hidden"),500);
+}
+
+
+async function stopScreenShare(notify=true){
+  if(!screenStream)return;
+  const sender=peer?.getSenders().find(s=>s.track?.kind==="video");
+  const cameraTrack=localStream?.getVideoTracks()[0];
+  try{if(sender&&cameraTrack)await sender.replaceTrack(cameraTrack)}catch(e){console.warn("Could not restore camera",e)}
+  screenStream.getTracks().forEach(t=>{t.onended=null;t.stop()});screenStream=null;
+  if(localStream)$("localVideo").srcObject=localStream;
+  $("shareScreenBtn").textContent="🖥 Share screen";
+  $("callStatus").textContent="Connected";
+  if(notify&&socket&&callPeerId)socket.emit("call:screen-status",{receiverId:callPeerId,sharing:false});
+}
+async function toggleScreenShare(){
+  if(screenStream)return stopScreenShare();
+  if(!peer||callMode!=="video")return toast("Start a video call before sharing your screen.");
+  try{
+    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:true});
+    const screenTrack=screenStream.getVideoTracks()[0];
+    const sender=peer.getSenders().find(s=>s.track?.kind==="video");
+    if(!sender||!screenTrack)throw new Error("No video sender");
+    await sender.replaceTrack(screenTrack);
+    $("localVideo").srcObject=screenStream;
+    $("shareScreenBtn").textContent="⏹ Stop sharing";
+    $("callStatus").textContent="You are sharing your screen";
+    socket.emit("call:screen-status",{receiverId:callPeerId,sharing:true});
+    screenTrack.onended=()=>stopScreenShare();
+  }catch(e){
+    if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
+    if(e?.name!=="NotAllowedError")toast("Screen sharing could not start.");
+  }
 }
 
 $("videoCallBtn").onclick=()=>startCall("video");
@@ -443,53 +426,15 @@ $("audioCallBtn").onclick=()=>startCall("audio");
 $("acceptCallBtn").onclick=acceptIncomingCall;
 $("declineCallBtn").onclick=()=>{if(callPeerId)socket.emit("call:reject",{receiverId:callPeerId});finishCall("Call declined",false)};
 $("endCallBtn").onclick=()=>finishCall();
+$("shareScreenBtn").onclick=toggleScreenShare;
 $("muteBtn").onclick=()=>{
   const track=localStream?.getAudioTracks()[0];if(!track)return;
   track.enabled=!track.enabled;$("muteBtn").textContent=track.enabled?"🎤 Mute":"🔇 Unmute";
 };
 $("cameraToggleBtn").onclick=()=>{
-  const track=cameraTrack||localStream?.getVideoTracks()[0];if(!track)return;
+  const track=localStream?.getVideoTracks()[0];if(!track)return;
   track.enabled=!track.enabled;$("cameraToggleBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera";
 };
-
-async function stopScreenShare(notify=true){
-  if(!screenStream)return;
-  const sender=peer?.getSenders().find(item=>item.track?.kind==="video");
-  try{if(sender&&cameraTrack)await sender.replaceTrack(cameraTrack)}catch(e){console.warn("Could not restore camera",e)}
-  screenStream.getTracks().forEach(track=>{track.onended=null;track.stop()});
-  screenStream=null;
-  if(localStream)$("localVideo").srcObject=localStream;
-  $("videoStage").classList.remove("local-sharing");
-  $("screenShareBtn").textContent="🖥 Share screen";
-  $("cameraToggleBtn").disabled=false;
-  $("callStatus").textContent="Connected";
-  if(notify&&callPeerId&&socket)socket.emit("call:screen-state",{receiverId:callPeerId,sharing:false});
-}
-
-async function toggleScreenShare(){
-  if(screenStream)return stopScreenShare();
-  if(!peer||callMode!=="video")return toast("Start a video call before sharing your screen.");
-  if(!navigator.mediaDevices?.getDisplayMedia)return toast("Screen sharing is not supported by this browser.");
-  try{
-    const stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:false});
-    const screenTrack=stream.getVideoTracks()[0];
-    const sender=peer.getSenders().find(item=>item.track?.kind==="video");
-    if(!screenTrack||!sender){stream.getTracks().forEach(track=>track.stop());throw new Error("No video sender")};
-    await sender.replaceTrack(screenTrack);
-    screenStream=stream;
-    $("localVideo").srcObject=screenStream;
-    $("videoStage").classList.add("local-sharing");
-    $("screenShareBtn").textContent="⏹ Stop sharing";
-    $("cameraToggleBtn").disabled=true;
-    $("callStatus").textContent="You are sharing your screen";
-    socket.emit("call:screen-state",{receiverId:callPeerId,sharing:true});
-    screenTrack.onended=()=>stopScreenShare();
-  }catch(e){
-    if(e?.name!=="NotAllowedError")toast("Screen sharing could not start.");
-  }
-}
-
-$("screenShareBtn").onclick=toggleScreenShare;
 function updateHeader(){
   if(!activeUser)return;
   $("chatName").textContent=activeUser.displayName||activeUser.username;
@@ -723,4 +668,41 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
     if(activeUser.isAI){$("messageInput").value=prompts[button.dataset.smart];updateComposer();$("messageInput").focus();}
     else toast("Smart actions will use Ollama in the AI integration phase.");
   }));
+})();
+
+
+// ConnectChat Pro v4 workspace navigation helpers
+if($("railThemeBtn"))$("railThemeBtn").onclick=()=>$("themeBtn").click();
+if($("railAccentBtn"))$("railAccentBtn").onclick=()=>$("accentBtn").click();
+if($("newChatBtn"))$("newChatBtn").onclick=()=>{$("userSearch").focus();toast("Search and select a user to start a new conversation.")};
+if($("quickAdd"))$("quickAdd").onclick=()=>{$("userSearch").focus();toast("Choose a user from the conversation list.")};
+
+
+// v4.1 workspace navigation polish
+(() => {
+  const heading = document.getElementById('workspaceHeading');
+  document.querySelectorAll('.rail-item[data-section], .rail-item[data-coming]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.rail-item').forEach((item) => item.classList.remove('active'));
+      button.classList.add('active');
+      const name = button.dataset.section || button.dataset.coming || 'Messages';
+      if (heading) heading.textContent = name === 'Chats' ? 'Messages' : name;
+      if (name !== 'Chats' && typeof showToast === 'function') showToast(`${name} workspace is ready for the next module.`);
+    });
+  });
+  document.querySelectorAll('.insight-tabs button').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.insight-tabs button').forEach((item) => item.classList.remove('active'));
+      button.classList.add('active');
+    });
+  });
+  const searchButton = document.getElementById('chatSearchBtn');
+  if (searchButton) searchButton.addEventListener('click', () => {
+    const input = document.getElementById('messageInput');
+    if (input && !input.disabled) input.focus();
+  });
+  const menuButton = document.getElementById('chatMenuBtn');
+  if (menuButton) menuButton.addEventListener('click', () => {
+    if (typeof showToast === 'function') showToast('Conversation options');
+  });
 })();

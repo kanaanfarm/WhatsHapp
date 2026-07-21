@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#182132">
-  <title>ConnectChat Pro v3</title>
+  <title>ConnectChat Pro v4 Workspace</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -37,25 +37,39 @@
   </section>
 
   <section id="appView" class="app hidden">
+    <nav class="app-rail" aria-label="Main navigation">
+      <button class="rail-brand" type="button" title="ConnectChat"><img src="logo.svg" alt=""></button>
+      <button class="rail-item active" type="button" data-section="Chats"><span>💬</span><small>Chats</small><b class="rail-badge">7</b></button>
+      <button class="rail-item" type="button" data-coming="AI workspace"><span>🤖</span><small>AI</small></button>
+      <button class="rail-item" type="button" data-coming="Groups"><span>👥</span><small>Groups</small></button>
+      <button class="rail-item" type="button" data-coming="Channels"><span>📣</span><small>Channels</small></button>
+      <button class="rail-item" type="button" data-coming="Files"><span>📁</span><small>Files</small></button>
+      <button class="rail-item" type="button" data-coming="Calls"><span>📞</span><small>Calls</small></button>
+      <div class="rail-spacer"></div>
+      <button id="railThemeBtn" class="rail-item compact" type="button"><span>🌙</span><small>Theme</small></button>
+      <button id="railAccentBtn" class="rail-item compact" type="button"><span>◉</span><small>Accent</small></button>
+      <button class="rail-item compact" type="button" data-coming="Settings"><span>⚙️</span><small>Settings</small></button>
+      <div id="railMe" class="rail-profile">MK</div>
+    </nav>
     <aside id="sidebar" class="sidebar">
-      <div class="sidebar-head">
-        <img class="brand-logo small" src="logo.svg" alt="">
-        <div>
-          <strong>ConnectChat Pro <small class="version-pill">v3</small></strong>
-          <span id="meName"></span>
-        </div>
+      <div class="workspace-title">
+        <div><small>WORKSPACE</small><h1 id="workspaceHeading">Messages</h1></div>
+        <button id="newChatBtn" class="new-chat-btn" type="button">＋ New</button>
       </div>
-
-      <div class="search-box">
-        <input id="userSearch" placeholder="Search users">
+      <div class="search-box"><span>⌕</span><input id="userSearch" placeholder="Search conversations"></div>
+      <div class="conversation-filters" aria-label="Conversation filters">
+        <button class="filter-chip active" type="button">All</button>
+        <button class="filter-chip" type="button" data-coming="Unread filter">Unread</button>
+        <button class="filter-chip" type="button" data-coming="Group conversations">Groups</button>
+        <button class="filter-chip" type="button" data-coming="Pinned conversations">Pinned</button>
       </div>
-
-      <div class="workspace-nav" aria-label="Workspace navigation">
-        <button class="workspace-tab active" type="button">💬 Chats</button>
-        <button class="workspace-tab" type="button" data-coming="AI workspace">✦ AI</button>
-        <button class="workspace-tab" type="button" data-coming="Business tools">▦ Business</button>
+      <div class="quick-people" aria-label="Quick contacts">
+        <button type="button" id="quickAdd"><span class="quick-add">＋</span><small>Add</small></button>
+        <button type="button" data-coming="Quick contact"><span class="quick-avatar teal">SA</span><small>Sarah</small></button>
+        <button type="button" data-coming="Quick contact"><span class="quick-avatar amber">AD</span><small>Adam</small></button>
+        <button type="button" data-coming="Quick contact"><span class="quick-avatar green">LN</span><small>Lina</small></button>
       </div>
-      <div class="section-label"><span>Conversations</span><button id="themeBtn" class="mini-icon" type="button" title="Change theme">◐</button><button id="accentBtn" class="mini-icon" type="button" title="Change accent">◉</button></div>
+      <div class="section-label"><span>RECENT</span><button id="themeBtn" class="mini-icon hidden" type="button">◐</button><button id="accentBtn" class="mini-icon hidden" type="button">◉</button></div>
       <div id="usersList" class="users-list"></div>
 
       <div class="sidebar-actions">
@@ -76,16 +90,20 @@
           <span id="chatStatus">Start a private conversation</span>
         </div>
         <div class="call-actions">
+          <button id="chatSearchBtn" class="header-btn" title="Search in conversation">⌕</button>
           <button id="audioCallBtn" class="header-btn" title="Audio call" disabled>☎</button>
-          <button id="videoCallBtn" class="header-btn" title="Video call" disabled>📹</button>
+          <button id="videoCallBtn" class="header-btn" title="Video call and screen sharing" disabled>◉</button>
+          <button id="chatMenuBtn" class="header-btn" title="Conversation menu">⋮</button>
         </div>
       </header>
 
       <div class="smart-strip" aria-label="Smart actions">
         <span>✦ Smart workspace</span>
-        <button type="button" data-smart="summary">Summarize</button>
-        <button type="button" data-smart="tasks">Action items</button>
-        <button type="button" data-smart="translate">Translate</button>
+        <div class="smart-buttons">
+          <button type="button" data-smart="summary">Summarize</button>
+          <button type="button" data-smart="tasks">Action items</button>
+          <button type="button" data-smart="translate">Translate</button>
+        </div>
       </div>
 
       <div id="messages" class="messages empty-state">
@@ -112,6 +130,7 @@
 
     <aside class="insights-panel" aria-label="Workspace insights">
       <div class="insights-head"><div><small>SMART WORKSPACE</small><h3>Overview</h3></div><button class="mini-icon" type="button">⋮</button></div>
+      <div class="insight-tabs"><button class="active" type="button">Overview</button><button type="button">Files</button><button type="button">Media</button></div>
       <div class="premium-card"><span>✦</span><h3>ConnectChat Premium</h3><p>Ad-free conversations, more storage and advanced AI tools.</p><button type="button" data-coming="Premium plans">Explore Premium</button></div>
       <div class="tool-grid">
         <button type="button" data-coming="Calendar"><b>🗓 Calendar</b><small>Connect schedules</small></button>
@@ -143,7 +162,7 @@
         <button id="declineCallBtn" class="decline-call hidden">Decline</button>
         <button id="muteBtn" class="call-control hidden">🎤 Mute</button>
         <button id="cameraToggleBtn" class="call-control hidden">📹 Camera</button>
-        <button id="screenShareBtn" class="call-control hidden">🖥 Share screen</button>
+        <button id="shareScreenBtn" class="call-control share-screen hidden">🖥 Share screen</button>
         <button id="endCallBtn" class="end-call hidden">End call</button>
       </div>
     </div>
@@ -216,6 +235,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>
