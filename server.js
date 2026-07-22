@@ -425,6 +425,22 @@ async function signedMessages(messages) {
   return Promise.all((messages || []).map(signedMessage));
 }
 
+async function signedAvatarUrl(storagePath) {
+  if (!storagePath) return null;
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, SIGNED_URL_SECONDS);
+  if (error) {
+    console.error("Could not sign avatar URL:", error.message);
+    return null;
+  }
+  return data?.signedUrl || null;
+}
+
+async function safeUserWithAvatar(row) {
+  const user = safeUser(row);
+  user.avatar = await signedAvatarUrl(row?.avatar);
+  return user;
+}
+
 async function signedStatus(status) {
   if (!status || !status.file_url) return status;
   const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(status.file_url, SIGNED_URL_SECONDS);
@@ -568,13 +584,14 @@ app.post("/api/login", async (req, res) => {
         code: String(user.status || "pending").toUpperCase()
       });
     }
+    const responseUser = await safeUserWithAvatar(user);
     req.session.regenerate(regenerateError => {
       if (regenerateError) return res.status(500).json({ error: "Login failed." });
       req.session.userId = Number(user.id);
       req.session.username = user.username;
       req.session.save(saveError => {
         if (saveError) return res.status(500).json({ error: "Login failed." });
-        res.json(safeUser(user));
+        res.json(responseUser);
       });
     });
   } catch (error) {
@@ -653,10 +670,57 @@ app.get("/api/me", async (req, res) => {
         error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval."
       });
     }
-    res.json(safeUser(user));
+    res.json(await safeUserWithAvatar(user));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not load account." });
+  }
+});
+
+app.post("/api/profile/avatar", auth, upload.single("avatar"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Choose a profile photo." });
+    const detected = await verifyUpload(req.file);
+    if (detected.kind !== "image") return res.status(400).json({ error: "Profile photo must be a JPG, PNG, WEBP, or GIF image." });
+    const oldAvatar = req.currentUser.avatar || null;
+    const storagePath = `avatars/${Number(req.currentUser.id)}/${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${detected.ext}`;
+    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
+      contentType: detected.mime,
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { error: updateError } = await supabase.from("users").update({ avatar: storagePath }).eq("id", req.currentUser.id);
+    if (updateError) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+      throw updateError;
+    }
+    if (oldAvatar && oldAvatar !== storagePath) {
+      const { error: removeError } = await supabase.storage.from(STORAGE_BUCKET).remove([oldAvatar]);
+      if (removeError) console.error("Could not remove previous avatar:", removeError.message);
+    }
+    const avatar = await signedAvatarUrl(storagePath);
+    io.emit("users:changed");
+    res.json({ ok: true, avatar });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message || "Could not upload profile photo." });
+  }
+});
+
+app.delete("/api/profile/avatar", auth, async (req, res) => {
+  try {
+    const oldAvatar = req.currentUser.avatar || null;
+    const { error } = await supabase.from("users").update({ avatar: null }).eq("id", req.currentUser.id);
+    if (error) throw error;
+    if (oldAvatar) {
+      const { error: removeError } = await supabase.storage.from(STORAGE_BUCKET).remove([oldAvatar]);
+      if (removeError) console.error("Could not remove avatar:", removeError.message);
+    }
+    io.emit("users:changed");
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not remove profile photo." });
   }
 });
 
@@ -835,21 +899,21 @@ app.get("/api/users", auth, async (req, res) => {
       const otherId = Number(message.sender_id) === userId ? Number(message.receiver_id) : Number(message.sender_id);
       if (!latest.has(otherId)) latest.set(otherId, message);
     }
-    const result = (users || []).map(user => {
+    const result = await Promise.all((users || []).map(async user => {
       const id = Number(user.id);
       const isSelf = id === userId;
       const last = latest.get(id);
       return {
         id,
         username: user.username,
-        avatar: user.avatar || null,
+        avatar: await signedAvatarUrl(user.avatar),
         isSelf,
         displayName: isSelf ? `${user.username} (You)` : user.username,
         online: isSelf || onlineUsers.has(id),
         lastSeenAt: user.last_seen_at || null,
         lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation")
       };
-    });
+    }));
     if (AI_ENABLED) result.unshift({
       id: -1,
       username: "ConnectChat AI",

@@ -7,7 +7,7 @@
   <title>ConnectChat Pro v4</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=44">
+  <link rel="stylesheet" href="style.css?v=46">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -135,6 +135,41 @@
     </aside>
   </section>
 
+  <section id="profilePage" class="profile-page hidden" aria-label="Profile page">
+    <header class="profile-page-head">
+      <button id="closeProfilePageBtn" type="button" class="profile-back">← Back</button>
+      <div><small>CONNECTCHAT PRO</small><h1 id="profilePageTitle">My profile</h1></div>
+    </header>
+    <main class="profile-page-body">
+      <section class="profile-photo-card">
+        <div id="profilePhotoPreview" class="profile-photo-preview">ME</div>
+        <div class="profile-photo-copy">
+          <h2 id="profilePageName">User</h2>
+          <p id="profilePageRole">Workspace member</p>
+          <div id="profileOwnerActions" class="profile-photo-actions">
+            <label for="profilePhotoInput" class="primary profile-upload-label">Upload photo</label>
+            <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+            <button id="removeProfilePhotoBtn" type="button" class="secondary-btn">Remove photo</button>
+          </div>
+          <div id="profileViewerActions" class="profile-photo-actions hidden">
+            <button id="profileMessageBtn" type="button" class="primary">Message</button>
+            <button id="profileVoiceBtn" type="button" class="secondary-btn">Voice call</button>
+            <button id="profileVideoBtn" type="button" class="secondary-btn">Video call</button>
+          </div>
+          <small id="profilePhotoHelp">JPG, PNG, WEBP or GIF. Maximum 12 MB. Square photos look best.</small>
+          <div id="profilePhotoResult" class="dialog-result"></div>
+        </div>
+      </section>
+      <section class="profile-details-card">
+        <h3>Account information</h3>
+        <div class="profile-detail-row"><span>Username</span><b id="profileUsername">—</b></div>
+        <div class="profile-detail-row"><span>Role</span><b id="profileRole">—</b></div>
+        <div class="profile-detail-row"><span>Status</span><b id="profileStatus">Approved</b></div>
+        <p id="profilePermissionNote">Only you can upload, replace or remove your profile photo.</p>
+      </section>
+    </main>
+  </section>
+
   <div id="toast" class="toast hidden"></div>
 
   <section id="callOverlay" class="call-overlay hidden">
@@ -227,6 +262,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=44"></script>
+  <script src="app.js?v=46"></script>
 </body>
 </html>

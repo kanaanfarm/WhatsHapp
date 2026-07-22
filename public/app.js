@@ -2,10 +2,21 @@ let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let currentUserFilter="all";
+let profileTarget=null;
 let callsEnabled=true;
 let aiBusy=false;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const $=id=>document.getElementById(id);
+
+function avatarHtml(user, fallbackText){
+  const fallback=escapeHtml(fallbackText||initials(user?.username||"User"));
+  const url=user?.avatar?safeFileUrl(user.avatar):"";
+  return url?`<img src="${escapeHtml(url)}" alt="${escapeHtml(user?.username||"Profile photo")}">`:fallback;
+}
+function setAvatarElement(element,user,fallbackText){
+  if(!element)return;
+  element.innerHTML=avatarHtml(user,fallbackText);
+}
 
 function toast(text){
   $("toast").textContent=text;$("toast").classList.remove("hidden");
@@ -178,7 +189,7 @@ $("statusOverlay").onclick=e=>{if(e.target===$("statusOverlay"))$("statusOverlay
 
 async function startApp(){
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
-  if($("railInitials"))$("railInitials").textContent=initials(me.username);
+  if($("railInitials"))setAvatarElement($("railInitials"),me,initials(me.username));
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
@@ -276,10 +287,10 @@ function updateWorkspaceOverview(){
   const humanContacts=users.filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup);
   const online=humanContacts.filter(u=>u.online).length;
   const unread=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
-  if($("workspaceProfileAvatar"))$("workspaceProfileAvatar").textContent=initials(me.username);
+  if($("workspaceProfileAvatar"))setAvatarElement($("workspaceProfileAvatar"),me,initials(me.username));
   if($("workspaceProfileName"))$("workspaceProfileName").textContent=me.username;
   if($("workspaceProfileRole"))$("workspaceProfileRole").textContent=me.isAdmin?"Administrator":"Workspace member";
-  if($("accountAvatar"))$("accountAvatar").textContent=initials(me.username);
+  if($("accountAvatar"))setAvatarElement($("accountAvatar"),me,initials(me.username));
   if($("accountName"))$("accountName").textContent=me.username;
   if($("accountRole"))$("accountRole").textContent=me.isAdmin?"Administrator":"Workspace member";
   if($("workspaceContactCount"))$("workspaceContactCount").textContent=String(humanContacts.length);
@@ -303,12 +314,18 @@ function renderUsers(){
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
     const name=u.isSelf?"Saved Messages":(u.displayName||u.username);
-    const avatar=u.isAI?"AI":(u.isSelf?"★":initials(u.username));
+    const avatar=u.isAI?"AI":(u.isSelf&&!u.avatar?"★":avatarHtml(u,initials(u.username)));
     const preview=u.isSelf&&!u.lastPreview?"Notes and messages to yourself":(u.lastPreview||"Start a conversation");
     const unread=Number(u.unreadCount||u.unread_count||0);
     const stamp=u.lastMessageAt||u.last_message_at;
     d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
-    d.onclick=()=>selectUser(u);$("usersList").appendChild(d);
+    d.onclick=()=>selectUser(u);
+    const listAvatar=d.querySelector(".avatar");
+    if(listAvatar&&!u.isAI){
+      listAvatar.title=`View ${name} profile`;
+      listAvatar.onclick=event=>{event.stopPropagation();openProfilePage(u)};
+    }
+    $("usersList").appendChild(d);
   });
   renderQuickContacts();
   updateWorkspaceOverview();
@@ -339,7 +356,7 @@ function renderQuickContacts(){
     b.className="quick-contact";
     const name=u.displayName||u.username;
     b.title=`Open chat with ${name}`;
-    b.innerHTML=`<span class="avatar">${initials(name)}</span><small>${escapeHtml(name.split(" ")[0])}</small><i class="quick-status ${u.online?"online":""}" aria-label="${u.online?"Online":"Offline"}"></i>`;
+    b.innerHTML=`<span class="avatar">${avatarHtml(u,initials(name))}</span><small>${escapeHtml(name.split(" ")[0])}</small><i class="quick-status ${u.online?"online":""}" aria-label="${u.online?"Online":"Offline"}"></i>`;
     b.onclick=()=>selectUser(u);
     box.appendChild(b);
   });
@@ -499,10 +516,13 @@ function updateHeader(){
   if(!activeUser)return;
   $("chatName").textContent=activeUser.displayName||activeUser.username;
   $("chatStatus").textContent=activeUser.isAI?"AI assistant · Arabic & English":(activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt)));
-  $("activeAvatar").textContent=activeUser.isAI?"AI":(activeUser.isSelf?"★":initials(activeUser.username));
+  $("activeAvatar").innerHTML=activeUser.isAI?"AI":avatarHtml(activeUser,activeUser.isSelf?"★":initials(activeUser.username));
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
 }
+
+if($("activeAvatar"))$("activeAvatar").onclick=()=>{if(activeUser&&!activeUser.isAI)openProfilePage(activeUser)};
+if($("chatName"))$("chatName").onclick=()=>{if(activeUser&&!activeUser.isAI)openProfilePage(activeUser)};
 
 function safeFileUrl(value){
   try{const url=new URL(value,location.origin);return url.protocol==="https:"||(!location.protocol.startsWith("https")&&url.protocol==="http:")?url.href:""}
@@ -703,7 +723,64 @@ if($("accountMenuBtn"))$("accountMenuBtn").onclick=()=>{
   const open=menu.classList.toggle("hidden")===false;
   $("accountMenuBtn").setAttribute("aria-expanded",String(open));
 };
-if($("profileBtn"))$("profileBtn").onclick=()=>toast(`Signed in as ${me.username}`);
+function refreshProfilePage(){
+  if(!me)return;
+  const user=profileTarget||me;
+  const isOwner=Number(user.id)===Number(me.id);
+  setAvatarElement($("profilePhotoPreview"),user,isOwner?initials(me.username):initials(user.username));
+  $("profilePageTitle").textContent=isOwner?"My profile":`${user.username}'s profile`;
+  $("profilePageName").textContent=isOwner?me.username:user.username;
+  const role=isOwner&&me.isAdmin?"Administrator":"Workspace member";
+  $("profilePageRole").textContent=role;
+  $("profileUsername").textContent=user.username;
+  $("profileRole").textContent=role;
+  $("profileStatus").textContent=user.online?"Online":lastSeenText(user.lastSeenAt);
+  $("profileOwnerActions").classList.toggle("hidden",!isOwner);
+  $("profileViewerActions").classList.toggle("hidden",isOwner||user.isSelf||user.isAI);
+  $("profilePhotoHelp").textContent=isOwner
+    ?"JPG, PNG, WEBP or GIF. Maximum 12 MB. Only you can change this photo."
+    :"This profile is view-only. Only the account owner can change the profile photo.";
+  $("profilePermissionNote").textContent=isOwner
+    ?"Only you can upload, replace or remove your profile photo."
+    :"You can view this profile, but you cannot edit the photo or account information.";
+  $("removeProfilePhotoBtn").disabled=!isOwner||!me.avatar;
+}
+function openProfilePage(user=me){
+  $("accountMenu")?.classList.add("hidden");
+  profileTarget=user||me;
+  refreshProfilePage();
+  $("profilePage").classList.remove("hidden");
+}
+if($("profileBtn"))$("profileBtn").onclick=()=>openProfilePage(me);
+if(document.querySelector(".rail-profile"))document.querySelector(".rail-profile").onclick=()=>openProfilePage(me);
+$("closeProfilePageBtn").onclick=()=>{$("profilePage").classList.add("hidden");profileTarget=null};
+$("profileMessageBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user)selectUser(user)};
+$("profileVoiceBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("audioCallBtn").click())}};
+$("profileVideoBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("videoCallBtn").click())}};
+$("profilePhotoInput").onchange=async e=>{
+  const file=e.target.files?.[0];e.target.value="";if(!file)return;
+  if(!profileTarget||Number(profileTarget.id)!==Number(me.id)){toast("You can only change your own profile photo.");return}
+  const result=$("profilePhotoResult");
+  try{
+    result.textContent="Uploading profile photo…";
+    const form=new FormData();form.append("avatar",file);
+    const data=await api("/api/profile/avatar",{method:"POST",body:form});
+    me.avatar=data.avatar||null;
+    users=await api("/api/users");
+    renderUsers();refreshProfilePage();updateHeader();
+    result.textContent="Profile photo updated.";toast("Profile photo updated");
+  }catch(error){result.textContent=error.message}
+};
+$("removeProfilePhotoBtn").onclick=async()=>{
+  if(!profileTarget||Number(profileTarget.id)!==Number(me.id)){toast("You can only change your own profile photo.");return}
+  if(!me.avatar||!confirm("Remove your profile photo?"))return;
+  const result=$("profilePhotoResult");
+  try{
+    await api("/api/profile/avatar",{method:"DELETE"});
+    me.avatar=null;users=await api("/api/users");renderUsers();refreshProfilePage();updateHeader();
+    result.textContent="Profile photo removed.";toast("Profile photo removed");
+  }catch(error){result.textContent=error.message}
+};
 if($("accountSettingsBtn"))$("accountSettingsBtn").onclick=()=>{
   $("accountMenu").classList.add("hidden");
   document.querySelector('[data-section="settings"]')?.click();

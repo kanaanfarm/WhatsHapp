@@ -175,3 +175,21 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 .composer textarea{width:100%;min-height:24px;max-height:120px;resize:none;border:0;background:transparent;color:var(--text);font:inherit;line-height:1.45;outline:0;padding:5px 2px 2px;overflow-y:auto}
 .message-entry{position:relative;min-width:0;padding:0 4px}.composer-hint{display:block;color:var(--muted);font-size:9px;line-height:1.2;margin-top:2px}.emoji-picker{position:absolute;left:-112px;bottom:58px;width:250px;max-height:180px;overflow:auto;display:grid;grid-template-columns:repeat(7,1fr);gap:3px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;box-shadow:0 16px 36px rgba(23,33,64,.18);z-index:20}.emoji-picker button{border:0;background:transparent;border-radius:7px;font-size:20px;padding:5px;cursor:pointer}.emoji-picker button:hover{background:#f0f3f9}
 @media(max-width:760px){.workspace-sidebar{padding-bottom:230px}.workspace-chat .composer{grid-template-columns:auto auto minmax(0,1fr) auto auto}.workspace-chat .composer #cameraBtn{display:none}.composer-hint{display:none}.emoji-picker{left:-75px;width:230px}}
+
+/* v4.5 profile page and real profile photos */
+.profile-page{position:fixed;inset:0;z-index:1200;background:var(--bg,#f4f6fb);color:var(--text,#172033);overflow:auto}
+.profile-page-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:18px;padding:18px 28px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#e5e7eb)}
+.profile-page-head h1{margin:2px 0 0}.profile-page-head small{letter-spacing:.08em;font-weight:800;opacity:.65}
+.profile-back{border:1px solid var(--line,#dbe1ea);background:var(--panel,#fff);border-radius:12px;padding:10px 14px;cursor:pointer}
+.profile-page-body{max-width:900px;margin:36px auto;padding:0 22px;display:grid;gap:22px}
+.profile-photo-card,.profile-details-card{background:var(--panel,#fff);border:1px solid var(--line,#e5e7eb);border-radius:22px;padding:28px;box-shadow:0 16px 40px rgba(15,23,42,.08)}
+.profile-photo-card{display:flex;align-items:center;gap:28px}.profile-photo-preview{width:150px;height:150px;flex:0 0 150px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,#7c3aed,#2563eb);color:white;font-size:42px;font-weight:800;border:5px solid rgba(255,255,255,.9);box-shadow:0 8px 28px rgba(37,99,235,.25)}
+.profile-photo-preview img,.avatar img,.account-avatar img,.workspace-profile-avatar img,.active-avatar img,.rail-profile img{width:100%;height:100%;object-fit:cover;display:block}
+.profile-photo-copy h2{margin:0 0 4px;font-size:28px}.profile-photo-copy p{margin:0 0 18px;opacity:.72}.profile-photo-copy small{display:block;margin-top:10px;opacity:.65}.profile-photo-actions{display:flex;gap:10px;flex-wrap:wrap}.profile-upload-label{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:10px 16px;border-radius:10px}
+.profile-details-card h3{margin-top:0}.profile-detail-row{display:flex;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--line,#e5e7eb)}.profile-details-card p{opacity:.72;margin-bottom:0}
+.avatar,.account-avatar,.workspace-profile-avatar,.active-avatar,.rail-profile span{overflow:hidden}
+@media(max-width:640px){.profile-photo-card{flex-direction:column;text-align:center}.profile-page-body{margin:18px auto}.profile-photo-actions{justify-content:center}}
+
+/* v4.6 profile privacy and navigation */
+.user-item .avatar,.active-avatar,.chat-identity h2{cursor:pointer}
+.profile-photo-actions.hidden{display:none!important}
