@@ -831,16 +831,177 @@ if($("refreshUsersBtn"))$("refreshUsersBtn").onclick=refreshUsers;
 if($("newChatBtn"))$("newChatBtn").onclick=()=>{$("userSearch").focus();toast("Search and select a user to start a new conversation.")};
 if($("searchChatBtn"))$("searchChatBtn").onclick=()=>{const term=prompt("Search visible messages for:");if(!term)return;const found=[...$("messages").querySelectorAll(".bubble")].find(x=>x.textContent.toLowerCase().includes(term.toLowerCase()));if(found){found.scrollIntoView({behavior:"smooth",block:"center"});found.classList.add("search-hit");setTimeout(()=>found.classList.remove("search-hit"),1600)}else toast("No matching visible message.")};
 if($("moreChatBtn"))$("moreChatBtn").onclick=()=>toast("Conversation options: attachments, status and delete controls are available in the workspace.");
-document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onclick=()=>{
-  document.querySelectorAll(".rail-item[data-section]").forEach(x=>x.classList.remove("active"));button.classList.add("active");
-  const section=button.dataset.section;
-  if(section==="chats"){$("workspaceHeading").textContent="Messages";currentUserFilter="all";renderUsers();return}
-  if(section==="ai"){$("workspaceHeading").textContent="AI Assistant";const ai=users.find(u=>u.isAI);if(ai)selectUser(ai);else toast("AI is not configured on this server.");return}
-  if(section==="calls"){$("workspaceHeading").textContent="Calls";toast("Select an online user and use the phone or video button.");return}
-  if(section==="files"){$("workspaceHeading").textContent="Files";toast("Open a conversation to view and share its files.");return}
-  if(section==="settings"){$("workspaceHeading").textContent="Settings";toast("Theme, accent, status, recovery and account controls are available.");return}
-  $("workspaceHeading").textContent=section[0].toUpperCase()+section.slice(1);toast(`${section[0].toUpperCase()+section.slice(1)} workspace is ready for its database module.`);
-});
+
+const LOCAL_GROUPS_KEY="connectchat-local-groups-v1";
+const LOCAL_CHANNELS_KEY="connectchat-local-channels-v1";
+
+function readLocalItems(key){
+  try{return JSON.parse(localStorage.getItem(key)||"[]")}catch{return []}
+}
+function saveLocalItems(key,items){localStorage.setItem(key,JSON.stringify(items))}
+function sectionEscape(value){return escapeHtml(String(value??""))}
+
+function setMainWorkspaceVisible(showChat){
+  $("chatPanel").classList.toggle("hidden",!showChat);
+  $("sectionPage").classList.toggle("hidden",showChat);
+  document.querySelector(".workspace-insights")?.classList.toggle("hidden",!showChat);
+}
+
+function workspaceEmpty(icon,title,description,action=""){
+  return `<div class="workspace-empty"><div class="workspace-empty-icon">${icon}</div><h2>${sectionEscape(title)}</h2><p>${sectionEscape(description)}</p>${action}</div>`;
+}
+
+function openChatsWorkspace(){
+  setMainWorkspaceVisible(true);
+  $("workspaceHeading").textContent="Messages";
+  currentUserFilter="all";
+  document.querySelectorAll(".chat-filter").forEach(x=>x.classList.toggle("active",x.dataset.filter==="all"));
+  renderUsers();
+}
+
+function renderPeopleCards(actionLabel,actionName){
+  const contacts=users.filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup);
+  if(!contacts.length)return workspaceEmpty("👤","No contacts yet","Approved users will appear here.");
+  return `<div class="workspace-card-grid">${contacts.map(u=>`
+    <article class="workspace-person-card">
+      <div class="avatar">${avatarMarkup(u,initials(u.username))}</div>
+      <div><h3>${sectionEscape(u.username)}</h3><p>${u.online?"Online":sectionEscape(lastSeenText(u.lastSeenAt))}</p></div>
+      <button type="button" data-work-action="${actionName}" data-user-id="${u.id}">${actionLabel}</button>
+    </article>`).join("")}</div>`;
+}
+
+function bindWorkspaceUserActions(){
+  $("sectionContent").querySelectorAll("[data-work-action]").forEach(btn=>btn.onclick=()=>{
+    const user=users.find(u=>Number(u.id)===Number(btn.dataset.userId));
+    if(!user)return;
+    const action=btn.dataset.workAction;
+    if(action==="message"){openChatsWorkspace();selectUser(user)}
+    if(action==="voice"){openChatsWorkspace();selectUser(user);setTimeout(()=>startCall("audio"),80)}
+    if(action==="video"){openChatsWorkspace();selectUser(user);setTimeout(()=>startCall("video"),80)}
+    if(action==="profile")openProfilePage(user);
+  });
+}
+
+async function renderGroupsWorkspace(){
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading groups…</div>`;
+  try{
+    const items=await api("/api/groups");
+    $("sectionContent").innerHTML=`
+      <div class="workspace-toolbar"><div><h2>Group conversations</h2><p>Server-synchronized private team conversations.</p></div><button id="createGroupBtn" class="primary">＋ Create group</button></div>
+      <div class="workspace-list">${items.length?items.map(g=>`<article><div class="workspace-list-icon">👥</div><div><h3>${sectionEscape(g.name)}</h3><p>${sectionEscape(g.description||"Private group")} · ${sectionEscape(g.role)}</p></div><button data-open-group="${g.id}">Open</button>${g.role==="owner"?`<button class="danger-link" data-delete-group="${g.id}">Delete</button>`:""}</article>`).join(""):workspaceEmpty("👥","No groups yet","Create your first synchronized group.")}</div>`;
+    $("createGroupBtn").onclick=async()=>{
+      const name=prompt("Group name:")?.trim(); if(!name)return;
+      const description=prompt("Description (optional):")?.trim()||"";
+      await api("/api/groups",{method:"POST",body:JSON.stringify({name,description})});
+      await renderGroupsWorkspace();
+    };
+    $("sectionContent").querySelectorAll("[data-open-group]").forEach(b=>b.onclick=()=>openGroupConversation(Number(b.dataset.openGroup),items.find(x=>Number(x.id)===Number(b.dataset.openGroup))));
+    $("sectionContent").querySelectorAll("[data-delete-group]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this group?")){await api(`/api/groups/${b.dataset.deleteGroup}`,{method:"DELETE"});await renderGroupsWorkspace()}});
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Groups unavailable",error.message)}
+}
+async function openGroupConversation(groupId,group){
+  $("sectionTitle").textContent=group?.name||"Group";
+  $("sectionDescription").textContent=group?.description||"Group conversation";
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading messages…</div>`;
+  try{
+    const messages=await api(`/api/groups/${groupId}/messages`);
+    $("sectionContent").innerHTML=`<div class="workspace-chat-feed" id="workspaceChatFeed">${messages.map(m=>`<div class="workspace-chat-message"><strong>${sectionEscape(m.sender_name)}</strong><p>${sectionEscape(m.body)}</p><small>${sectionEscape(time(m.created_at))}</small></div>`).join("")||workspaceEmpty("💬","No messages","Send the first group message.")}</div><form id="workspaceChatForm" class="workspace-composer"><input id="workspaceChatInput" maxlength="4000" placeholder="Message the group…" required><button class="primary">Send</button></form>`;
+    $("workspaceChatForm").onsubmit=async e=>{e.preventDefault();const body=$("workspaceChatInput").value.trim();if(!body)return;await api(`/api/groups/${groupId}/messages`,{method:"POST",body:JSON.stringify({body})});await openGroupConversation(groupId,group)};
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Group unavailable",error.message)}
+}
+
+async function renderChannelsWorkspace(){
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading channels…</div>`;
+  try{
+    const items=await api("/api/channels");
+    $("sectionContent").innerHTML=`
+      <div class="workspace-toolbar"><div><h2>Project channels</h2><p>Server-synchronized project discussions and announcements.</p></div><button id="createChannelBtn" class="primary">＋ Create channel</button></div>
+      <div class="workspace-list">${items.length?items.map(c=>`<article><div class="workspace-list-icon">📣</div><div><h3># ${sectionEscape(c.name)}</h3><p>${sectionEscape(c.description||"Project channel")} · ${sectionEscape(c.visibility)}</p></div><button data-open-channel="${c.id}">Open</button>${c.role==="owner"?`<button class="danger-link" data-delete-channel="${c.id}">Delete</button>`:""}</article>`).join(""):workspaceEmpty("📣","No channels yet","Create General, HVAC, Electrical or another project channel.")}</div>`;
+    $("createChannelBtn").onclick=async()=>{const name=prompt("Channel name:")?.trim();if(!name)return;const description=prompt("Description (optional):")?.trim()||"";const visibility=confirm("Make this channel public?")?"public":"private";await api("/api/channels",{method:"POST",body:JSON.stringify({name,description,visibility})});await renderChannelsWorkspace()};
+    $("sectionContent").querySelectorAll("[data-open-channel]").forEach(b=>b.onclick=()=>openChannelConversation(Number(b.dataset.openChannel),items.find(x=>Number(x.id)===Number(b.dataset.openChannel))));
+    $("sectionContent").querySelectorAll("[data-delete-channel]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this channel?")){await api(`/api/channels/${b.dataset.deleteChannel}`,{method:"DELETE"});await renderChannelsWorkspace()}});
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Channels unavailable",error.message)}
+}
+async function openChannelConversation(channelId,channel){
+  $("sectionTitle").textContent=`# ${channel?.name||"Channel"}`;
+  $("sectionDescription").textContent=channel?.description||"Project discussion";
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading posts…</div>`;
+  try{
+    const posts=await api(`/api/channels/${channelId}/posts`);
+    $("sectionContent").innerHTML=`<div class="workspace-chat-feed">${posts.map(p=>`<div class="workspace-chat-message ${p.is_announcement?"announcement":""}"><strong>${p.is_announcement?"📢 ":""}${sectionEscape(p.author_name)}</strong><p>${sectionEscape(p.body)}</p><small>${sectionEscape(time(p.created_at))}</small></div>`).join("")||workspaceEmpty("📣","No posts","Publish the first channel post.")}</div><form id="channelPostForm" class="workspace-composer"><input id="channelPostInput" maxlength="8000" placeholder="Write a channel post…" required><label><input id="announcementCheck" type="checkbox"> Announcement</label><button class="primary">Publish</button></form>`;
+    $("channelPostForm").onsubmit=async e=>{e.preventDefault();const body=$("channelPostInput").value.trim();if(!body)return;await api(`/api/channels/${channelId}/posts`,{method:"POST",body:JSON.stringify({body,isAnnouncement:$("announcementCheck").checked})});await openChannelConversation(channelId,channel)};
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Channel unavailable",error.message)}
+}
+
+async function renderFilesWorkspace(){
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading shared files…</div>`;
+  try{
+    const files=await api("/api/files");
+    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Shared files</h2><p>Server-backed index of attachments from your private conversations.</p></div></div>${files.length?`<div class="file-workspace-list">${files.map(f=>`<article><div class="workspace-list-icon">${f.kind==="image"?"🖼️":f.kind==="voice"||f.kind==="audio"?"🎤":"📄"}</div><div><h3>${sectionEscape(f.file_name||f.kind||"Attachment")}</h3><p>${sectionEscape(f.mime_type||"File")} · ${sectionEscape(time(f.created_at))}</p></div>${f.file_url?`<a href="${sectionEscape(f.file_url)}" target="_blank" rel="noopener">Open</a>`:""}</article>`).join("")}</div>`:workspaceEmpty("📁","No shared files","Attachments sent in conversations will appear here.")}`;
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Files unavailable",error.message)}
+}
+
+async function renderCallsWorkspace(){
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Loading call history…</div>`;
+  try{
+    const calls=await api("/api/calls");
+    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div></div>${renderPeopleCards("Voice call","voice")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon">${c.mode==="video"?"🎥":"📞"}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty("📞","No calls yet","Voice and video calls will appear here.")}`;
+    bindWorkspaceUserActions();
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Calls unavailable",error.message)}
+}
+
+function renderSettingsWorkspace(){
+  $("sectionContent").innerHTML=`
+    <div class="settings-workspace-grid">
+      <section><h2>Profile</h2><p>View your profile and manage your own profile photo.</p><button id="settingsProfileBtn" class="primary">Open my profile</button></section>
+      <section><h2>Appearance</h2><p>Theme and accent colour are included here.</p><div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button></div></section>
+      <section><h2>Account</h2><p>Status, recovery, switching accounts and logout.</p><div class="settings-button-row"><button id="settingsStatusBtn">Status</button><button id="settingsRecoveryBtn">Recovery code</button><button id="settingsSwitchBtn">Switch account</button><button id="settingsLogoutBtn" class="danger-link">Logout</button></div></section>
+      ${me.isAdmin?`<section><h2>Administration</h2><p>Approve, block or remove user accounts.</p><button id="settingsAdminBtn">Manage users</button></section>`:""}
+    </div>`;
+  $("settingsProfileBtn").onclick=()=>openProfilePage(me);
+  $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
+  $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
+  $("settingsStatusBtn").onclick=()=>$("statusBtn").click();
+  $("settingsRecoveryBtn").onclick=()=>$("recoveryBtn").click();
+  $("settingsSwitchBtn").onclick=logout;
+  $("settingsLogoutBtn").onclick=logout;
+  if($("settingsAdminBtn"))$("settingsAdminBtn").onclick=()=>$("adminBtn").click();
+}
+
+function renderAIWorkspace(){
+  const ai=users.find(u=>u.isAI);
+  if(ai){openChatsWorkspace();selectUser(ai);return}
+  $("sectionContent").innerHTML=workspaceEmpty("🤖","AI is not configured","Add the AI provider settings on the server to activate the assistant.");
+}
+
+async function openWorkspaceSection(section){
+  document.querySelectorAll(".rail-item[data-section]").forEach(x=>x.classList.toggle("active",x.dataset.section===section));
+  if(section==="chats"){openChatsWorkspace();return}
+  setMainWorkspaceVisible(false);
+  const titles={
+    ai:["AI Assistant","Ask questions, translate text and work with documents."],
+    groups:["Groups","Multi-user private conversations."],
+    channels:["Channels","Organized project and announcement spaces."],
+    files:["Files","All attachments shared in your conversations."],
+    calls:["Calls","Voice and video calling workspace."],
+    settings:["Settings","Profile, appearance, privacy, account and administration."]
+  };
+  const [title,description]=titles[section]||["Workspace",""];
+  $("workspaceHeading").textContent=title;
+  $("sectionTitle").textContent=title;
+  $("sectionDescription").textContent=description;
+  $("sectionContent").innerHTML=`<div class="workspace-loading">Opening ${sectionEscape(title)}…</div>`;
+  if(section==="ai")renderAIWorkspace();
+  if(section==="groups")await renderGroupsWorkspace();
+  if(section==="channels")await renderChannelsWorkspace();
+  if(section==="files")await renderFilesWorkspace();
+  if(section==="calls")await renderCallsWorkspace();
+  if(section==="settings")renderSettingsWorkspace();
+}
+
+if($("sectionBackBtn"))$("sectionBackBtn").onclick=()=>openWorkspaceSection("chats");
+document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onclick=()=>openWorkspaceSection(button.dataset.section));
+
 
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden")});
 $("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").classList.add("hidden")};

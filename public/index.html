@@ -7,7 +7,7 @@
   <title>ConnectChat Pro v4</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=46">
+  <link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -37,6 +37,8 @@
   </section>
 
   <section id="appView" class="app app-v4 hidden">
+    <button id="themeBtn" class="hidden" type="button" aria-hidden="true"></button>
+    <button id="accentBtn" class="hidden" type="button" aria-hidden="true"></button>
     <nav class="rail" aria-label="Primary navigation">
       <button class="rail-brand" type="button" title="ConnectChat"><img src="logo.svg" alt="ConnectChat"></button>
       <button class="rail-item active" type="button" data-section="chats"><span>💬</span><small>Chats</small><b id="railUnread" class="rail-badge hidden">0</b></button>
@@ -46,8 +48,6 @@
       <button class="rail-item" type="button" data-section="files"><span>📁</span><small>Files</small></button>
       <button class="rail-item" type="button" data-section="calls"><span>📞</span><small>Calls</small></button>
       <div class="rail-spacer"></div>
-      <button id="themeBtn" class="rail-item" type="button"><span>🌙</span><small>Theme</small></button>
-      <button id="accentBtn" class="rail-item" type="button"><span>◉</span><small>Accent</small></button>
       <button class="rail-item" type="button" data-section="settings"><span>⚙️</span><small>Settings</small></button>
       <button class="rail-profile" type="button"><span id="railInitials">ME</span></button>
     </nav>
@@ -115,6 +115,19 @@
         <button id="recordBtn" class="circle-btn record-btn" type="button" title="Record voice">🎤</button>
         <button id="sendBtn" class="send-btn" type="button" title="Send" disabled>➤</button>
       </footer>
+    </main>
+
+
+    <main id="sectionPage" class="section-page hidden" aria-label="Workspace page">
+      <header class="section-page-head">
+        <div>
+          <small id="sectionEyebrow">CONNECTCHAT PRO</small>
+          <h1 id="sectionTitle">Workspace</h1>
+          <p id="sectionDescription">Choose a workspace from the navigation.</p>
+        </div>
+        <button id="sectionBackBtn" class="secondary-btn" type="button">Back to chats</button>
+      </header>
+      <div id="sectionContent" class="section-page-content"></div>
     </main>
 
     <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
@@ -262,6 +275,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=50"></script>
 </body>
 </html>

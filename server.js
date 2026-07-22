@@ -885,6 +885,230 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   }
 });
 
+
+// ---------------- Enterprise v5 collaboration workspaces ----------------
+async function groupAccess(groupId, userId) {
+  const { data, error } = await supabase.from("group_members")
+    .select("role").eq("group_id", groupId).eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+async function channelAccess(channelId, userId) {
+  const { data, error } = await supabase.from("channel_members")
+    .select("role").eq("channel_id", channelId).eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+app.get("/api/groups", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data: memberships, error } = await supabase.from("group_members")
+      .select("group_id,role,groups(id,name,description,owner_id,created_at,updated_at)")
+      .eq("user_id", userId).order("joined_at", { ascending: false });
+    if (error) throw error;
+    res.json((memberships || []).map(x => ({ ...x.groups, role: x.role })));
+  } catch (error) {
+    console.error("List groups failed:", error);
+    res.status(500).json({ error: "Groups could not be loaded. Run enterprise-v5-migration.sql." });
+  }
+});
+
+app.post("/api/groups", auth, async (req, res) => {
+  try {
+    const ownerId = Number(req.session.userId);
+    const name = cleanText(req.body?.name, 80);
+    const description = cleanText(req.body?.description, 500);
+    const memberIds = [...new Set((Array.isArray(req.body?.memberIds) ? req.body.memberIds : [])
+      .map(Number).filter(id => Number.isSafeInteger(id) && id > 0 && id !== ownerId))].slice(0, 100);
+    if (!name) return res.status(400).json({ error: "Group name is required." });
+    const { data: group, error } = await supabase.from("groups")
+      .insert({ name, description, owner_id: ownerId }).select("*").single();
+    if (error) throw error;
+    const rows = [{ group_id: group.id, user_id: ownerId, role: "owner" },
+      ...memberIds.map(user_id => ({ group_id: group.id, user_id, role: "member" }))];
+    const { error: memberError } = await supabase.from("group_members").insert(rows);
+    if (memberError) throw memberError;
+    res.status(201).json({ ...group, role: "owner" });
+  } catch (error) {
+    console.error("Create group failed:", error);
+    res.status(500).json({ error: "Group could not be created." });
+  }
+});
+
+app.get("/api/groups/:groupId/messages", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
+    if (!Number.isSafeInteger(groupId) || !(await groupAccess(groupId, userId))) return res.status(403).json({ error: "Access denied." });
+    const { data, error } = await supabase.from("group_messages")
+      .select("id,group_id,sender_id,body,created_at,users!group_messages_sender_id_fkey(username,avatar_url)")
+      .eq("group_id", groupId).order("created_at", { ascending: true }).limit(500);
+    if (error) throw error;
+    res.json((data || []).map(m => ({ ...m, sender_name: m.users?.username || "User", avatar_url: m.users?.avatar_url || null, users: undefined })));
+  } catch (error) {
+    console.error("Group messages failed:", error);
+    res.status(500).json({ error: "Group messages could not be loaded." });
+  }
+});
+
+app.post("/api/groups/:groupId/messages", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), senderId = Number(req.session.userId);
+    const body = cleanText(req.body?.body, 4000);
+    if (!body) return res.status(400).json({ error: "Message is required." });
+    if (!Number.isSafeInteger(groupId) || !(await groupAccess(groupId, senderId))) return res.status(403).json({ error: "Access denied." });
+    const { data, error } = await supabase.from("group_messages")
+      .insert({ group_id: groupId, sender_id: senderId, body }).select("*").single();
+    if (error) throw error;
+    io.to(`group:${groupId}`).emit("group:message", { ...data, sender_name: req.session.username || "User" });
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Send group message failed:", error);
+    res.status(500).json({ error: "Group message could not be sent." });
+  }
+});
+
+app.delete("/api/groups/:groupId", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
+    const access = await groupAccess(groupId, userId);
+    if (!access || access.role !== "owner") return res.status(403).json({ error: "Only the owner can delete this group." });
+    const { error } = await supabase.from("groups").delete().eq("id", groupId);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Delete group failed:", error);
+    res.status(500).json({ error: "Group could not be deleted." });
+  }
+});
+
+app.get("/api/channels", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data: privateRows, error } = await supabase.from("channel_members")
+      .select("channel_id,role,channels(id,name,description,visibility,owner_id,created_at,updated_at)")
+      .eq("user_id", userId).order("joined_at", { ascending: false });
+    if (error) throw error;
+    const { data: publicRows, error: publicError } = await supabase.from("channels")
+      .select("id,name,description,visibility,owner_id,created_at,updated_at").eq("visibility", "public");
+    if (publicError) throw publicError;
+    const map = new Map();
+    (publicRows || []).forEach(c => map.set(Number(c.id), { ...c, role: "viewer" }));
+    (privateRows || []).forEach(x => map.set(Number(x.channels.id), { ...x.channels, role: x.role }));
+    res.json([...map.values()]);
+  } catch (error) {
+    console.error("List channels failed:", error);
+    res.status(500).json({ error: "Channels could not be loaded. Run enterprise-v5-migration.sql." });
+  }
+});
+
+app.post("/api/channels", auth, async (req, res) => {
+  try {
+    const ownerId = Number(req.session.userId);
+    const name = cleanText(req.body?.name, 80).replace(/\s+/g, "-");
+    const description = cleanText(req.body?.description, 500);
+    const visibility = req.body?.visibility === "public" ? "public" : "private";
+    if (!name) return res.status(400).json({ error: "Channel name is required." });
+    const { data: channel, error } = await supabase.from("channels")
+      .insert({ name, description, visibility, owner_id: ownerId }).select("*").single();
+    if (error) throw error;
+    const { error: memberError } = await supabase.from("channel_members")
+      .insert({ channel_id: channel.id, user_id: ownerId, role: "owner" });
+    if (memberError) throw memberError;
+    res.status(201).json({ ...channel, role: "owner" });
+  } catch (error) {
+    console.error("Create channel failed:", error);
+    res.status(500).json({ error: "Channel could not be created." });
+  }
+});
+
+app.get("/api/channels/:channelId/posts", auth, async (req, res) => {
+  try {
+    const channelId = Number(req.params.channelId), userId = Number(req.session.userId);
+    const { data: channel, error: channelError } = await supabase.from("channels").select("visibility").eq("id", channelId).maybeSingle();
+    if (channelError) throw channelError;
+    if (!channel || (channel.visibility !== "public" && !(await channelAccess(channelId, userId)))) return res.status(403).json({ error: "Access denied." });
+    const { data, error } = await supabase.from("channel_posts")
+      .select("id,channel_id,author_id,body,parent_post_id,is_announcement,created_at,users!channel_posts_author_id_fkey(username,avatar_url)")
+      .eq("channel_id", channelId).order("created_at", { ascending: true }).limit(500);
+    if (error) throw error;
+    res.json((data || []).map(p => ({ ...p, author_name: p.users?.username || "User", avatar_url: p.users?.avatar_url || null, users: undefined })));
+  } catch (error) {
+    console.error("Channel posts failed:", error);
+    res.status(500).json({ error: "Channel posts could not be loaded." });
+  }
+});
+
+app.post("/api/channels/:channelId/posts", auth, async (req, res) => {
+  try {
+    const channelId = Number(req.params.channelId), authorId = Number(req.session.userId);
+    const body = cleanText(req.body?.body, 8000);
+    if (!body) return res.status(400).json({ error: "Post text is required." });
+    const { data: channel, error: channelError } = await supabase.from("channels").select("visibility").eq("id", channelId).maybeSingle();
+    if (channelError) throw channelError;
+    if (!channel || (channel.visibility !== "public" && !(await channelAccess(channelId, authorId)))) return res.status(403).json({ error: "Access denied." });
+    const row = { channel_id: channelId, author_id: authorId, body, is_announcement: req.body?.isAnnouncement === true };
+    const { data, error } = await supabase.from("channel_posts").insert(row).select("*").single();
+    if (error) throw error;
+    io.to(`channel:${channelId}`).emit("channel:post", { ...data, author_name: req.session.username || "User" });
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Create channel post failed:", error);
+    res.status(500).json({ error: "Channel post could not be created." });
+  }
+});
+
+app.delete("/api/channels/:channelId", auth, async (req, res) => {
+  try {
+    const channelId = Number(req.params.channelId), userId = Number(req.session.userId);
+    const access = await channelAccess(channelId, userId);
+    if (!access || access.role !== "owner") return res.status(403).json({ error: "Only the owner can delete this channel." });
+    const { error } = await supabase.from("channels").delete().eq("id", channelId);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Delete channel failed:", error);
+    res.status(500).json({ error: "Channel could not be deleted." });
+  }
+});
+
+app.get("/api/calls", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data, error } = await supabase.from("call_logs")
+      .select("id,caller_id,receiver_id,mode,status,started_at,ended_at")
+      .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("started_at", { ascending: false }).limit(100);
+    if (error) throw error;
+    const userIds = [...new Set((data || []).flatMap(x => [Number(x.caller_id), Number(x.receiver_id)]))];
+    const { data: people, error: peopleError } = userIds.length
+      ? await supabase.from("users").select("id,username,avatar_url").in("id", userIds)
+      : { data: [], error: null };
+    if (peopleError) throw peopleError;
+    const peopleMap = new Map((people || []).map(x => [Number(x.id), x]));
+    res.json((data || []).map(x => ({ ...x, caller: peopleMap.get(Number(x.caller_id)), receiver: peopleMap.get(Number(x.receiver_id)) })));
+  } catch (error) {
+    console.error("Call history failed:", error);
+    res.status(500).json({ error: "Call history could not be loaded. Run enterprise-v5-migration.sql." });
+  }
+});
+
+app.get("/api/files", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data, error } = await supabase.from("messages")
+      .select("id,sender_id,receiver_id,kind,file_url,file_name,mime_type,created_at")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .neq("kind", "text").order("created_at", { ascending: false }).limit(500);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    console.error("Files workspace failed:", error);
+    res.status(500).json({ error: "Files could not be loaded." });
+  }
+});
+
+
 app.get("/api/users", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
@@ -1230,6 +1454,16 @@ io.on("connection", async socket => {
   if (!socketUser || socketUser.status !== "approved") return socket.disconnect(true);
   const username = socketUser.username;
   socket.join(`user:${userId}`);
+  try {
+    const [{ data: gm }, { data: cm }] = await Promise.all([
+      supabase.from("group_members").select("group_id").eq("user_id", userId),
+      supabase.from("channel_members").select("channel_id").eq("user_id", userId)
+    ]);
+    (gm || []).forEach(x => socket.join(`group:${x.group_id}`));
+    (cm || []).forEach(x => socket.join(`channel:${x.channel_id}`));
+  } catch (error) {
+    console.error("Could not join collaboration rooms:", error.message);
+  }
   addOnlineSocket(userId, socket.id);
   io.emit("presence", { userId, online: true });
   socket.emit("presence:snapshot", { userIds: [...onlineUsers.keys()] });
@@ -1309,6 +1543,10 @@ io.on("connection", async socket => {
     if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || receiverId === userId || !onlineUsers.has(receiverId)
       || !validDescription(payload.offer, "offer")) return socket.emit("call:unavailable", { receiverId });
     openCallPair(userId, receiverId);
+    supabase.from("call_logs").insert({
+      caller_id: userId, receiver_id: receiverId,
+      mode: payload.mode === "audio" ? "audio" : "video", status: "started"
+    }).then(({ error }) => { if (error) console.error("Could not save call history:", error.message); });
     io.to(`user:${receiverId}`).emit("call:incoming", {
       callerId: userId,
       callerName: username,
@@ -1383,6 +1621,17 @@ async function start() {
   ]);
   if (socialChecks.some(result => result.error)) {
     throw new Error("Social migration is required. Run social-migration.sql in the Supabase SQL Editor before deploying this release.");
+  }
+  const enterpriseChecks = await Promise.all([
+    supabase.from("groups").select("id", { head: true, count: "exact" }),
+    supabase.from("group_members").select("group_id", { head: true, count: "exact" }),
+    supabase.from("group_messages").select("id", { head: true, count: "exact" }),
+    supabase.from("channels").select("id", { head: true, count: "exact" }),
+    supabase.from("channel_posts").select("id", { head: true, count: "exact" }),
+    supabase.from("call_logs").select("id", { head: true, count: "exact" })
+  ]);
+  if (enterpriseChecks.some(result => result.error)) {
+    throw new Error("Enterprise v5 migration is required. Run enterprise-v5-migration.sql in Supabase SQL Editor.");
   }
   const { error: cleanupError } = await supabase.from("app_sessions").delete().lt("expires_at", new Date().toISOString());
   if (cleanupError) console.error("Could not clean expired sessions:", cleanupError.message);

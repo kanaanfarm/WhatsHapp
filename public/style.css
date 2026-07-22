@@ -193,3 +193,68 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 /* v4.6 profile privacy and navigation */
 .user-item .avatar,.active-avatar,.chat-identity h2{cursor:pointer}
 .profile-photo-actions.hidden{display:none!important}
+
+
+/* v4.8 active workspace pages */
+.section-page{
+  min-width:0;
+  overflow:auto;
+  background:var(--panel,#fff);
+  padding:28px;
+}
+.section-page-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:24px;
+  padding-bottom:22px;
+  border-bottom:1px solid var(--line,#e6eaf2);
+}
+.section-page-head small{font-weight:800;letter-spacing:.12em;color:var(--accent,#5b61ff)}
+.section-page-head h1{margin:6px 0 4px;font-size:30px}
+.section-page-head p{margin:0;color:var(--muted,#74809a)}
+.section-page-content{padding-top:24px}
+.workspace-toolbar{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:18px}
+.workspace-toolbar h2,.workspace-subtitle{margin:0 0 6px}
+.workspace-toolbar p{margin:0;color:var(--muted,#74809a)}
+.workspace-info-note{
+  padding:12px 14px;border-radius:12px;background:rgba(91,97,255,.08);
+  color:var(--muted,#65708a);margin-bottom:18px;font-size:13px
+}
+.workspace-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.workspace-person-card,.workspace-list article,.file-workspace-list article,.settings-workspace-grid section{
+  border:1px solid var(--line,#e3e8f1);border-radius:16px;background:var(--surface,#fff);
+  padding:16px;box-shadow:0 8px 24px rgba(23,35,68,.05)
+}
+.workspace-person-card{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:center}
+.workspace-person-card .avatar{width:48px;height:48px}
+.workspace-person-card h3,.workspace-list h3,.file-workspace-list h3{margin:0 0 4px}
+.workspace-person-card p,.workspace-list p,.file-workspace-list p{margin:0;color:var(--muted,#74809a);font-size:13px}
+.workspace-person-card button{grid-column:1/-1}
+.workspace-list,.file-workspace-list{display:grid;gap:12px}
+.workspace-list article,.file-workspace-list article{display:grid;grid-template-columns:46px 1fr auto auto;gap:12px;align-items:center}
+.workspace-list-icon{font-size:28px;text-align:center}
+.workspace-empty{text-align:center;padding:60px 24px;border:1px dashed var(--line,#d8deea);border-radius:18px}
+.workspace-empty-icon{font-size:48px;margin-bottom:12px}
+.workspace-empty h2{margin:0 0 8px}.workspace-empty p{margin:0;color:var(--muted,#74809a)}
+.workspace-loading{padding:50px;text-align:center;color:var(--muted,#74809a)}
+.settings-workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.settings-workspace-grid section h2{margin-top:0}
+.settings-workspace-grid section p{color:var(--muted,#74809a)}
+.settings-button-row{display:flex;flex-wrap:wrap;gap:8px}
+.danger-link{color:#d43b4f!important}
+@media(max-width:900px){
+  .section-page{padding:18px}
+  .section-page-head{flex-direction:column}
+  .workspace-list article,.file-workspace-list article{grid-template-columns:42px 1fr}
+  .workspace-list article button,.file-workspace-list article a{grid-column:2}
+}
+
+.workspace-chat-feed{display:flex;flex-direction:column;gap:12px;min-height:360px;max-height:58vh;overflow:auto;padding:6px}
+.workspace-chat-message{max-width:760px;border:1px solid var(--line,#e3e8f1);background:var(--surface,#fff);border-radius:15px;padding:12px 14px}
+.workspace-chat-message p{white-space:pre-wrap;margin:6px 0}
+.workspace-chat-message small{color:var(--muted,#74809a)}
+.workspace-chat-message.announcement{border-left:4px solid var(--accent,#5b61ff)}
+.workspace-composer{display:flex;align-items:center;gap:10px;position:sticky;bottom:0;background:var(--panel,#fff);padding:14px 0 4px}
+.workspace-composer input[type="text"],.workspace-composer>input:not([type]){flex:1;min-width:0;padding:13px 14px;border:1px solid var(--line,#dce2ec);border-radius:12px}
+.workspace-composer label{display:flex;align-items:center;gap:6px;font-size:13px}
