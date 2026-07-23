@@ -1,4 +1,4 @@
-CONNECTCHAT PRO ENTERPRISE v5.3 PERSONAL WORKSPACE
+CONNECTCHAT PRO ENTERPRISE v5.4 CLEAN WORKSPACE
 
 1. Upload all project files to GitHub/Render.
 2. Open Supabase > SQL Editor.

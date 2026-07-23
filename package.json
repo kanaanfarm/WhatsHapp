@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v5",
-  "version": "5.3.0",
+  "version": "5.4.0",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v5.3 with reliable hybrid AI diagnostics and per-user workspace controls",
+  "description": "ConnectChat Pro Enterprise v5.4 with clean conversation navigation and controllable composer tools",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

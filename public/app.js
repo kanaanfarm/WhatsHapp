@@ -9,7 +9,7 @@ let aiStatus=null;
 let activeConversation=[];
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
-const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show"};
+const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential"};
 const $=id=>document.getElementById(id);
 
 function appearanceKey(){return `connectchat-appearance-${me?.id||"guest"}`}
@@ -24,6 +24,7 @@ function applyAppearance(settings=loadAppearance()){
   root.dataset.iconSize=settings.icons;
   root.dataset.sidebarSize=settings.sidebar;
   root.dataset.insights=settings.insights;
+  root.dataset.composer=settings.composer;
 }
 function saveAppearance(settings){
   localStorage.setItem(appearanceKey(),JSON.stringify(settings));
@@ -388,6 +389,7 @@ $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
   activeUser=u;renderUsers();updateHeader();
+  if($("smartStrip"))$("smartStrip").classList.remove("hidden");
   if($("aiProviderControl"))$("aiProviderControl").classList.toggle("hidden",!u.isAI);
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
@@ -1064,6 +1066,7 @@ function renderSettingsWorkspace(){
         <label>Icon size<select id="appearanceIcons"><option value="compact">Compact</option><option value="standard">Standard</option></select></label>
         <label>Conversation sidebar<select id="appearanceSidebar"><option value="narrow">Narrow</option><option value="standard">Standard</option></select></label>
         <label>Overview panel<select id="appearanceInsights"><option value="show">Show</option><option value="hide">Hide</option></select></label>
+        <label>Message-bar icons<select id="appearanceComposer"><option value="essential">Hide extra icons</option><option value="all">Show all icons</option></select></label>
         <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
       </section>
       <section><h2>Account</h2><p>Status, recovery, switching accounts and logout.</p><div class="settings-button-row"><button id="settingsStatusBtn">Status</button><button id="settingsRecoveryBtn">Recovery code</button><button id="settingsSwitchBtn">Switch account</button><button id="settingsLogoutBtn" class="danger-link">Logout</button></div></section>
@@ -1072,7 +1075,7 @@ function renderSettingsWorkspace(){
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
-  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights"};
+  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights",appearanceComposer:"composer"};
   Object.entries(controls).forEach(([id,key])=>{
     $(id).value=appearance[key];
     $(id).onchange=()=>{const next=loadAppearance();next[key]=$(id).value;saveAppearance(next)};

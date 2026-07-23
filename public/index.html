@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#182132">
-  <title>ConnectChat Pro Enterprise v5.3 Personal Workspace</title>
+  <title>ConnectChat Pro Enterprise v5.4 Clean Workspace</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css?v=50">
@@ -64,7 +64,7 @@
       <div id="quickContacts" class="quick-contacts"></div>
       <div class="section-label"><span>RECENT</span><button id="refreshUsersBtn" class="plain-icon" type="button" title="Refresh">↻</button></div>
       <div id="usersList" class="users-list"></div>
-      <div class="sidebar-actions compact-actions">
+      <div class="sidebar-actions compact-actions hidden-utility-actions" aria-hidden="true">
         <button id="adminBtn" class="admin-btn hidden">Manage users</button>
         <button id="statusBtn" class="status-btn">Status</button>
         <button id="installBtn" class="install-btn hidden">Install app</button>
@@ -99,7 +99,7 @@
       </header>
       <div class="date-chip">Today</div>
       <div id="messages" class="messages empty-state"><div><h3>Your messages</h3><p>Select a user to start chatting.</p></div></div>
-      <div class="smart-strip" aria-label="Smart actions"><span>✦ Smart workspace</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
+      <div id="smartStrip" class="smart-strip hidden" aria-label="Smart actions"><span>✦ Smart workspace</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
       <div id="typingText" class="typing"></div><div id="uploadStatus" class="upload-status hidden">Uploading…</div>
       <footer class="composer">
         <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" hidden>
@@ -131,7 +131,7 @@
     </main>
 
     <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
-      <div class="insights-head"><div><small>CONNECTCHAT PRO v5.3</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
+      <div class="insights-head"><div><small>CONNECTCHAT PRO v5.4</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
       <div class="insight-tabs"><button class="active" type="button">Overview</button><button type="button">Files</button><button type="button">Media</button></div>
       <div class="workspace-profile-card">
         <div id="workspaceProfileAvatar" class="workspace-profile-avatar">ME</div>
