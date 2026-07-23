@@ -8,6 +8,9 @@ const session = require("express-session");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const helmet = require("helmet");
+const PDFDocument = require("pdfkit");
+const ExcelJS = require("exceljs");
+const { Document, Packer, Paragraph, HeadingLevel } = require("docx");
 const { rateLimit } = require("express-rate-limit");
 const { createClient } = require("@supabase/supabase-js");
 const { Server } = require("socket.io");
@@ -27,6 +30,7 @@ const PASSWORD_MIN_LENGTH = 10;
 const BCRYPT_ROUNDS = 12;
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
+const AVATAR_SIGNED_URL_SECONDS = 7 * 24 * 60 * 60;
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
@@ -100,7 +104,7 @@ const io = new Server(server, {
 const allowedMimeTypes = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "audio/webm", "video/webm", "video/mp4", "video/quicktime", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
-  "application/pdf", "text/plain",
+  "application/pdf", "text/plain", "text/csv", "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -438,7 +442,7 @@ async function signedMessages(messages) {
 
 async function signedAvatarUrl(storagePath) {
   if (!storagePath) return null;
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, SIGNED_URL_SECONDS);
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, AVATAR_SIGNED_URL_SECONDS);
   if (error) {
     console.error("Could not sign avatar URL:", error.message);
     return null;
@@ -508,7 +512,7 @@ async function markPendingMessagesDelivered(receiverId) {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 3, parts: 4 }
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 6, parts: 8 }
 });
 
 function cleanText(value, maxLength) {
@@ -524,10 +528,10 @@ async function verifyUpload(file) {
   const { fileTypeFromBuffer } = await import("file-type");
   const detected = await fileTypeFromBuffer(file.buffer);
   if (!detected) {
-    if (file.mimetype !== "text/plain" || file.buffer.includes(0)) throw new Error("The file content does not match an allowed type.");
+    if (!["text/plain", "text/csv"].includes(file.mimetype) || file.buffer.includes(0)) throw new Error("The file content does not match an allowed type.");
     try {
       new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
-      return { mime: "text/plain", ext: "txt", kind: "file" };
+      return { mime: file.mimetype, ext: file.mimetype === "text/csv" ? "csv" : "txt", kind: "file" };
     } catch {
       throw new Error("Text files must use UTF-8 encoding.");
     }
@@ -998,6 +1002,74 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   }
 });
 
+function exportFileName(title, extension) {
+  const base = cleanFileName(title || "ConnectChat AI Export").replace(/\.[^.]+$/, "").slice(0, 80);
+  return `${base || "ConnectChat AI Export"}.${extension}`;
+}
+
+function createPdfBuffer(title, content) {
+  return new Promise((resolve, reject) => {
+    const pdf = new PDFDocument({ size: "A4", margin: 54, info: { Title: title } });
+    const chunks = [];
+    pdf.on("data", chunk => chunks.push(chunk));
+    pdf.on("end", () => resolve(Buffer.concat(chunks)));
+    pdf.on("error", reject);
+    pdf.fontSize(18).fillColor("#25304a").text(title);
+    pdf.moveDown();
+    pdf.fontSize(10).fillColor("#6b7280").text(`Exported from ConnectChat AI · ${new Date().toISOString()}`);
+    pdf.moveDown();
+    pdf.fontSize(11).fillColor("#111827").text(content, { lineGap: 3 });
+    pdf.end();
+  });
+}
+
+app.post("/api/ai/export", auth, async (req, res) => {
+  try {
+    const format = String(req.body?.format || "").toLowerCase();
+    const title = cleanText(req.body?.title || "ConnectChat AI Export", 100);
+    const content = cleanText(req.body?.content, 50000);
+    if (!content) return res.status(400).json({ error: "There is no AI content to export." });
+    if (!["docx", "pdf", "xlsx"].includes(format)) return res.status(400).json({ error: "Choose Word, PDF, or Excel." });
+
+    let buffer;
+    let mime;
+    if (format === "docx") {
+      const document = new Document({
+        sections: [{
+          children: [
+            new Paragraph({ text: title, heading: HeadingLevel.TITLE }),
+            new Paragraph({ text: `Exported from ConnectChat AI · ${new Date().toISOString()}` }),
+            ...content.split(/\r?\n/).map(line => new Paragraph({ text: line || " " }))
+          ]
+        }]
+      });
+      buffer = await Packer.toBuffer(document);
+      mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    } else if (format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ConnectChat AI";
+      const sheet = workbook.addWorksheet("AI Export", { views: [{ state: "frozen", ySplit: 1 }] });
+      sheet.columns = [{ header: "Line", key: "line", width: 10 }, { header: "AI content", key: "content", width: 100 }];
+      content.split(/\r?\n/).forEach((line, index) => sheet.addRow({ line: index + 1, content: line }));
+      sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF5B63F6" } };
+      sheet.getColumn("content").alignment = { wrapText: true, vertical: "top" };
+      buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else {
+      buffer = await createPdfBuffer(title, content);
+      mime = "application/pdf";
+    }
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Disposition", `attachment; filename="${exportFileName(title, format)}"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.end(buffer);
+  } catch (error) {
+    console.error("AI export failed:", error);
+    res.status(500).json({ error: "The AI result could not be exported." });
+  }
+});
+
 
 // ---------------- Enterprise v5 collaboration workspaces ----------------
 async function groupAccess(groupId, userId) {
@@ -1203,6 +1275,177 @@ app.get("/api/calls", auth, async (req, res) => {
   } catch (error) {
     console.error("Call history failed:", error);
     res.status(500).json({ error: "Call history could not be loaded. Run enterprise-v5-migration.sql." });
+  }
+});
+
+const calculationSheetMimeTypes = new Set([
+  "application/pdf", "text/csv", "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+]);
+
+async function calculationSheetView(row, usernames = new Map()) {
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_SECONDS);
+  if (error) console.error("Could not sign calculation sheet:", error.message);
+  return {
+    id: Number(row.id),
+    uploaderId: Number(row.uploader_id),
+    uploaderName: usernames.get(Number(row.uploader_id)) || "User",
+    title: row.title,
+    description: row.description || "",
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    fileSize: Number(row.file_size || 0),
+    accessScope: row.access_scope || "all",
+    createdAt: row.created_at,
+    downloadUrl: data?.signedUrl || null
+  };
+}
+
+app.get("/api/calculation-sheets", auth, async (req, res) => {
+  try {
+    const { data: sheets, error } = await supabase.from("calculation_sheets")
+      .select("id,uploader_id,title,description,storage_path,file_name,mime_type,file_size,access_scope,created_at")
+      .order("created_at", { ascending: false }).limit(500);
+    if (error) throw error;
+    let visibleSheets = sheets || [];
+    if (!req.currentUser.is_admin) {
+      const { data: grants, error: grantError } = await supabase.from("calculation_sheet_access")
+        .select("sheet_id").eq("user_id", req.currentUser.id);
+      if (grantError) throw grantError;
+      const selectedIds = new Set((grants || []).map(grant => Number(grant.sheet_id)));
+      visibleSheets = visibleSheets.filter(row =>
+        Number(row.uploader_id) === Number(req.currentUser.id) ||
+        row.access_scope === "all" ||
+        (row.access_scope === "selected" && selectedIds.has(Number(row.id)))
+      );
+    }
+    const ids = [...new Set(visibleSheets.map(row => Number(row.uploader_id)))];
+    const { data: people, error: peopleError } = ids.length
+      ? await supabase.from("users").select("id,username").in("id", ids)
+      : { data: [], error: null };
+    if (peopleError) throw peopleError;
+    const usernames = new Map((people || []).map(person => [Number(person.id), person.username]));
+    res.json(await Promise.all(visibleSheets.map(row => calculationSheetView(row, usernames))));
+  } catch (error) {
+    console.error("Calculation sheets failed:", error);
+    res.status(500).json({ error: "Calculation sheets are unavailable. Run v6-calculation-sheets-migration.sql once." });
+  }
+});
+
+app.post("/api/calculation-sheets", uploadLimiter, auth, upload.single("sheet"), async (req, res) => {
+  let storagePath;
+  try {
+    if (!req.file) return res.status(400).json({ error: "Choose a calculation sheet." });
+    const verified = await verifyUpload(req.file);
+    if (!calculationSheetMimeTypes.has(verified.mime)) {
+      return res.status(400).json({ error: "Calculation sheets must be XLSX, XLS, CSV, or PDF." });
+    }
+    const title = cleanText(req.body?.title || req.file.originalname, 120);
+    const description = cleanText(req.body?.description, 500);
+    const requestedScope = cleanText(req.body?.accessScope, 20);
+    const accessScope = req.currentUser.is_admin && ["all", "admins", "selected"].includes(requestedScope)
+      ? requestedScope
+      : req.currentUser.is_admin ? "admins" : "all";
+    let allowedUserIds = [];
+    if (accessScope === "selected") {
+      try {
+        allowedUserIds = [...new Set(JSON.parse(req.body?.allowedUserIds || "[]").map(Number))]
+          .filter(id => Number.isSafeInteger(id) && id > 0 && id !== Number(req.currentUser.id)).slice(0, 200);
+      } catch {
+        return res.status(400).json({ error: "Selected-user permissions are invalid." });
+      }
+      if (!allowedUserIds.length) return res.status(400).json({ error: "Select at least one user." });
+      const { data: approved, error: approvedError } = await supabase.from("users")
+        .select("id").in("id", allowedUserIds).eq("status", "approved");
+      if (approvedError) throw approvedError;
+      allowedUserIds = (approved || []).map(user => Number(user.id));
+      if (!allowedUserIds.length) return res.status(400).json({ error: "No approved selected users were found." });
+    }
+    const extension = verified.ext ? `.${verified.ext}` : "";
+    storagePath = `calculation-sheets/${Number(req.currentUser.id)}/${Date.now()}-${crypto.randomUUID()}${extension}`;
+    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
+      contentType: verified.mime,
+      cacheControl: "900",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { data: row, error } = await supabase.from("calculation_sheets").insert({
+      uploader_id: req.currentUser.id,
+      title,
+      description,
+      storage_path: storagePath,
+      file_name: cleanFileName(req.file.originalname),
+      mime_type: verified.mime,
+      file_size: req.file.size,
+      access_scope: accessScope
+    }).select("id,uploader_id,title,description,storage_path,file_name,mime_type,file_size,access_scope,created_at").single();
+    if (error) throw error;
+    if (accessScope === "selected") {
+      const { error: grantError } = await supabase.from("calculation_sheet_access").insert(
+        allowedUserIds.map(userId => ({ sheet_id: row.id, user_id: userId }))
+      );
+      if (grantError) {
+        await supabase.from("calculation_sheets").delete().eq("id", row.id);
+        throw grantError;
+      }
+    }
+    res.json(await calculationSheetView(row, new Map([[Number(req.currentUser.id), req.currentUser.username]])));
+  } catch (error) {
+    if (storagePath) await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]).catch(() => {});
+    console.error("Calculation sheet upload failed:", error);
+    res.status(400).json({ error: error.message || "Calculation sheet upload failed." });
+  }
+});
+
+app.get("/api/calculation-sheets/:id/download", auth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid calculation sheet." });
+    const { data: row, error } = await supabase.from("calculation_sheets")
+      .select("id,uploader_id,file_name,mime_type,storage_path,access_scope").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!row) return res.status(404).json({ error: "Calculation sheet not found." });
+    if (!req.currentUser.is_admin && Number(row.uploader_id) !== Number(req.currentUser.id)) {
+      if (row.access_scope === "admins") return res.status(403).json({ error: "This calculation sheet is restricted to administrators." });
+      if (row.access_scope === "selected") {
+        const { data: grant, error: grantError } = await supabase.from("calculation_sheet_access")
+          .select("sheet_id").eq("sheet_id", row.id).eq("user_id", req.currentUser.id).maybeSingle();
+        if (grantError) throw grantError;
+        if (!grant) return res.status(403).json({ error: "This calculation sheet was not shared with your account." });
+      }
+    }
+    const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(row.storage_path);
+    if (downloadError) throw downloadError;
+    const buffer = Buffer.from(await data.arrayBuffer());
+    res.setHeader("Content-Type", row.mime_type || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${cleanFileName(row.file_name)}"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.end(buffer);
+  } catch (error) {
+    console.error("Calculation sheet download failed:", error);
+    res.status(500).json({ error: "The calculation sheet could not be downloaded." });
+  }
+});
+
+app.delete("/api/calculation-sheets/:id", auth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid calculation sheet." });
+    const { data: row, error } = await supabase.from("calculation_sheets")
+      .select("id,uploader_id,storage_path").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!row) return res.status(404).json({ error: "Calculation sheet not found." });
+    if (Number(row.uploader_id) !== Number(req.currentUser.id) && !req.currentUser.is_admin) {
+      return res.status(403).json({ error: "Only the uploader or administrator can delete this sheet." });
+    }
+    const { error: deleteError } = await supabase.from("calculation_sheets").delete().eq("id", id);
+    if (deleteError) throw deleteError;
+    const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([row.storage_path]);
+    if (storageError) console.error("Could not remove calculation sheet file:", storageError.message);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Calculation sheet delete failed:", error);
+    res.status(500).json({ error: "The calculation sheet could not be deleted." });
   }
 });
 

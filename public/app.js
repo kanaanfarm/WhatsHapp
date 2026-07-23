@@ -9,7 +9,7 @@ let aiStatus=null;
 let activeConversation=[];
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
-const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential"};
+const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
 const $=id=>document.getElementById(id);
 
 function appearanceKey(){return `connectchat-appearance-${me?.id||"guest"}`}
@@ -25,6 +25,7 @@ function applyAppearance(settings=loadAppearance()){
   root.dataset.sidebarSize=settings.sidebar;
   root.dataset.insights=settings.insights;
   root.dataset.composer=settings.composer;
+  root.dataset.avatarFit=settings.avatarFit;
 }
 function saveAppearance(settings){
   localStorage.setItem(appearanceKey(),JSON.stringify(settings));
@@ -64,6 +65,23 @@ async function api(url,options={}){
   const data=await res.json().catch(()=>({}));
   if(!res.ok){const error=new Error(data.error||"Request failed");error.code=data.code;error.status=res.status;error.details=data.details;error.retryable=data.retryable;throw error}
   return data;
+}
+
+async function downloadApiFile(url,options={},fallbackName="download"){
+  const headers={"X-ConnectChat-Request":"1",...(options.headers||{})};
+  if(!(options.body instanceof FormData))headers["Content-Type"]="application/json";
+  const response=await fetch(url,{credentials:"same-origin",cache:"no-store",...options,headers});
+  if(!response.ok){
+    const data=await response.json().catch(()=>({}));
+    const error=new Error(data.error||"Download failed");error.details=data.details;throw error;
+  }
+  const disposition=response.headers.get("content-disposition")||"";
+  const match=disposition.match(/filename="([^"]+)"/i);
+  const blob=await response.blob();
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);link.download=match?.[1]||fallbackName;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(link.href),1000);
 }
 
 $("authForm").onsubmit=async e=>{
@@ -588,12 +606,27 @@ function addMessage(msg){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   }
   const row=document.createElement("div");
-  row.className=`msg ${own?"own":"other"} ${msg.aiError?"ai-error":""}`;
+  row.className=`msg ${own?"own":"other"} ${msg.ai?"ai-message":""} ${msg.aiError?"ai-error":""}`;
   row.dataset.messageId=String(msg.id);
-  row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
+  const aiExports=msg.ai&&!own&&!msg.aiError?'<div class="ai-export-actions"><button type="button" data-export="docx" title="Export this AI answer to Word">W Word</button><button type="button" data-export="pdf" title="Export this AI answer to PDF">PDF</button><button type="button" data-export="xlsx" title="Export this AI answer to Excel">XLS Excel</button></div>':"";
+  row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>${aiExports}`;
   const deleteButton=row.querySelector(".message-delete");
   if(deleteButton)deleteButton.onclick=()=>deleteMessage(msg,deleteButton);
+  row.querySelectorAll("[data-export]").forEach(button=>button.onclick=()=>exportAiMessage(msg,button.dataset.export,button));
   $("messages").appendChild(row);$("messages").scrollTop=$("messages").scrollHeight;
+}
+
+async function exportAiMessage(msg,format,button){
+  const original=button.textContent;
+  try{
+    button.disabled=true;button.textContent="…";
+    await downloadApiFile("/api/ai/export",{
+      method:"POST",
+      body:JSON.stringify({format,title:"ConnectChat AI Export",content:msg.body})
+    },`ConnectChat-AI-Export.${format}`);
+    toast(`AI answer exported to ${format.toUpperCase()}.`);
+  }catch(error){toast(error.message)}
+  finally{button.disabled=false;button.textContent=original}
 }
 
 function removeMessage(messageId){
@@ -1046,6 +1079,72 @@ async function renderFilesWorkspace(){
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Files unavailable",error.message)}
 }
 
+function readableBytes(value){
+  const bytes=Number(value||0);
+  if(bytes<1024)return `${bytes} B`;
+  if(bytes<1024*1024)return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/(1024*1024)).toFixed(1)} MB`;
+}
+
+async function renderCalculationSheetsWorkspace(){
+  $("sectionContent").innerHTML='<div class="workspace-loading">Loading calculation sheets…</div>';
+  try{
+    const sheets=await api("/api/calculation-sheets");
+    const shareableUsers=users.filter(user=>!user.isAI&&!user.isSelf&&!user.isGroup);
+    const permissionControls=me.isAdmin?`
+      <div class="calculation-permissions">
+        <label>Who can download?<select id="calculationAccessScope"><option value="admins">Administrators only</option><option value="all">All approved users</option><option value="selected">Selected users</option></select></label>
+        <div id="calculationSelectedUsers" class="calculation-selected-users hidden">${shareableUsers.map(user=>`<label><input type="checkbox" value="${Number(user.id)}"> ${sectionEscape(user.displayName||user.username)}</label>`).join("")||"<small>No other approved users are available.</small>"}</div>
+      </div>`:"";
+    $("sectionContent").innerHTML=`
+      <div class="workspace-toolbar"><div><h2>Shared calculation sheets</h2><p>Approved users can upload and download engineering calculation files.</p></div></div>
+      <form id="calculationUploadForm" class="calculation-upload-card">
+        <div><label>Sheet title<input id="calculationTitle" maxlength="120" placeholder="Example: FAHU cooling-load calculation" required></label><label>Description<input id="calculationDescription" maxlength="500" placeholder="Optional revision, project, or design note"></label></div>
+        <div><label>Calculation file<input id="calculationFile" type="file" accept=".xlsx,.xls,.csv,.pdf" required></label><button id="calculationUploadBtn" class="primary" type="submit">Upload sheet</button></div>
+        ${permissionControls}
+        <small>XLSX, XLS, CSV, or PDF · maximum 12 MB</small><p id="calculationResult"></p>
+      </form>
+      ${sheets.length?`<div class="calculation-sheet-grid">${sheets.map(sheet=>`
+        <article data-sheet-id="${sheet.id}">
+          <div class="calculation-file-icon">${sheet.mimeType==="application/pdf"?"PDF":"XLS"}</div>
+          <div><h3>${sectionEscape(sheet.title)}</h3><p>${sectionEscape(sheet.description||sheet.fileName)}</p><small>${sectionEscape(sheet.uploaderName)} · ${readableBytes(sheet.fileSize)} · ${sectionEscape(time(sheet.createdAt))} · ${sheet.accessScope==="admins"?"Administrators only":sheet.accessScope==="selected"?"Selected users":"All users"}</small></div>
+          <div class="calculation-actions"><button type="button" data-sheet-download="${sheet.id}">Download</button>${Number(sheet.uploaderId)===Number(me.id)||me.isAdmin?`<button type="button" class="danger-link" data-sheet-delete="${sheet.id}">Delete</button>`:""}</div>
+        </article>`).join("")}</div>`:workspaceEmpty("📊","No calculation sheets","Upload the first calculation sheet for the team.")}`;
+    $("calculationUploadForm").onsubmit=uploadCalculationSheet;
+    if($("calculationAccessScope"))$("calculationAccessScope").onchange=()=>$("calculationSelectedUsers").classList.toggle("hidden",$("calculationAccessScope").value!=="selected");
+    document.querySelectorAll("[data-sheet-download]").forEach(button=>button.onclick=async()=>{
+      try{button.disabled=true;await downloadApiFile(`/api/calculation-sheets/${button.dataset.sheetDownload}/download`,{}, "calculation-sheet");}
+      catch(error){toast(error.message)}finally{button.disabled=false}
+    });
+    document.querySelectorAll("[data-sheet-delete]").forEach(button=>button.onclick=async()=>{
+      if(!confirm("Permanently delete this shared calculation sheet?"))return;
+      try{button.disabled=true;await api(`/api/calculation-sheets/${button.dataset.sheetDelete}`,{method:"DELETE"});toast("Calculation sheet deleted.");await renderCalculationSheetsWorkspace()}
+      catch(error){button.disabled=false;toast(error.message)}
+    });
+  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Calculation sheets unavailable",error.message)}
+}
+
+async function uploadCalculationSheet(event){
+  event.preventDefault();
+  const file=$("calculationFile").files?.[0];
+  if(!file)return;
+  const button=$("calculationUploadBtn"),result=$("calculationResult");
+  try{
+    button.disabled=true;button.textContent="Uploading…";result.textContent="";
+    const form=new FormData();
+    form.append("sheet",file);form.append("title",$("calculationTitle").value.trim());form.append("description",$("calculationDescription").value.trim());
+    if(me.isAdmin){
+      const scope=$("calculationAccessScope")?.value||"admins";
+      form.append("accessScope",scope);
+      const selected=[...document.querySelectorAll("#calculationSelectedUsers input:checked")].map(input=>Number(input.value));
+      form.append("allowedUserIds",JSON.stringify(selected));
+    }
+    await api("/api/calculation-sheets",{method:"POST",body:form});
+    toast("Calculation sheet shared.");await renderCalculationSheetsWorkspace();
+  }catch(error){result.textContent=error.message}
+  finally{button.disabled=false;button.textContent="Upload sheet"}
+}
+
 async function renderCallsWorkspace(){
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading call history…</div>`;
   try{
@@ -1067,6 +1166,7 @@ function renderSettingsWorkspace(){
         <label>Conversation sidebar<select id="appearanceSidebar"><option value="narrow">Narrow</option><option value="standard">Standard</option></select></label>
         <label>Overview panel<select id="appearanceInsights"><option value="show">Show</option><option value="hide">Hide</option></select></label>
         <label>Message-bar icons<select id="appearanceComposer"><option value="essential">Hide extra icons</option><option value="all">Show all icons</option></select></label>
+        <label>Profile-photo display<select id="appearanceAvatarFit"><option value="cover">Crop to fill</option><option value="contain">Fit full photo</option></select></label>
         <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
       </section>
       <section><h2>Account</h2><p>Status, recovery, switching accounts and logout.</p><div class="settings-button-row"><button id="settingsStatusBtn">Status</button><button id="settingsRecoveryBtn">Recovery code</button><button id="settingsSwitchBtn">Switch account</button><button id="settingsLogoutBtn" class="danger-link">Logout</button></div></section>
@@ -1075,7 +1175,7 @@ function renderSettingsWorkspace(){
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
-  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights",appearanceComposer:"composer"};
+  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights",appearanceComposer:"composer",appearanceAvatarFit:"avatarFit"};
   Object.entries(controls).forEach(([id,key])=>{
     $(id).value=appearance[key];
     $(id).onchange=()=>{const next=loadAppearance();next[key]=$(id).value;saveAppearance(next)};
@@ -1103,6 +1203,7 @@ async function openWorkspaceSection(section){
     groups:["Groups","Multi-user private conversations."],
     channels:["Channels","Organized project and announcement spaces."],
     files:["Files","All attachments shared in your conversations."],
+    calculations:["Calculation Sheets","Upload and download shared engineering calculation files."],
     calls:["Calls","Voice and video calling workspace."],
     settings:["Settings","Profile, appearance, privacy, account and administration."]
   };
@@ -1115,6 +1216,7 @@ async function openWorkspaceSection(section){
   if(section==="groups")await renderGroupsWorkspace();
   if(section==="channels")await renderChannelsWorkspace();
   if(section==="files")await renderFilesWorkspace();
+  if(section==="calculations")await renderCalculationSheetsWorkspace();
   if(section==="calls")await renderCallsWorkspace();
   if(section==="settings")renderSettingsWorkspace();
 }

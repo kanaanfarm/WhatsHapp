@@ -1,0 +1,20 @@
+CONNECTCHAT PRO ENTERPRISE v6.1
+
+IF v6 WAS ALREADY INSTALLED
+1. Open Supabase > SQL Editor.
+2. Run v6.1-calculation-sheet-permissions-migration.sql once.
+3. Deploy the complete v6.1 project.
+4. Refresh with Ctrl+Shift+R.
+
+IF INSTALLING FOR THE FIRST TIME
+1. Run the updated v6-calculation-sheets-migration.sql once.
+2. Deploy the complete v6.1 project.
+3. Refresh with Ctrl+Shift+R.
+
+CALCULATION-SHEET SECURITY
+- New administrator uploads default to Administrators only.
+- The administrator may choose All approved users.
+- The administrator may choose specific approved users.
+- Non-admin users cannot list or download restricted sheets.
+- The uploader and administrators retain access.
+- Permissions are enforced by the server at listing and download time.

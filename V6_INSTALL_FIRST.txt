@@ -1,0 +1,21 @@
+CONNECTCHAT PRO ENTERPRISE v6
+
+1. Open Supabase > SQL Editor.
+2. Run v6-calculation-sheets-migration.sql once.
+3. Upload the complete v6 project to GitHub/Render.
+4. Keep all existing Supabase, session, call, and AI environment variables.
+5. Deploy the latest commit.
+6. Refresh the browser with Ctrl+Shift+R.
+
+NEW IN v6
+- Responsive desktop/web presentation across window sizes and browser zoom.
+- Longer-lived profile images plus Crop to fill / Fit full photo control.
+- AI-answer export to Word (.docx), PDF (.pdf), and Excel (.xlsx).
+- Shared Calculation Sheets workspace for all approved users.
+- XLSX, XLS, CSV, and PDF calculation-sheet upload/download.
+- Uploader or administrator deletion permissions.
+
+IMPORTANT
+- The calculation sheets workspace requires the included SQL migration.
+- OpenAI exports do not make new AI calls and do not consume extra AI tokens.
+- The server still limits each uploaded calculation file to 12 MB.
