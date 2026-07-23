@@ -8,6 +8,7 @@ let aiBusy=false;
 let aiStatus=null;
 let activeConversation=[];
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
+const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const $=id=>document.getElementById(id);
 
 function avatarHtml(user, fallbackText){
@@ -367,6 +368,7 @@ $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
   activeUser=u;renderUsers();updateHeader();
+  if($("aiProviderControl"))$("aiProviderControl").classList.toggle("hidden",!u.isAI);
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
@@ -609,9 +611,17 @@ function showAiWelcome(){
 async function loadAiStatus(){
   try{
     aiStatus=await api("/api/ai/status");
+    const selector=$("aiProviderSelect");
+    if(selector){
+      selector.value=localStorage.getItem(AI_PROVIDER_KEY)||"auto";
+      [...selector.options].forEach(option=>{
+        if(option.value==="openai")option.disabled=!aiStatus.providers?.openai?.available;
+        if(option.value==="ollama")option.disabled=!aiStatus.providers?.ollama?.available;
+      });
+    }
     if(activeUser?.isAI){
       $("chatStatus").textContent=aiStatus.enabled
-        ? `${aiStatus.provider} · ${aiStatus.model} · Ready`
+        ? aiStatus.mode==="hybrid" ? `Hybrid AI · Auto fallback ready` : `${aiStatus.provider} · ${aiStatus.model} · Ready`
         : `${aiStatus.provider} · Setup required`;
     }
   }catch{
@@ -624,8 +634,10 @@ async function sendAi(body){
   const items=loadAiHistory();const userMsg=aiMessage("user",body);items.push(userMsg);saveAiHistory(items);addMessage(userMsg);
   try{
     const history=items.slice(0,-1).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
-    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history})});
-    const reply=aiMessage("assistant",data.answer);items.push(reply);saveAiHistory(items);addMessage(reply);
+    const provider=$("aiProviderSelect")?.value||"auto";
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider})});
+    const source=`${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`;
+    const reply=aiMessage("assistant",`${data.answer}\n\n— ${source}`);items.push(reply);saveAiHistory(items);addMessage(reply);
   }catch(error){toast(error.message)}
   finally{aiBusy=false;$("sendBtn").disabled=false;$("messageInput").disabled=false;$("typingText").textContent="";$("messageInput").focus()}
 }
@@ -655,13 +667,14 @@ async function runSmartAction(action,button){
   const original=button.textContent;
   try{
     button.disabled=true;button.textContent="Working…";
-    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:`${instructions[action]}\n\nConversation:\n${transcript}`,history:[]})});
+    const provider=$("aiProviderSelect")?.value||localStorage.getItem(AI_PROVIDER_KEY)||"auto";
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:`${instructions[action]}\n\nConversation:\n${transcript}`,history:[],provider})});
     const ai=users.find(user=>user.isAI);
     if(!ai)throw new Error("AI assistant is unavailable.");
     await selectUser(ai);
     const items=loadAiHistory();
     const label={summary:"Conversation summary",tasks:"Conversation action items",translate:"Latest-message translation"}[action];
-    const reply=aiMessage("assistant",`${label}\n\n${data.answer}`);
+    const reply=aiMessage("assistant",`${label}\n\n${data.answer}\n\n— ${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`);
     items.push(reply);saveAiHistory(items);addMessage(reply);
   }catch(error){toast(error.message)}
   finally{button.disabled=false;button.textContent=original}
@@ -1083,4 +1096,8 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
   document.querySelectorAll("[data-smart]").forEach(button=>button.addEventListener("click",()=>{
     runSmartAction(button.dataset.smart,button);
   }));
+  if($("aiProviderSelect"))$("aiProviderSelect").onchange=()=>{
+    localStorage.setItem(AI_PROVIDER_KEY,$("aiProviderSelect").value);
+    toast(`AI provider: ${$("aiProviderSelect").selectedOptions[0].textContent}`);
+  };
 })();

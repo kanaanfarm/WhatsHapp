@@ -1,10 +1,10 @@
-CONNECTCHAT PRO ENTERPRISE v5.1
+CONNECTCHAT PRO ENTERPRISE v5.2 HYBRID AI
 
 1. Upload all project files to GitHub/Render.
 2. Open Supabase > SQL Editor.
 3. Run enterprise-v5-migration.sql once.
 4. Confirm your existing .env values are still configured.
-5. Configure AI using AI_SETUP.txt (OpenAI for hosted deployment or Ollama locally).
+5. Configure OpenAI, Ollama, or hybrid mode using AI_SETUP.txt.
 6. Deploy latest commit.
 7. Refresh the browser with Ctrl+Shift+R.
 

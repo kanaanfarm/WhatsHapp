@@ -34,8 +34,13 @@ const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
 const OLLAMA_URL = String(process.env.OLLAMA_URL || "http://127.0.0.1:11434").trim().replace(/\/$/, "");
 const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
+const AI_DEFAULT_PROVIDER = String(process.env.AI_DEFAULT_PROVIDER || "ollama").trim().toLowerCase() === "openai" ? "openai" : "ollama";
 const AI_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60000, 10000), 180000);
-const AI_CONFIGURED = AI_PROVIDER === "ollama" ? Boolean(OLLAMA_URL && OLLAMA_MODEL) : Boolean(OPENAI_API_KEY);
+const OPENAI_CONFIGURED = Boolean(OPENAI_API_KEY && OPENAI_MODEL);
+const OLLAMA_CONFIGURED = Boolean(OLLAMA_URL && OLLAMA_MODEL);
+const AI_CONFIGURED = AI_PROVIDER === "hybrid"
+  ? OPENAI_CONFIGURED || OLLAMA_CONFIGURED
+  : AI_PROVIDER === "ollama" ? OLLAMA_CONFIGURED : OPENAI_CONFIGURED;
 const AI_ENABLED = process.env.AI_ENABLED !== "false" && AI_CONFIGURED;
 const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are ConnectChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
 const SESSION_COOKIE_OPTIONS = {
@@ -842,11 +847,18 @@ function extractOpenAIText(data) {
 }
 
 function aiPublicStatus() {
+  const activeProvider = AI_PROVIDER === "hybrid" ? "Hybrid" : AI_PROVIDER === "ollama" ? "Ollama" : "OpenAI";
   return {
     enabled: AI_ENABLED,
-    provider: AI_PROVIDER === "ollama" ? "Ollama" : "OpenAI",
-    model: AI_PROVIDER === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
-    configured: AI_CONFIGURED
+    mode: AI_PROVIDER,
+    provider: activeProvider,
+    model: AI_PROVIDER === "hybrid" ? "Automatic selection" : AI_PROVIDER === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
+    defaultProvider: AI_DEFAULT_PROVIDER,
+    configured: AI_CONFIGURED,
+    providers: {
+      openai: { available: OPENAI_CONFIGURED, label: "OpenAI", model: OPENAI_MODEL },
+      ollama: { available: OLLAMA_CONFIGURED, label: "Ollama", model: OLLAMA_MODEL }
+    }
   };
 }
 
@@ -905,9 +917,7 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   try {
     if (!AI_ENABLED) {
       return res.status(503).json({
-        error: AI_PROVIDER === "ollama"
-          ? "ConnectChat AI is not configured. Check OLLAMA_URL and OLLAMA_MODEL."
-          : "ConnectChat AI is not configured. Add OPENAI_API_KEY on the server."
+        error: "ConnectChat AI is not configured. Check the OpenAI or Ollama server settings."
       });
     }
     const message = cleanText(req.body?.message, 4000);
@@ -917,26 +927,51 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
       role: item?.role === "assistant" ? "assistant" : "user",
       content: cleanText(item?.content, 4000)
     })).filter(item => item.content);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
-    let answer;
-    try {
-      answer = AI_PROVIDER === "ollama"
-        ? await requestOllama(message, history, controller.signal)
-        : await requestOpenAI(message, history, controller.signal);
-    } finally {
-      clearTimeout(timeout);
+    const requested = ["auto", "openai", "ollama"].includes(req.body?.provider) ? req.body.provider : "auto";
+    const allowed = AI_PROVIDER === "hybrid" ? ["openai", "ollama"] : [AI_PROVIDER === "ollama" ? "ollama" : "openai"];
+    const available = allowed.filter(provider => provider === "openai" ? OPENAI_CONFIGURED : OLLAMA_CONFIGURED);
+    let queue;
+    if (requested !== "auto") {
+      if (!allowed.includes(requested)) return res.status(400).json({ error: `${requested === "openai" ? "OpenAI" : "Ollama"} is disabled by the server administrator.` });
+      if (!available.includes(requested)) return res.status(503).json({ error: `${requested === "openai" ? "OpenAI" : "Ollama"} is not configured on the server.` });
+      queue = [requested];
+    } else {
+      const preferred = available.includes(AI_DEFAULT_PROVIDER) ? AI_DEFAULT_PROVIDER : available[0];
+      queue = [preferred, ...available.filter(provider => provider !== preferred)].filter(Boolean);
     }
+    let answer = "";
+    let usedProvider = "";
+    let lastError;
+    for (const provider of queue) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+      try {
+        answer = provider === "ollama"
+          ? await requestOllama(message, history, controller.signal)
+          : await requestOpenAI(message, history, controller.signal);
+        if (answer) { usedProvider = provider; break; }
+      } catch (error) {
+        lastError = error;
+        console.error(`${provider} AI attempt failed:`, error?.message || error);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    if (!answer && lastError) throw lastError;
     if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
-    res.json({ answer, ...aiPublicStatus() });
+    res.json({
+      answer,
+      provider: usedProvider === "ollama" ? "Ollama" : "OpenAI",
+      model: usedProvider === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
+      fallbackUsed: requested === "auto" && queue[0] !== usedProvider,
+      status: aiPublicStatus()
+    });
   } catch (error) {
     if (error?.name === "AbortError") return res.status(504).json({ error: "ConnectChat AI took too long to respond." });
     console.error("AI chat failed:", error);
     if (error?.status === 401) return res.status(502).json({ error: "The AI provider rejected its API key." });
     if (error?.status === 429) return res.status(429).json({ error: "AI usage limit reached. Please try again shortly." });
-    res.status(502).json({ error: AI_PROVIDER === "ollama"
-      ? "Ollama is unavailable. Confirm that Ollama is running and the selected model is installed."
-      : "ConnectChat AI could not answer right now." });
+    res.status(502).json({ error: "No AI provider could answer. Check the OpenAI key and confirm that the Ollama server is reachable." });
   }
 });
 

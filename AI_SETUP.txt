@@ -1,5 +1,27 @@
-CONNECTCHAT AI SETUP — v5.1
-===========================
+CONNECTCHAT HYBRID AI SETUP — v5.2
+==================================
+
+HYBRID MODE — OLLAMA FIRST, OPENAI FALLBACK
+--------------------------------------------
+Add these server environment variables:
+
+   AI_ENABLED=true
+   AI_PROVIDER=hybrid
+   AI_DEFAULT_PROVIDER=ollama
+   OPENAI_API_KEY=your_private_OpenAI_API_key
+   OPENAI_MODEL=gpt-4.1-mini
+   OLLAMA_URL=https://your-secured-ollama-server.example.com
+   OLLAMA_MODEL=qwen2.5:7b
+   AI_REQUEST_TIMEOUT_MS=120000
+
+In ConnectChat AI, users can select Auto, Ollama, or OpenAI. Auto tries the
+default provider first and uses the other configured provider if it fails.
+
+IMPORTANT FOR RENDER
+--------------------
+OLLAMA_URL=http://127.0.0.1:11434 does not connect Render to Ollama on your
+Windows PC. Render requires an HTTPS address for a separately hosted, secured
+Ollama server. Never publish an unprotected Ollama endpoint on the internet.
 
 OPTION A — OPENAI (RECOMMENDED FOR RENDER / WEB / MOBILE)
 ---------------------------------------------------------
@@ -45,6 +67,9 @@ CURRENT AI FEATURES
 - Latest-message Arabic/English translation
 - Visible provider/model status and useful setup errors
 - OpenAI and Ollama provider support
+- Auto / Ollama / OpenAI selector
+- Ollama-first automatic fallback to OpenAI
+- Provider and model label on each response
 
 NOT INCLUDED IN THIS RELEASE
 ----------------------------

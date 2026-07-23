@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v5",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v5.1 with enhanced OpenAI/Ollama assistant and working smart actions",
+  "description": "ConnectChat Pro Enterprise v5.2 with selectable OpenAI/Ollama hybrid AI and automatic fallback",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
