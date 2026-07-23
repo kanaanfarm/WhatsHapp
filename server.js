@@ -10,6 +10,7 @@ const multer = require("multer");
 const helmet = require("helmet");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
+const { Readable } = require("stream");
 const { Document, Packer, Paragraph, HeadingLevel } = require("docx");
 const { rateLimit } = require("express-rate-limit");
 const { createClient } = require("@supabase/supabase-js");
@@ -1301,6 +1302,18 @@ async function calculationSheetView(row, usernames = new Map()) {
   };
 }
 
+async function calculationSheetAllowed(row, user) {
+  if (user.is_admin || Number(row.uploader_id) === Number(user.id) || row.access_scope === "all") return true;
+  if (row.access_scope === "admins") return false;
+  if (row.access_scope === "selected") {
+    const { data, error } = await supabase.from("calculation_sheet_access")
+      .select("sheet_id").eq("sheet_id", row.id).eq("user_id", user.id).maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
+  }
+  return false;
+}
+
 app.get("/api/calculation-sheets", auth, async (req, res) => {
   try {
     const { data: sheets, error } = await supabase.from("calculation_sheets")
@@ -1405,15 +1418,7 @@ app.get("/api/calculation-sheets/:id/download", auth, async (req, res) => {
       .select("id,uploader_id,file_name,mime_type,storage_path,access_scope").eq("id", id).maybeSingle();
     if (error) throw error;
     if (!row) return res.status(404).json({ error: "Calculation sheet not found." });
-    if (!req.currentUser.is_admin && Number(row.uploader_id) !== Number(req.currentUser.id)) {
-      if (row.access_scope === "admins") return res.status(403).json({ error: "This calculation sheet is restricted to administrators." });
-      if (row.access_scope === "selected") {
-        const { data: grant, error: grantError } = await supabase.from("calculation_sheet_access")
-          .select("sheet_id").eq("sheet_id", row.id).eq("user_id", req.currentUser.id).maybeSingle();
-        if (grantError) throw grantError;
-        if (!grant) return res.status(403).json({ error: "This calculation sheet was not shared with your account." });
-      }
-    }
+    if (!await calculationSheetAllowed(row, req.currentUser)) return res.status(403).json({ error: "This calculation sheet was not shared with your account." });
     const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(row.storage_path);
     if (downloadError) throw downloadError;
     const buffer = Buffer.from(await data.arrayBuffer());
@@ -1424,6 +1429,60 @@ app.get("/api/calculation-sheets/:id/download", auth, async (req, res) => {
   } catch (error) {
     console.error("Calculation sheet download failed:", error);
     res.status(500).json({ error: "The calculation sheet could not be downloaded." });
+  }
+});
+
+app.get("/api/calculation-sheets/:id/preview", auth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid calculation sheet." });
+    const { data: row, error } = await supabase.from("calculation_sheets")
+      .select("id,uploader_id,title,file_name,mime_type,storage_path,access_scope").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!row) return res.status(404).json({ error: "Calculation sheet not found." });
+    if (!await calculationSheetAllowed(row, req.currentUser)) return res.status(403).json({ error: "This calculation sheet was not shared with your account." });
+    const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(row.storage_path);
+    if (downloadError) throw downloadError;
+    const buffer = Buffer.from(await data.arrayBuffer());
+    if (row.mime_type === "application/pdf") {
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${cleanFileName(row.file_name)}"`);
+      return res.end(buffer);
+    }
+    if (row.mime_type === "application/vnd.ms-excel") {
+      return res.status(415).json({ error: "Legacy XLS files can be downloaded but cannot be previewed safely. Save the file as XLSX to enable preview." });
+    }
+    const workbook = new ExcelJS.Workbook();
+    if (row.mime_type === "text/csv") await workbook.csv.read(Readable.from(buffer));
+    else await workbook.xlsx.load(buffer);
+    const requestedSheet = cleanText(req.query?.sheet, 100);
+    const worksheet = workbook.getWorksheet(requestedSheet) || workbook.worksheets[0];
+    if (!worksheet) return res.status(422).json({ error: "The workbook does not contain a readable worksheet." });
+    const rows = [];
+    worksheet.eachRow({ includeEmpty: true }, sheetRow => {
+      if (rows.length >= 500) return;
+      const values = [];
+      const lastColumn = Math.min(sheetRow.cellCount || sheetRow.actualCellCount || 0, 100);
+      for (let column = 1; column <= lastColumn; column += 1) {
+        const cell = sheetRow.getCell(column);
+        const value = cell.value && typeof cell.value === "object" && "result" in cell.value ? cell.value.result : cell.text;
+        values.push(cleanText(value ?? "", 2000));
+      }
+      rows.push(values);
+    });
+    res.json({
+      kind: "spreadsheet",
+      title: row.title,
+      fileName: row.file_name,
+      sheetNames: workbook.worksheets.map(sheet => sheet.name).slice(0, 50),
+      activeSheet: worksheet.name,
+      rows,
+      truncated: worksheet.rowCount > 500 || worksheet.columnCount > 100,
+      note: "Formula results are the values saved in the uploaded workbook; ConnectChat does not recalculate Excel formulas."
+    });
+  } catch (error) {
+    console.error("Calculation sheet preview failed:", error);
+    res.status(422).json({ error: "This calculation sheet could not be previewed. Download it to open in its original application." });
   }
 });
 

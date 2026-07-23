@@ -7,6 +7,7 @@ let callsEnabled=true;
 let aiBusy=false;
 let aiStatus=null;
 let activeConversation=[];
+let currentCalculationPreviewId=null,calculationPreviewObjectUrl=null;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
@@ -1086,6 +1087,46 @@ function readableBytes(value){
   return `${(bytes/(1024*1024)).toFixed(1)} MB`;
 }
 
+async function openCalculationPreview(sheetId,sheetName=""){
+  const id=Number(sheetId);if(!Number.isSafeInteger(id)||id<=0)return;
+  const overlay=$("calculationPreviewOverlay"),content=$("calculationPreviewContent"),tabs=$("calculationPreviewTabs");
+  currentCalculationPreviewId=id;content.innerHTML='<div class="workspace-loading">Opening calculation sheet…</div>';tabs.innerHTML="";$("calculationPreviewNote").textContent="";
+  overlay.classList.remove("hidden");
+  try{
+    const suffix=sheetName?`?sheet=${encodeURIComponent(sheetName)}`:"";
+    const response=await fetch(`/api/calculation-sheets/${id}/preview${suffix}`,{credentials:"same-origin",cache:"no-store",headers:{"X-ConnectChat-Request":"1"}});
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"Preview failed.")}
+    const type=response.headers.get("content-type")||"";
+    if(type.includes("application/pdf")){
+      if(calculationPreviewObjectUrl)URL.revokeObjectURL(calculationPreviewObjectUrl);
+      calculationPreviewObjectUrl=URL.createObjectURL(await response.blob());
+      $("calculationPreviewTitle").textContent="PDF calculation sheet";
+      content.innerHTML=`<iframe class="calculation-pdf-preview" src="${calculationPreviewObjectUrl}" title="Calculation sheet PDF preview"></iframe>`;
+      return;
+    }
+    const data=await response.json();
+    $("calculationPreviewTitle").textContent=data.title||data.fileName||"Calculation sheet";
+    $("calculationPreviewNote").textContent=data.note||"";
+    tabs.innerHTML=(data.sheetNames||[]).map(name=>`<button type="button" class="${name===data.activeSheet?"active":""}" data-preview-sheet="${sectionEscape(name)}">${sectionEscape(name)}</button>`).join("");
+    const maxColumns=Math.max(0,...(data.rows||[]).map(row=>row.length));
+    content.innerHTML=data.rows?.length?`<div class="calculation-table-wrap"><table><tbody>${data.rows.map((row,rowIndex)=>`<tr>${Array.from({length:maxColumns},(_,columnIndex)=>`${rowIndex===0?"<th>":"<td>"}${sectionEscape(row[columnIndex]??"")}${rowIndex===0?"</th>":"</td>"}`).join("")}</tr>`).join("")}</tbody></table></div>${data.truncated?'<p class="preview-warning">Preview limited to 500 rows and 100 columns. Download the original file for the complete workbook.</p>':""}`:workspaceEmpty("📊","Empty worksheet","This worksheet does not contain saved display values.");
+    tabs.querySelectorAll("[data-preview-sheet]").forEach(button=>button.onclick=()=>openCalculationPreview(id,button.dataset.previewSheet));
+  }catch(error){content.innerHTML=workspaceEmpty("⚠️","Preview unavailable",error.message)}
+}
+
+function closeCalculationPreview(){
+  $("calculationPreviewOverlay").classList.add("hidden");
+  if(calculationPreviewObjectUrl){URL.revokeObjectURL(calculationPreviewObjectUrl);calculationPreviewObjectUrl=null}
+  currentCalculationPreviewId=null;
+}
+if($("closeCalculationPreview"))$("closeCalculationPreview").onclick=closeCalculationPreview;
+if($("calculationPreviewOverlay"))$("calculationPreviewOverlay").onclick=event=>{if(event.target===$("calculationPreviewOverlay"))closeCalculationPreview()};
+if($("calculationPreviewDownload"))$("calculationPreviewDownload").onclick=async()=>{
+  if(!currentCalculationPreviewId)return;
+  try{await downloadApiFile(`/api/calculation-sheets/${currentCalculationPreviewId}/download`,{},"calculation-sheet")}
+  catch(error){toast(error.message)}
+};
+
 async function renderCalculationSheetsWorkspace(){
   $("sectionContent").innerHTML='<div class="workspace-loading">Loading calculation sheets…</div>';
   try{
@@ -1108,10 +1149,12 @@ async function renderCalculationSheetsWorkspace(){
         <article data-sheet-id="${sheet.id}">
           <div class="calculation-file-icon">${sheet.mimeType==="application/pdf"?"PDF":"XLS"}</div>
           <div><h3>${sectionEscape(sheet.title)}</h3><p>${sectionEscape(sheet.description||sheet.fileName)}</p><small>${sectionEscape(sheet.uploaderName)} · ${readableBytes(sheet.fileSize)} · ${sectionEscape(time(sheet.createdAt))} · ${sheet.accessScope==="admins"?"Administrators only":sheet.accessScope==="selected"?"Selected users":"All users"}</small></div>
-          <div class="calculation-actions"><button type="button" data-sheet-download="${sheet.id}">Download</button>${Number(sheet.uploaderId)===Number(me.id)||me.isAdmin?`<button type="button" class="danger-link" data-sheet-delete="${sheet.id}">Delete</button>`:""}</div>
+          <div class="calculation-actions"><button type="button" data-sheet-open="${sheet.id}">Open</button><button type="button" data-sheet-download="${sheet.id}">Download</button>${Number(sheet.uploaderId)===Number(me.id)||me.isAdmin?`<button type="button" class="danger-link" data-sheet-delete="${sheet.id}">Delete</button>`:""}</div>
         </article>`).join("")}</div>`:workspaceEmpty("📊","No calculation sheets","Upload the first calculation sheet for the team.")}`;
     $("calculationUploadForm").onsubmit=uploadCalculationSheet;
     if($("calculationAccessScope"))$("calculationAccessScope").onchange=()=>$("calculationSelectedUsers").classList.toggle("hidden",$("calculationAccessScope").value!=="selected");
+    document.querySelectorAll("[data-sheet-open]").forEach(button=>button.onclick=()=>openCalculationPreview(button.dataset.sheetOpen));
+    document.querySelectorAll(".calculation-sheet-grid article").forEach(card=>card.ondblclick=event=>{if(!event.target.closest("button"))openCalculationPreview(card.dataset.sheetId)});
     document.querySelectorAll("[data-sheet-download]").forEach(button=>button.onclick=async()=>{
       try{button.disabled=true;await downloadApiFile(`/api/calculation-sheets/${button.dataset.sheetDownload}/download`,{}, "calculation-sheet");}
       catch(error){toast(error.message)}finally{button.disabled=false}
