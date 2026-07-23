@@ -29,9 +29,14 @@ const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
+const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
-const AI_ENABLED = process.env.AI_ENABLED !== "false" && Boolean(OPENAI_API_KEY);
+const OLLAMA_URL = String(process.env.OLLAMA_URL || "http://127.0.0.1:11434").trim().replace(/\/$/, "");
+const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
+const AI_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60000, 10000), 180000);
+const AI_CONFIGURED = AI_PROVIDER === "ollama" ? Boolean(OLLAMA_URL && OLLAMA_MODEL) : Boolean(OPENAI_API_KEY);
+const AI_ENABLED = process.env.AI_ENABLED !== "false" && AI_CONFIGURED;
 const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are ConnectChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -836,9 +841,75 @@ function extractOpenAIText(data) {
   return parts.join("\n").trim();
 }
 
+function aiPublicStatus() {
+  return {
+    enabled: AI_ENABLED,
+    provider: AI_PROVIDER === "ollama" ? "Ollama" : "OpenAI",
+    model: AI_PROVIDER === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
+    configured: AI_CONFIGURED
+  };
+}
+
+async function requestOpenAI(message, history, signal) {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: AI_SYSTEM_PROMPT,
+      input: [...history, { role: "user", content: message }],
+      max_output_tokens: 1600
+    }),
+    signal
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || "OpenAI request failed.");
+    error.status = response.status;
+    throw error;
+  }
+  return extractOpenAIText(data);
+}
+
+async function requestOllama(message, history, signal) {
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      stream: false,
+      messages: [
+        { role: "system", content: AI_SYSTEM_PROMPT },
+        ...history,
+        { role: "user", content: message }
+      ],
+      options: { temperature: 0.3 }
+    }),
+    signal
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.error || "Ollama request failed.");
+    error.status = response.status;
+    throw error;
+  }
+  return String(data?.message?.content || "").trim();
+}
+
+app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
+
 app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   try {
-    if (!AI_ENABLED) return res.status(503).json({ error: "ConnectChat AI is not configured. Add OPENAI_API_KEY on the server." });
+    if (!AI_ENABLED) {
+      return res.status(503).json({
+        error: AI_PROVIDER === "ollama"
+          ? "ConnectChat AI is not configured. Check OLLAMA_URL and OLLAMA_MODEL."
+          : "ConnectChat AI is not configured. Add OPENAI_API_KEY on the server."
+      });
+    }
     const message = cleanText(req.body?.message, 4000);
     if (!message) return res.status(400).json({ error: "Please enter a message." });
     const rawHistory = Array.isArray(req.body?.history) ? req.body.history.slice(-12) : [];
@@ -847,41 +918,25 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
       content: cleanText(item?.content, 4000)
     })).filter(item => item.content);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    let response;
+    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+    let answer;
     try {
-      response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          instructions: AI_SYSTEM_PROMPT,
-          input: [...history, { role: "user", content: message }],
-          max_output_tokens: 1200
-        }),
-        signal: controller.signal
-      });
+      answer = AI_PROVIDER === "ollama"
+        ? await requestOllama(message, history, controller.signal)
+        : await requestOpenAI(message, history, controller.signal);
     } finally {
       clearTimeout(timeout);
     }
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      console.error("OpenAI API error:", response.status, data?.error?.message || "Unknown error");
-      const publicMessage = response.status === 429
-        ? "AI usage limit reached. Please try again shortly."
-        : "ConnectChat AI could not answer right now.";
-      return res.status(502).json({ error: publicMessage });
-    }
-    const answer = extractOpenAIText(data);
     if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
-    res.json({ answer, model: OPENAI_MODEL });
+    res.json({ answer, ...aiPublicStatus() });
   } catch (error) {
     if (error?.name === "AbortError") return res.status(504).json({ error: "ConnectChat AI took too long to respond." });
     console.error("AI chat failed:", error);
-    res.status(500).json({ error: "ConnectChat AI could not answer right now." });
+    if (error?.status === 401) return res.status(502).json({ error: "The AI provider rejected its API key." });
+    if (error?.status === 429) return res.status(429).json({ error: "AI usage limit reached. Please try again shortly." });
+    res.status(502).json({ error: AI_PROVIDER === "ollama"
+      ? "Ollama is unavailable. Confirm that Ollama is running and the selected model is installed."
+      : "ConnectChat AI could not answer right now." });
   }
 });
 
@@ -1138,15 +1193,15 @@ app.get("/api/users", auth, async (req, res) => {
         lastPreview: last ? (last.kind !== "text" ? `[${last.kind}]` : (last.body || "Message")) : (isSelf ? "Your private conversation" : "Start a conversation")
       };
     }));
-    if (AI_ENABLED) result.unshift({
+    result.unshift({
       id: -1,
       username: "ConnectChat AI",
       displayName: "ConnectChat AI",
       isAI: true,
       isSelf: false,
-      online: true,
+      online: AI_ENABLED,
       lastSeenAt: null,
-      lastPreview: "Ask anything in Arabic or English"
+      lastPreview: AI_ENABLED ? "Ask anything in Arabic or English" : "AI setup required"
     });
     result.sort((a, b) => Number(b.isAI) - Number(a.isAI) || Number(b.isSelf) - Number(a.isSelf) || a.username.localeCompare(b.username));
     res.json(result);

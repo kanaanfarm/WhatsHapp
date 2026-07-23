@@ -1,10 +1,10 @@
-CONNECTCHAT PRO ENTERPRISE v5
+CONNECTCHAT PRO ENTERPRISE v5.1
 
 1. Upload all project files to GitHub/Render.
 2. Open Supabase > SQL Editor.
 3. Run enterprise-v5-migration.sql once.
 4. Confirm your existing .env values are still configured.
-5. Optional AI: add OPENAI_API_KEY and set AI_ENABLED=true.
+5. Configure AI using AI_SETUP.txt (OpenAI for hosted deployment or Ollama locally).
 6. Deploy latest commit.
 7. Refresh the browser with Ctrl+Shift+R.
 
@@ -19,5 +19,5 @@ IMPLEMENTED IN THIS RELEASE
 LIMITATIONS
 - Group member invitation UI is not yet included; the API/database foundation supports members.
 - Group video meetings and call recordings are not included.
-- AI requires a valid server API key.
+- OpenAI requires a valid server API key; Ollama requires a running local model.
 - File folders, version history and permissions are future modules.

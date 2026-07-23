@@ -1,11 +1,11 @@
 {
-  "name": "ConnectChat Pro",
+  "name": "ConnectChat Pro Enterprise v5.1",
   "short_name": "ConnectChat",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#eef2f7",
   "theme_color": "#182132",
-  "description": "Private chat for mobile and PC",
+  "description": "Private AI-enhanced collaboration for mobile and PC",
   "icons": [
     {"src":"/logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ]

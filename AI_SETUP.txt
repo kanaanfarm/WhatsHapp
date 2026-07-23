@@ -1,13 +1,31 @@
-CONNECTCHAT AI SETUP
-====================
+CONNECTCHAT AI SETUP — v5.1
+===========================
 
+OPTION A — OPENAI (RECOMMENDED FOR RENDER / WEB / MOBILE)
+---------------------------------------------------------
 1. Open your hosting service environment variables.
 2. Add:
    AI_ENABLED=true
+   AI_PROVIDER=openai
    OPENAI_API_KEY=your_private_OpenAI_API_key
    OPENAI_MODEL=gpt-4.1-mini
 3. Restart or redeploy the server.
 4. Log in. "ConnectChat AI" will appear at the top of the contacts list.
+
+OPTION B — OLLAMA (FREE LOCAL AI)
+---------------------------------
+1. Install Ollama on the same computer that runs server.js.
+2. Run: ollama pull qwen2.5:7b
+3. Add to .env:
+   AI_ENABLED=true
+   AI_PROVIDER=ollama
+   OLLAMA_URL=http://127.0.0.1:11434
+   OLLAMA_MODEL=qwen2.5:7b
+4. Restart ConnectChat.
+
+Important: Render cannot normally reach Ollama running on your private PC.
+Use OpenAI for a public Render deployment, or host Ollama on a reachable,
+secured server.
 
 SECURITY
 --------
@@ -22,6 +40,11 @@ CURRENT AI FEATURES
 - Arabic and English
 - Short conversation memory saved in the user's browser
 - MEP/HVAC/construction and general assistance
+- Real conversation summaries
+- Action-item extraction
+- Latest-message Arabic/English translation
+- Visible provider/model status and useful setup errors
+- OpenAI and Ollama provider support
 
 NOT INCLUDED IN THIS RELEASE
 ----------------------------

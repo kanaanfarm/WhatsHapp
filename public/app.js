@@ -5,6 +5,8 @@ let currentUserFilter="all";
 let profileTarget=null;
 let callsEnabled=true;
 let aiBusy=false;
+let aiStatus=null;
+let activeConversation=[];
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const $=id=>document.getElementById(id);
 
@@ -369,10 +371,14 @@ async function selectUser(u){
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   if(u.isAI){
+    activeConversation=[];
     loadAiHistory().forEach(addMessage);
     if(!$("messages").children.length)showAiWelcome();
+    loadAiStatus();
   }else{
-    const history=await api(`/api/messages/${u.id}`);history.forEach(addMessage);
+    const history=await api(`/api/messages/${u.id}`);
+    activeConversation=history;
+    history.forEach(addMessage);
   }
   if(window.innerWidth<=760){$("sidebar").classList.add("mobile-hidden");$("chatPanel").classList.remove("mobile-hidden")}
   $("messageInput").focus();
@@ -598,7 +604,19 @@ function aiMessage(role,body){
 }
 function showAiWelcome(){
   $("messages").className="messages empty-state";
-  $("messages").innerHTML="<div><h3>ConnectChat AI</h3><p>Ask a question in Arabic or English. Your AI history is saved only in this browser.</p></div>";
+  $("messages").innerHTML="<div><h3>ConnectChat AI</h3><p>Ask in Arabic or English, or use Smart actions in another conversation. AI history is private to this browser.</p></div>";
+}
+async function loadAiStatus(){
+  try{
+    aiStatus=await api("/api/ai/status");
+    if(activeUser?.isAI){
+      $("chatStatus").textContent=aiStatus.enabled
+        ? `${aiStatus.provider} · ${aiStatus.model} · Ready`
+        : `${aiStatus.provider} · Setup required`;
+    }
+  }catch{
+    if(activeUser?.isAI)$("chatStatus").textContent="AI status unavailable";
+  }
 }
 async function sendAi(body){
   if(aiBusy)return;
@@ -610,6 +628,43 @@ async function sendAi(body){
     const reply=aiMessage("assistant",data.answer);items.push(reply);saveAiHistory(items);addMessage(reply);
   }catch(error){toast(error.message)}
   finally{aiBusy=false;$("sendBtn").disabled=false;$("messageInput").disabled=false;$("typingText").textContent="";$("messageInput").focus()}
+}
+
+function conversationText(){
+  return activeConversation
+    .filter(item=>item.kind==="text"&&item.body)
+    .slice(-40)
+    .map(item=>`${Number(item.sender_id)===Number(me.id)?"You":(item.sender_name||activeUser?.username||"Contact")}: ${item.body}`)
+    .join("\n")
+    .slice(-12000);
+}
+
+async function runSmartAction(action,button){
+  if(!activeUser)return toast("Select a conversation first.");
+  if(activeUser.isAI){
+    const prompts={summary:"Summarize our AI conversation.",tasks:"Extract the action items from our AI conversation.",translate:"Translate the latest message to the other language (Arabic or English)."};
+    $("messageInput").value=prompts[action];updateComposer();$("messageInput").focus();return;
+  }
+  const transcript=conversationText();
+  if(!transcript)return toast("This conversation has no text messages to analyze.");
+  const instructions={
+    summary:"Summarize the conversation clearly. Include decisions, important facts, and unresolved points.",
+    tasks:"Extract action items. For each item identify the owner and deadline when stated; never invent missing details.",
+    translate:"Translate the latest message into Arabic if it is English, or English if it is Arabic. Return only the translation."
+  };
+  const original=button.textContent;
+  try{
+    button.disabled=true;button.textContent="Working…";
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:`${instructions[action]}\n\nConversation:\n${transcript}`,history:[]})});
+    const ai=users.find(user=>user.isAI);
+    if(!ai)throw new Error("AI assistant is unavailable.");
+    await selectUser(ai);
+    const items=loadAiHistory();
+    const label={summary:"Conversation summary",tasks:"Conversation action items",translate:"Latest-message translation"}[action];
+    const reply=aiMessage("assistant",`${label}\n\n${data.answer}`);
+    items.push(reply);saveAiHistory(items);addMessage(reply);
+  }catch(error){toast(error.message)}
+  finally{button.disabled=false;button.textContent=original}
 }
 function send(){
   const body=$("messageInput").value.trim();
@@ -1026,9 +1081,6 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
     document.querySelectorAll(".workspace-tab").forEach(x=>x.classList.remove("active"));button.classList.add("active");
   }));
   document.querySelectorAll("[data-smart]").forEach(button=>button.addEventListener("click",()=>{
-    if(!activeUser){toast("Select a conversation first.");return}
-    const prompts={summary:"Summarize this conversation",tasks:"Create action items from this conversation",translate:"Translate the latest message"};
-    if(activeUser.isAI){$("messageInput").value=prompts[button.dataset.smart];updateComposer();$("messageInput").focus();}
-    else toast("Smart actions will use Ollama in the AI integration phase.");
+    runSmartAction(button.dataset.smart,button);
   }));
 })();
