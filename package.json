@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v6",
-  "version": "6.2.0",
+  "version": "6.2.1",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v6.2 with authenticated PDF, XLSX, and CSV calculation-sheet previews",
+  "description": "ConnectChat Pro Enterprise v6.2.1 with resilient authenticated calculation-sheet previews and all-user sharing by default",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

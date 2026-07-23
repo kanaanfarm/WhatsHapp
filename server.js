@@ -1314,6 +1314,43 @@ async function calculationSheetAllowed(row, user) {
   return false;
 }
 
+function calculationSheetFormat(row, buffer) {
+  const extension = path.extname(String(row.file_name || "")).toLowerCase();
+  if (buffer?.subarray(0, 5).toString() === "%PDF-") return "pdf";
+  if (extension === ".csv" || row.mime_type === "text/csv") return "csv";
+  if (extension === ".xls") return "xls";
+  if ([".xlsx", ".xlsm", ".xltx", ".xltm"].includes(extension)) return "xlsx";
+  if (row.mime_type === "application/pdf") return "pdf";
+  if (row.mime_type === "application/vnd.ms-excel") return "xls";
+  if (row.mime_type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return "xlsx";
+  return "unknown";
+}
+
+async function loadCalculationWorkbook(buffer, format) {
+  const workbook = new ExcelJS.Workbook();
+  if (format === "csv") {
+    await workbook.csv.read(Readable.from(buffer));
+    return workbook;
+  }
+  try {
+    await workbook.xlsx.load(buffer);
+    return workbook;
+  } catch (initialError) {
+    const fallbackWorkbook = new ExcelJS.Workbook();
+    try {
+      await fallbackWorkbook.xlsx.load(buffer, {
+        ignoreNodes: [
+          "dataValidations", "extLst", "drawing", "hyperlinks",
+          "conditionalFormatting", "headerFooter", "picture"
+        ]
+      });
+      return fallbackWorkbook;
+    } catch {
+      throw initialError;
+    }
+  }
+}
+
 app.get("/api/calculation-sheets", auth, async (req, res) => {
   try {
     const { data: sheets, error } = await supabase.from("calculation_sheets")
@@ -1358,7 +1395,7 @@ app.post("/api/calculation-sheets", uploadLimiter, auth, upload.single("sheet"),
     const requestedScope = cleanText(req.body?.accessScope, 20);
     const accessScope = req.currentUser.is_admin && ["all", "admins", "selected"].includes(requestedScope)
       ? requestedScope
-      : req.currentUser.is_admin ? "admins" : "all";
+      : "all";
     let allowedUserIds = [];
     if (accessScope === "selected") {
       try {
@@ -1444,17 +1481,19 @@ app.get("/api/calculation-sheets/:id/preview", auth, async (req, res) => {
     const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(row.storage_path);
     if (downloadError) throw downloadError;
     const buffer = Buffer.from(await data.arrayBuffer());
-    if (row.mime_type === "application/pdf") {
+    const format = calculationSheetFormat(row, buffer);
+    if (format === "pdf") {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${cleanFileName(row.file_name)}"`);
       return res.end(buffer);
     }
-    if (row.mime_type === "application/vnd.ms-excel") {
+    if (format === "xls") {
       return res.status(415).json({ error: "Legacy XLS files can be downloaded but cannot be previewed safely. Save the file as XLSX to enable preview." });
     }
-    const workbook = new ExcelJS.Workbook();
-    if (row.mime_type === "text/csv") await workbook.csv.read(Readable.from(buffer));
-    else await workbook.xlsx.load(buffer);
+    if (!["xlsx", "csv"].includes(format)) {
+      return res.status(415).json({ error: "This file format cannot be previewed. Upload an XLSX, CSV, or PDF file." });
+    }
+    const workbook = await loadCalculationWorkbook(buffer, format);
     const requestedSheet = cleanText(req.query?.sheet, 100);
     const worksheet = workbook.getWorksheet(requestedSheet) || workbook.worksheets[0];
     if (!worksheet) return res.status(422).json({ error: "The workbook does not contain a readable worksheet." });

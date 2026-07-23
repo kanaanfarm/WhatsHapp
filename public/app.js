@@ -1134,11 +1134,11 @@ async function renderCalculationSheetsWorkspace(){
     const shareableUsers=users.filter(user=>!user.isAI&&!user.isSelf&&!user.isGroup);
     const permissionControls=me.isAdmin?`
       <div class="calculation-permissions">
-        <label>Who can download?<select id="calculationAccessScope"><option value="admins">Administrators only</option><option value="all">All approved users</option><option value="selected">Selected users</option></select></label>
+        <label>Who can open or download?<select id="calculationAccessScope"><option value="all" selected>All approved users</option><option value="admins">Administrators only</option><option value="selected">Selected users</option></select></label>
         <div id="calculationSelectedUsers" class="calculation-selected-users hidden">${shareableUsers.map(user=>`<label><input type="checkbox" value="${Number(user.id)}"> ${sectionEscape(user.displayName||user.username)}</label>`).join("")||"<small>No other approved users are available.</small>"}</div>
       </div>`:"";
     $("sectionContent").innerHTML=`
-      <div class="workspace-toolbar"><div><h2>Shared calculation sheets</h2><p>Approved users can upload and download engineering calculation files.</p></div></div>
+      <div class="workspace-toolbar"><div><h2>Shared calculation sheets</h2><p>Approved users can open shared engineering calculations by double-clicking a file.</p></div></div>
       <form id="calculationUploadForm" class="calculation-upload-card">
         <div><label>Sheet title<input id="calculationTitle" maxlength="120" placeholder="Example: FAHU cooling-load calculation" required></label><label>Description<input id="calculationDescription" maxlength="500" placeholder="Optional revision, project, or design note"></label></div>
         <div><label>Calculation file<input id="calculationFile" type="file" accept=".xlsx,.xls,.csv,.pdf" required></label><button id="calculationUploadBtn" class="primary" type="submit">Upload sheet</button></div>
@@ -1177,7 +1177,7 @@ async function uploadCalculationSheet(event){
     const form=new FormData();
     form.append("sheet",file);form.append("title",$("calculationTitle").value.trim());form.append("description",$("calculationDescription").value.trim());
     if(me.isAdmin){
-      const scope=$("calculationAccessScope")?.value||"admins";
+      const scope=$("calculationAccessScope")?.value||"all";
       form.append("accessScope",scope);
       const selected=[...document.querySelectorAll("#calculationSelectedUsers input:checked")].map(input=>Number(input.value));
       form.append("allowedUserIds",JSON.stringify(selected));
