@@ -1,4 +1,4 @@
-CONNECTCHAT HYBRID AI SETUP — v5.2
+CONNECTCHAT HYBRID AI SETUP — v5.3
 ==================================
 
 HYBRID MODE — OLLAMA FIRST, OPENAI FALLBACK
@@ -13,9 +13,11 @@ Add these server environment variables:
    OLLAMA_URL=https://your-secured-ollama-server.example.com
    OLLAMA_MODEL=qwen2.5:7b
    AI_REQUEST_TIMEOUT_MS=120000
+   AI_AUTO_FALLBACK_TIMEOUT_MS=12000
 
 In ConnectChat AI, users can select Auto, Ollama, or OpenAI. Auto tries the
 default provider first and uses the other configured provider if it fails.
+If an AI request fails, the reason now remains visible in the conversation.
 
 IMPORTANT FOR RENDER
 --------------------

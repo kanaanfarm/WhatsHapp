@@ -9,7 +9,26 @@ let aiStatus=null;
 let activeConversation=[];
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
+const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show"};
 const $=id=>document.getElementById(id);
+
+function appearanceKey(){return `connectchat-appearance-${me?.id||"guest"}`}
+function loadAppearance(){
+  try{return {...DEFAULT_APPEARANCE,...JSON.parse(localStorage.getItem(appearanceKey())||"{}")}}
+  catch{return {...DEFAULT_APPEARANCE}}
+}
+function applyAppearance(settings=loadAppearance()){
+  const root=document.documentElement;
+  root.dataset.density=settings.density;
+  root.dataset.textSize=settings.text;
+  root.dataset.iconSize=settings.icons;
+  root.dataset.sidebarSize=settings.sidebar;
+  root.dataset.insights=settings.insights;
+}
+function saveAppearance(settings){
+  localStorage.setItem(appearanceKey(),JSON.stringify(settings));
+  applyAppearance(settings);
+}
 
 function avatarHtml(user, fallbackText){
   const fallback=escapeHtml(fallbackText||initials(user?.username||"User"));
@@ -42,7 +61,7 @@ async function api(url,options={}){
   if(!(options.body instanceof FormData))headers["Content-Type"]="application/json";
   const res=await fetch(url,{credentials:"same-origin",cache:"no-store",redirect:"error",...options,headers});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok){const error=new Error(data.error||"Request failed");error.code=data.code;error.status=res.status;throw error}
+  if(!res.ok){const error=new Error(data.error||"Request failed");error.code=data.code;error.status=res.status;error.details=data.details;error.retryable=data.retryable;throw error}
   return data;
 }
 
@@ -191,6 +210,7 @@ $("postStatusBtn").onclick=postStatus;
 $("statusOverlay").onclick=e=>{if(e.target===$("statusOverlay"))$("statusOverlay").classList.add("hidden")};
 
 async function startApp(){
+  applyAppearance();
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
   if($("railInitials"))setAvatarElement($("railInitials"),me,initials(me.username));
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
@@ -566,7 +586,7 @@ function addMessage(msg){
     $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   }
   const row=document.createElement("div");
-  row.className=`msg ${own?"own":"other"}`;
+  row.className=`msg ${own?"own":"other"} ${msg.aiError?"ai-error":""}`;
   row.dataset.messageId=String(msg.id);
   row.innerHTML=`<div class="meta"><span>${own?"You":escapeHtml(msg.sender_name)} · ${time(msg.created_at)}</span>${own?`<span class="${receipt.className}">${receipt.text}</span>`:""}${canDelete?'<button type="button" class="message-delete" title="Permanently delete this message">Delete</button>':""}</div><div class="bubble">${messageContent(msg)}</div>`;
   const deleteButton=row.querySelector(".message-delete");
@@ -604,6 +624,10 @@ function saveAiHistory(items){localStorage.setItem(AI_HISTORY_KEY,JSON.stringify
 function aiMessage(role,body){
   return {id:`ai-${Date.now()}-${Math.random()}`,sender_id:role==="user"?me.id:-1,sender_name:role==="user"?me.username:"ConnectChat AI",kind:"text",body,created_at:new Date().toISOString(),ai:true};
 }
+function aiErrorMessage(error){
+  const details=error.details?`\n\nDetails: ${error.details}`:"";
+  return {...aiMessage("assistant",`⚠️ ${error.message}${details}\n\nCheck the selected provider or try again.`),aiError:true};
+}
 function showAiWelcome(){
   $("messages").className="messages empty-state";
   $("messages").innerHTML="<div><h3>ConnectChat AI</h3><p>Ask in Arabic or English, or use Smart actions in another conversation. AI history is private to this browser.</p></div>";
@@ -620,8 +644,9 @@ async function loadAiStatus(){
       });
     }
     if(activeUser?.isAI){
+      const readyProviders=Object.values(aiStatus.providers||{}).filter(item=>item.available).map(item=>item.label);
       $("chatStatus").textContent=aiStatus.enabled
-        ? aiStatus.mode==="hybrid" ? `Hybrid AI · Auto fallback ready` : `${aiStatus.provider} · ${aiStatus.model} · Ready`
+        ? aiStatus.mode==="hybrid" ? `Hybrid AI · ${readyProviders.join(" + ")} ready` : `${aiStatus.provider} · ${aiStatus.model} · Ready`
         : `${aiStatus.provider} · Setup required`;
     }
   }catch{
@@ -633,12 +658,14 @@ async function sendAi(body){
   aiBusy=true;$("sendBtn").disabled=true;$("messageInput").disabled=true;$("typingText").textContent="ConnectChat AI is thinking…";
   const items=loadAiHistory();const userMsg=aiMessage("user",body);items.push(userMsg);saveAiHistory(items);addMessage(userMsg);
   try{
-    const history=items.slice(0,-1).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
+    const history=items.slice(0,-1).filter(x=>!x.aiError).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
     const provider=$("aiProviderSelect")?.value||"auto";
     const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider})});
     const source=`${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`;
     const reply=aiMessage("assistant",`${data.answer}\n\n— ${source}`);items.push(reply);saveAiHistory(items);addMessage(reply);
-  }catch(error){toast(error.message)}
+  }catch(error){
+    const failure=aiErrorMessage(error);items.push(failure);saveAiHistory(items);addMessage(failure);toast(error.message);
+  }
   finally{aiBusy=false;$("sendBtn").disabled=false;$("messageInput").disabled=false;$("typingText").textContent="";$("messageInput").focus()}
 }
 
@@ -676,7 +703,15 @@ async function runSmartAction(action,button){
     const label={summary:"Conversation summary",tasks:"Conversation action items",translate:"Latest-message translation"}[action];
     const reply=aiMessage("assistant",`${label}\n\n${data.answer}\n\n— ${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`);
     items.push(reply);saveAiHistory(items);addMessage(reply);
-  }catch(error){toast(error.message)}
+  }catch(error){
+    const ai=users.find(user=>user.isAI);
+    if(ai){
+      await selectUser(ai);
+      const items=loadAiHistory(),failure=aiErrorMessage(error);
+      items.push(failure);saveAiHistory(items);addMessage(failure);
+    }
+    toast(error.message);
+  }
   finally{button.disabled=false;button.textContent=original}
 }
 function send(){
@@ -1019,20 +1054,34 @@ async function renderCallsWorkspace(){
 }
 
 function renderSettingsWorkspace(){
+  const appearance=loadAppearance();
   $("sectionContent").innerHTML=`
     <div class="settings-workspace-grid">
       <section><h2>Profile</h2><p>View your profile and manage your own profile photo.</p><button id="settingsProfileBtn" class="primary">Open my profile</button></section>
-      <section><h2>Appearance</h2><p>Theme and accent colour are included here.</p><div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button></div></section>
+      <section class="appearance-settings"><h2>My page appearance</h2><p>These settings belong to your account on this device.</p>
+        <label>Layout density<select id="appearanceDensity"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
+        <label>Text size<select id="appearanceText"><option value="small">Small</option><option value="standard">Standard</option><option value="large">Large</option></select></label>
+        <label>Icon size<select id="appearanceIcons"><option value="compact">Compact</option><option value="standard">Standard</option></select></label>
+        <label>Conversation sidebar<select id="appearanceSidebar"><option value="narrow">Narrow</option><option value="standard">Standard</option></select></label>
+        <label>Overview panel<select id="appearanceInsights"><option value="show">Show</option><option value="hide">Hide</option></select></label>
+        <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
+      </section>
       <section><h2>Account</h2><p>Status, recovery, switching accounts and logout.</p><div class="settings-button-row"><button id="settingsStatusBtn">Status</button><button id="settingsRecoveryBtn">Recovery code</button><button id="settingsSwitchBtn">Switch account</button><button id="settingsLogoutBtn" class="danger-link">Logout</button></div></section>
       ${me.isAdmin?`<section><h2>Administration</h2><p>Approve, block or remove user accounts.</p><button id="settingsAdminBtn">Manage users</button></section>`:""}
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
+  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights"};
+  Object.entries(controls).forEach(([id,key])=>{
+    $(id).value=appearance[key];
+    $(id).onchange=()=>{const next=loadAppearance();next[key]=$(id).value;saveAppearance(next)};
+  });
+  $("appearanceResetBtn").onclick=()=>{saveAppearance({...DEFAULT_APPEARANCE});renderSettingsWorkspace();toast("Your page layout was reset.")};
   $("settingsStatusBtn").onclick=()=>$("statusBtn").click();
   $("settingsRecoveryBtn").onclick=()=>$("recoveryBtn").click();
-  $("settingsSwitchBtn").onclick=logout;
-  $("settingsLogoutBtn").onclick=logout;
+  $("settingsSwitchBtn").onclick=logoutAndReturn;
+  $("settingsLogoutBtn").onclick=logoutAndReturn;
   if($("settingsAdminBtn"))$("settingsAdminBtn").onclick=()=>$("adminBtn").click();
 }
 

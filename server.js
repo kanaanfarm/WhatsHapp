@@ -32,12 +32,13 @@ const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
-const OLLAMA_URL = String(process.env.OLLAMA_URL || "http://127.0.0.1:11434").trim().replace(/\/$/, "");
+const OLLAMA_URL = String(process.env.OLLAMA_URL || (AI_PROVIDER === "ollama" ? "http://127.0.0.1:11434" : "")).trim().replace(/\/$/, "");
 const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
 const AI_DEFAULT_PROVIDER = String(process.env.AI_DEFAULT_PROVIDER || "ollama").trim().toLowerCase() === "openai" ? "openai" : "ollama";
 const AI_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60000, 10000), 180000);
+const AI_AUTO_FALLBACK_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_AUTO_FALLBACK_TIMEOUT_MS) || 12000, 5000), 30000);
 const OPENAI_CONFIGURED = Boolean(OPENAI_API_KEY && OPENAI_MODEL);
-const OLLAMA_CONFIGURED = Boolean(OLLAMA_URL && OLLAMA_MODEL);
+const OLLAMA_CONFIGURED = Boolean(OLLAMA_URL && OLLAMA_MODEL && !/example\.com|replace-me|your-secured/i.test(OLLAMA_URL));
 const AI_CONFIGURED = AI_PROVIDER === "hybrid"
   ? OPENAI_CONFIGURED || OLLAMA_CONFIGURED
   : AI_PROVIDER === "ollama" ? OLLAMA_CONFIGURED : OPENAI_CONFIGURED;
@@ -858,8 +859,18 @@ function aiPublicStatus() {
     providers: {
       openai: { available: OPENAI_CONFIGURED, label: "OpenAI", model: OPENAI_MODEL },
       ollama: { available: OLLAMA_CONFIGURED, label: "Ollama", model: OLLAMA_MODEL }
-    }
+    },
+    autoFallbackSeconds: Math.round(AI_AUTO_FALLBACK_TIMEOUT_MS / 1000)
   };
+}
+
+function aiFailureText(provider, error) {
+  const label = provider === "ollama" ? "Ollama" : "OpenAI";
+  if (error?.name === "AbortError") return `${label} timed out`;
+  if (error?.status === 401) return `${label} rejected its credentials`;
+  if (error?.status === 429) return `${label} quota or rate limit reached`;
+  if (provider === "ollama") return "Ollama server is unreachable";
+  return "OpenAI request failed";
 }
 
 async function requestOpenAI(message, history, signal) {
@@ -942,9 +953,14 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     let answer = "";
     let usedProvider = "";
     let lastError;
-    for (const provider of queue) {
+    const failures = [];
+    for (let index = 0; index < queue.length; index += 1) {
+      const provider = queue[index];
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+      const attemptTimeout = requested === "auto" && queue.length > 1 && index === 0
+        ? Math.min(AI_REQUEST_TIMEOUT_MS, AI_AUTO_FALLBACK_TIMEOUT_MS)
+        : AI_REQUEST_TIMEOUT_MS;
+      const timeout = setTimeout(() => controller.abort(), attemptTimeout);
       try {
         answer = provider === "ollama"
           ? await requestOllama(message, history, controller.signal)
@@ -952,12 +968,19 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
         if (answer) { usedProvider = provider; break; }
       } catch (error) {
         lastError = error;
+        failures.push(aiFailureText(provider, error));
         console.error(`${provider} AI attempt failed:`, error?.message || error);
       } finally {
         clearTimeout(timeout);
       }
     }
-    if (!answer && lastError) throw lastError;
+    if (!answer && lastError) {
+      return res.status(502).json({
+        error: "ConnectChat AI could not answer.",
+        details: failures.join(" · "),
+        retryable: true
+      });
+    }
     if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
     res.json({
       answer,

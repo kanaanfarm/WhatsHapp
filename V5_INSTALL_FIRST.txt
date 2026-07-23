@@ -1,4 +1,4 @@
-CONNECTCHAT PRO ENTERPRISE v5.2 HYBRID AI
+CONNECTCHAT PRO ENTERPRISE v5.3 PERSONAL WORKSPACE
 
 1. Upload all project files to GitHub/Render.
 2. Open Supabase > SQL Editor.
