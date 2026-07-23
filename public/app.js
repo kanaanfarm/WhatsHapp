@@ -13,6 +13,24 @@ const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
 const $=id=>document.getElementById(id);
 
+const INTERNAL_SCROLL_SELECTOR=[
+  ".rail",".users-list",".quick-contacts",".messages",".workspace-insights",
+  ".section-page",".profile-page",".dialog-overlay",".statuses-list",
+  ".admin-users",".calculation-preview-content",".calculation-table-wrap",
+  ".calculation-preview-tabs",".emoji-picker",".smart-strip",
+  "textarea","select"
+].join(",");
+
+document.addEventListener("wheel",event=>{
+  const app=$("appView");
+  if(!app||app.classList.contains("hidden"))return;
+  if(event.ctrlKey||event.metaKey){
+    event.preventDefault();
+    return;
+  }
+  if(!event.target.closest(INTERNAL_SCROLL_SELECTOR))event.preventDefault();
+},{passive:false});
+
 function appearanceKey(){return `connectchat-appearance-${me?.id||"guest"}`}
 function loadAppearance(){
   try{return {...DEFAULT_APPEARANCE,...JSON.parse(localStorage.getItem(appearanceKey())||"{}")}}

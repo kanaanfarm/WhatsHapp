@@ -1,4 +1,13 @@
-# ConnectChat Pro Enterprise v6.2.1
+# ConnectChat Pro Enterprise v6.2.2
+
+## Fixed page and panel scrolling
+
+- The application stays within the visible browser window.
+- Contacts, messages, workspace pages, insights and previews have independent
+  scrollbars.
+- Mouse-wheel movement is contained inside the panel under the pointer.
+- Ctrl/Command plus mouse-wheel zoom is blocked while the application is open,
+  preventing accidental page resizing.
 
 ## Double-click preview
 
