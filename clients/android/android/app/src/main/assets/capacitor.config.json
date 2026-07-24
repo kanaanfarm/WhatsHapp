@@ -1,0 +1,16 @@
+{
+	"appId": "com.connectchat.pro",
+	"appName": "ConnectChat Pro",
+	"webDir": "www",
+	"server": {
+		"url": "https://connectchat-pro-kanaan.onrender.com",
+		"cleartext": false,
+		"allowNavigation": [
+			"connectchat-pro-kanaan.onrender.com"
+		]
+	},
+	"android": {
+		"allowMixedContent": false,
+		"backgroundColor": "#f7f8fc"
+	}
+}

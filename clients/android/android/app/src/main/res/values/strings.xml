@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ConnectChat Pro</string>
+    <string name="title_activity_main">ConnectChat Pro</string>
+    <string name="package_name">com.connectchat.pro</string>
+    <string name="custom_url_scheme">com.connectchat.pro</string>
+</resources>
