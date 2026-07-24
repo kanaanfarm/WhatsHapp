@@ -10,6 +10,7 @@ let activeConversation=[];
 let archivedUserIds=new Set();
 let currentInsightTab="overview";
 let currentCalculationPreviewId=null,currentCalculationPreviewCanDownload=false,calculationPreviewObjectUrl=null;
+let avatarCropImage=null,avatarCropObjectUrl=null,avatarCropBaseScale=1,avatarCropZoom=1,avatarCropX=0,avatarCropY=0,avatarCropDragging=false,avatarCropPointerX=0,avatarCropPointerY=0;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
@@ -364,6 +365,7 @@ function resetConversation(){
   $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
   $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
   $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
+  $("attachBtn").disabled=true;
   if($("chatAiBtn"))$("chatAiBtn").disabled=true;
   $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
 }
@@ -373,6 +375,7 @@ async function loadArchivedConversations(){
     const data=await api("/api/conversations/archived");
     archivedUserIds=new Set((data.userIds||[]).map(Number));
   }catch{archivedUserIds=new Set()}
+  if(localStorage.getItem(`connectchat-ai-archived-${me?.id}`)==="1")archivedUserIds.add(-1);
 }
 
 function initials(name){return name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
@@ -432,8 +435,8 @@ function renderUsers(){
     const matches=(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q);
     if(!matches)return false;
     const archived=archivedUserIds.has(Number(u.id));
-    if(currentUserFilter==="archived")return archived&&!u.isAI&&!u.isSelf;
-    if(archived&&!u.isAI&&!u.isSelf)return false;
+    if(currentUserFilter==="archived")return archived&&!u.isSelf;
+    if(archived&&!u.isSelf)return false;
     if(currentUserFilter==="unread")return Number(u.unreadCount||u.unread_count||0)>0;
     if(currentUserFilter==="groups")return Boolean(u.isGroup);
     if(currentUserFilter==="pinned")return Boolean(u.pinned);
@@ -658,13 +661,15 @@ function updateHeader(){
   $("activeAvatar").innerHTML=activeUser.isAI?"AI":avatarHtml(activeUser,activeUser.isSelf?"★":initials(activeUser.username));
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
+  $("moreChatBtn").classList.remove("hidden");
   if($("chatAiBtn"))$("chatAiBtn").disabled=false;
+  $("attachBtn").disabled=Boolean(activeUser.isAI);
   if($("archiveChatBtn")){
     const archived=archivedUserIds.has(Number(activeUser.id));
     $("archiveChatBtn").textContent=archived?"📤 Restore chat":"🗃 Archive chat";
-    $("archiveChatBtn").disabled=Boolean(activeUser.isAI)||Boolean(activeUser.isSelf);
+    $("archiveChatBtn").disabled=Boolean(activeUser.isSelf);
   }
-  if($("deleteConversationBtn"))$("deleteConversationBtn").disabled=Boolean(activeUser.isAI);
+  if($("deleteConversationBtn"))$("deleteConversationBtn").disabled=false;
 }
 
 if($("activeAvatar"))$("activeAvatar").onclick=()=>{if(activeUser&&!activeUser.isAI)openProfilePage(activeUser)};
@@ -902,22 +907,47 @@ function updateComposer(){
 }
 
 async function uploadFile(file,kind){
-  if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI)return toast("AI file analysis is not enabled in this version.");
-  const fd=new FormData();fd.append("file",file);fd.append("receiverId",activeUser.id);fd.append("kind",kind);
-  $("uploadStatus").classList.remove("hidden");
-  try{await api("/api/upload",{method:"POST",body:fd});toast(kind==="voice"?"Voice sent":"File sent")}
-  catch(e){toast(e.message)}
-  finally{$("uploadStatus").classList.add("hidden")}
+  if(!activeUser){toast("Select a user first.");return false}
+  if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
+  if(file.size>12*1024*1024){toast(`${file.name} is larger than 12 MB.`);return false}
+  const caption=$("messageInput").value.trim();
+  const fd=new FormData();fd.append("file",file);fd.append("receiverId",activeUser.id);fd.append("kind",kind);fd.append("caption",caption);
+  $("uploadStatus").textContent=`Uploading ${file.name}…`;$("uploadStatus").classList.remove("hidden");$("attachBtn").disabled=true;
+  try{
+    await api("/api/upload",{method:"POST",body:fd});
+    if(caption){$("messageInput").value="";updateComposer()}
+    toast(kind==="voice"?"Voice sent":kind==="image"?"Photo sent":"Document sent");return true
+  }catch(e){toast(e.message);return false}
+  finally{$("uploadStatus").classList.add("hidden");$("uploadStatus").textContent="Uploading…";$("attachBtn").disabled=false}
 }
-$("attachBtn").onclick=()=>activeUser&&$("fileInput").click();
+function attachmentKind(file){return file.type.startsWith("image/")?"image":file.type.startsWith("audio/")?"voice":"file"}
+async function uploadFiles(fileList){
+  const files=[...fileList].slice(0,10);
+  if(!files.length)return;
+  for(const file of files)await uploadFile(file,attachmentKind(file));
+  if(fileList.length>10)toast("A maximum of 10 files can be added at one time.");
+}
+$("attachBtn").onclick=()=>{
+  if(!activeUser)return toast("Select a user first.");
+  if(activeUser.isAI)return toast("Attachments are available in human chats.");
+  $("fileInput").click();
+};
 $("cameraBtn").onclick=()=>activeUser&&$("cameraInput").click();
 $("fileInput").onchange=e=>{
-  const f=e.target.files[0];if(!f)return;
-  const kind=f.type.startsWith("image/")?"image":f.type.startsWith("audio/")?"voice":"file";
-  uploadFile(f,kind);e.target.value="";
+  uploadFiles(e.target.files);e.target.value="";
 };
 $("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)uploadFile(f,"image");e.target.value=""};
+
+const chatDropTarget=$("chatPanel");
+["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
+  if(![...(event.dataTransfer?.types||[])].includes("Files")||!activeUser||activeUser.isAI)return;
+  event.preventDefault();event.dataTransfer.dropEffect="copy";chatDropTarget.classList.add("file-drop-active");
+}));
+["dragleave","drop"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
+  if(type==="drop"&&event.dataTransfer?.files?.length&&!activeUser?.isAI){event.preventDefault();uploadFiles(event.dataTransfer.files)}
+  if(type==="dragleave"&&event.relatedTarget&&chatDropTarget.contains(event.relatedTarget))return;
+  chatDropTarget.classList.remove("file-drop-active");
+}));
 
 $("messageInput").addEventListener("paste",e=>{
   const items=[...(e.clipboardData?.items||[])];
@@ -990,6 +1020,7 @@ function refreshProfilePage(){
 function openProfilePage(user=me){
   $("accountMenu")?.classList.add("hidden");
   profileTarget=user||me;
+  $("profilePhotoResult").textContent="";
   refreshProfilePage();
   $("profilePage").classList.remove("hidden");
 }
@@ -999,19 +1030,80 @@ $("closeProfilePageBtn").onclick=()=>{$("profilePage").classList.add("hidden");p
 $("profileMessageBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user)selectUser(user)};
 $("profileVoiceBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("audioCallBtn").click())}};
 $("profileVideoBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("videoCallBtn").click())}};
-$("profilePhotoInput").onchange=async e=>{
+function avatarCropScale(){return avatarCropBaseScale*avatarCropZoom}
+function clampAvatarCrop(){
+  const canvas=$("avatarCropCanvas"),scale=avatarCropScale();
+  const width=avatarCropImage.width*scale,height=avatarCropImage.height*scale;
+  avatarCropX=Math.min(0,Math.max(canvas.width-width,avatarCropX));
+  avatarCropY=Math.min(0,Math.max(canvas.height-height,avatarCropY));
+}
+function drawAvatarCrop(){
+  if(!avatarCropImage)return;
+  const canvas=$("avatarCropCanvas"),context=canvas.getContext("2d");
+  clampAvatarCrop();context.clearRect(0,0,canvas.width,canvas.height);
+  context.drawImage(avatarCropImage,avatarCropX,avatarCropY,avatarCropImage.width*avatarCropScale(),avatarCropImage.height*avatarCropScale());
+}
+function closeAvatarCrop(){
+  $("avatarCropOverlay").classList.add("hidden");avatarCropImage=null;avatarCropDragging=false;
+  if(avatarCropObjectUrl){URL.revokeObjectURL(avatarCropObjectUrl);avatarCropObjectUrl=null}
+}
+function openAvatarCrop(file){
+  if(!file.type.startsWith("image/"))return toast("Choose a JPG, PNG, WEBP or GIF image.");
+  if(file.size>12*1024*1024)return toast("Profile photo must be 12 MB or smaller.");
+  if(avatarCropObjectUrl)URL.revokeObjectURL(avatarCropObjectUrl);
+  avatarCropObjectUrl=URL.createObjectURL(file);
+  const image=new Image();
+  image.onload=()=>{
+    avatarCropImage=image;avatarCropZoom=1;$("avatarZoomRange").value="1";
+    const canvas=$("avatarCropCanvas");
+    avatarCropBaseScale=Math.max(canvas.width/image.width,canvas.height/image.height);
+    avatarCropX=(canvas.width-image.width*avatarCropBaseScale)/2;
+    avatarCropY=(canvas.height-image.height*avatarCropBaseScale)/2;
+    $("avatarCropResult").textContent="";$("avatarCropOverlay").classList.remove("hidden");drawAvatarCrop();
+  };
+  image.onerror=()=>{closeAvatarCrop();toast("This photo could not be opened.")};
+  image.src=avatarCropObjectUrl;
+}
+async function uploadCroppedAvatar(blob){
+  const result=$("avatarCropResult"),button=$("saveAvatarCropBtn");
+  try{
+    button.disabled=true;button.textContent="Uploading…";result.textContent="";
+    const form=new FormData();
+    form.append("avatar",new File([blob],`profile-${Date.now()}.jpg`,{type:"image/jpeg"}));
+    const data=await api("/api/profile/avatar",{method:"POST",body:form});
+    me.avatar=data.avatar||null;users=await api("/api/users");
+    synchronizeCurrentAccount();renderUsers();refreshProfilePage();updateHeader();closeAvatarCrop();
+    $("profilePhotoResult").textContent="Profile photo updated.";toast("Profile photo cropped and updated");
+  }catch(error){result.textContent=error.message}
+  finally{button.disabled=false;button.textContent="Crop and upload"}
+}
+$("profilePhotoInput").onchange=e=>{
   const file=e.target.files?.[0];e.target.value="";if(!file)return;
   if(!profileTarget||Number(profileTarget.id)!==Number(me.id)){toast("You can only change your own profile photo.");return}
-  const result=$("profilePhotoResult");
-  try{
-    result.textContent="Uploading profile photo…";
-    const form=new FormData();form.append("avatar",file);
-    const data=await api("/api/profile/avatar",{method:"POST",body:form});
-    me.avatar=data.avatar||null;
-    users=await api("/api/users");
-    synchronizeCurrentAccount();renderUsers();refreshProfilePage();updateHeader();
-    result.textContent="Profile photo updated.";toast("Profile photo updated");
-  }catch(error){result.textContent=error.message}
+  openAvatarCrop(file);
+};
+$("avatarZoomRange").oninput=event=>{
+  if(!avatarCropImage)return;
+  const canvas=$("avatarCropCanvas"),oldScale=avatarCropScale();
+  const sourceCenterX=(canvas.width/2-avatarCropX)/oldScale,sourceCenterY=(canvas.height/2-avatarCropY)/oldScale;
+  avatarCropZoom=Number(event.target.value);
+  const newScale=avatarCropScale();
+  avatarCropX=canvas.width/2-sourceCenterX*newScale;avatarCropY=canvas.height/2-sourceCenterY*newScale;drawAvatarCrop();
+};
+const avatarCanvas=$("avatarCropCanvas");
+avatarCanvas.onpointerdown=event=>{if(!avatarCropImage)return;avatarCropDragging=true;avatarCropPointerX=event.clientX;avatarCropPointerY=event.clientY;avatarCanvas.setPointerCapture(event.pointerId)};
+avatarCanvas.onpointermove=event=>{
+  if(!avatarCropDragging)return;
+  const rect=avatarCanvas.getBoundingClientRect(),ratio=avatarCanvas.width/rect.width;
+  avatarCropX+=(event.clientX-avatarCropPointerX)*ratio;avatarCropY+=(event.clientY-avatarCropPointerY)*ratio;
+  avatarCropPointerX=event.clientX;avatarCropPointerY=event.clientY;drawAvatarCrop();
+};
+avatarCanvas.onpointerup=avatarCanvas.onpointercancel=()=>{avatarCropDragging=false};
+$("closeAvatarCropBtn").onclick=closeAvatarCrop;$("cancelAvatarCropBtn").onclick=closeAvatarCrop;
+$("avatarCropOverlay").onclick=event=>{if(event.target===$("avatarCropOverlay"))closeAvatarCrop()};
+$("saveAvatarCropBtn").onclick=()=>{
+  if(!avatarCropImage)return;
+  drawAvatarCrop();$("avatarCropCanvas").toBlob(blob=>{if(blob)uploadCroppedAvatar(blob);else $("avatarCropResult").textContent="The cropped photo could not be created."},"image/jpeg",.9);
 };
 $("removeProfilePhotoBtn").onclick=async()=>{
   if(!profileTarget||Number(profileTarget.id)!==Number(me.id)){toast("You can only change your own profile photo.");return}
@@ -1085,8 +1177,15 @@ if($("moreChatBtn"))$("moreChatBtn").onclick=()=>{
   $("conversationMenu").classList.toggle("hidden");
 };
 if($("archiveChatBtn"))$("archiveChatBtn").onclick=async()=>{
-  if(!activeUser||activeUser.isAI||activeUser.isSelf)return;
+  if(!activeUser||activeUser.isSelf)return;
   const archived=archivedUserIds.has(Number(activeUser.id));
+  if(activeUser.isAI){
+    if(archived){archivedUserIds.delete(-1);localStorage.removeItem(`connectchat-ai-archived-${me.id}`)}
+    else{archivedUserIds.add(-1);localStorage.setItem(`connectchat-ai-archived-${me.id}`,"1")}
+    $("conversationMenu").classList.add("hidden");renderUsers();updateHeader();
+    toast(archived?"AI chat restored.":"AI chat archived on this device.");
+    return;
+  }
   try{
     await api(`/api/conversations/${activeUser.id}/archive`,{method:archived?"DELETE":"POST",body:archived?undefined:"{}"});
     if(archived)archivedUserIds.delete(Number(activeUser.id));else archivedUserIds.add(Number(activeUser.id));
@@ -1095,8 +1194,14 @@ if($("archiveChatBtn"))$("archiveChatBtn").onclick=async()=>{
   }catch(error){toast(error.message)}
 };
 if($("deleteConversationBtn"))$("deleteConversationBtn").onclick=async()=>{
-  if(!activeUser||activeUser.isAI)return;
+  if(!activeUser)return;
   const name=activeUser.isSelf?"Saved Messages":(activeUser.displayName||activeUser.username);
+  if(activeUser.isAI){
+    if(!confirm("Delete all private ConnectChat AI history on this device? This cannot be undone."))return;
+    saveAiHistory([]);activeConversation=[];$("messages").innerHTML="";$("conversationMenu").classList.add("hidden");
+    showAiWelcome();updateWorkspaceOverview();renderUsers();toast("AI conversation history deleted.");
+    return;
+  }
   if(!confirm(`Delete all messages and attachments in “${name}”? This removes the conversation for both participants and cannot be undone.`))return;
   try{
     await api(`/api/conversations/${activeUser.id}`,{method:"DELETE",body:JSON.stringify({confirm:"DELETE ALL"})});

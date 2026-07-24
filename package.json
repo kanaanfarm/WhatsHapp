@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v6",
-  "version": "6.3.2",
+  "version": "6.4.1",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v6.3.2 with authenticated cross-device avatar delivery and corrected self presence",
+  "description": "ConnectChat Pro Enterprise v6.4.1 with visible multi-file photo and document sharing in user chats",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

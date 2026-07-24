@@ -105,6 +105,7 @@ const allowedMimeTypes = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "audio/webm", "video/webm", "video/mp4", "video/quicktime", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav",
   "application/pdf", "text/plain", "text/csv", "application/vnd.ms-excel",
+  "application/zip",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation"
