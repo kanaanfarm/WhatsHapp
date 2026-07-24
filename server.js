@@ -31,7 +31,6 @@ const PASSWORD_MIN_LENGTH = 10;
 const BCRYPT_ROUNDS = 12;
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
-const AVATAR_SIGNED_URL_SECONDS = 7 * 24 * 60 * 60;
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
@@ -441,19 +440,15 @@ async function signedMessages(messages) {
   return Promise.all((messages || []).map(signedMessage));
 }
 
-async function signedAvatarUrl(storagePath) {
+function avatarProxyUrl(userId, storagePath) {
   if (!storagePath) return null;
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, AVATAR_SIGNED_URL_SECONDS);
-  if (error) {
-    console.error("Could not sign avatar URL:", error.message);
-    return null;
-  }
-  return data?.signedUrl || null;
+  const version = crypto.createHash("sha256").update(String(storagePath)).digest("hex").slice(0, 12);
+  return `/api/users/${Number(userId)}/avatar?v=${version}`;
 }
 
 async function safeUserWithAvatar(row) {
   const user = safeUser(row);
-  user.avatar = await signedAvatarUrl(row?.avatar);
+  user.avatar = avatarProxyUrl(row?.id, row?.avatar);
   return user;
 }
 
@@ -693,6 +688,32 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
+app.get("/api/users/:userId/avatar", auth, async (req, res) => {
+  try {
+    const userId = Number(req.params.userId);
+    if (!Number.isSafeInteger(userId) || userId <= 0) return res.status(400).end();
+    const user = await getUserById(userId, "id,avatar,status");
+    if (!user || user.status !== "approved" || !user.avatar) return res.status(404).end();
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).download(user.avatar);
+    if (error) throw error;
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const extension = path.extname(String(user.avatar)).toLowerCase();
+    const mime = {
+      ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+      ".webp": "image/webp", ".gif": "image/gif"
+    }[extension] || (String(data.type || "").startsWith("image/") ? data.type : "application/octet-stream");
+    if (!mime.startsWith("image/")) return res.status(415).end();
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "private, max-age=3600, immutable");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.end(buffer);
+  } catch (error) {
+    console.error("Avatar delivery failed:", error);
+    res.status(404).end();
+  }
+});
+
 app.post("/api/profile/avatar", auth, upload.single("avatar"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Choose a profile photo." });
@@ -714,7 +735,7 @@ app.post("/api/profile/avatar", auth, upload.single("avatar"), async (req, res) 
       const { error: removeError } = await supabase.storage.from(STORAGE_BUCKET).remove([oldAvatar]);
       if (removeError) console.error("Could not remove previous avatar:", removeError.message);
     }
-    const avatar = await signedAvatarUrl(storagePath);
+    const avatar = avatarProxyUrl(req.currentUser.id, storagePath);
     io.emit("profile:updated", { userId: Number(req.currentUser.id), changedAt: new Date().toISOString() });
     io.emit("users:changed");
     res.json({ ok: true, avatar, userId: Number(req.currentUser.id) });
@@ -1595,7 +1616,7 @@ app.get("/api/users", auth, async (req, res) => {
       return {
         id,
         username: user.username,
-        avatar: await signedAvatarUrl(user.avatar),
+        avatar: avatarProxyUrl(user.id, user.avatar),
         isSelf,
         displayName: isSelf ? `${user.username} (You)` : user.username,
         online: isSelf || onlineUsers.has(id),
@@ -1798,7 +1819,7 @@ app.get("/api/statuses", auth, async (req, res) => {
     const userIds = [...new Set((statuses || []).map(status => Number(status.user_id)))];
     const [{ data: statusUsers, error: userError }, viewResult] = await Promise.all([
       userIds.length
-        ? supabase.from("users").select("id,username").in("id", userIds).eq("status", "approved")
+        ? supabase.from("users").select("id,username,avatar").in("id", userIds).eq("status", "approved")
         : Promise.resolve({ data: [], error: null }),
       statusIds.length
         ? supabase.from("status_views").select("status_id,viewer_id").in("status_id", statusIds)
@@ -1807,6 +1828,7 @@ app.get("/api/statuses", auth, async (req, res) => {
     if (userError) throw userError;
     if (viewResult.error) throw viewResult.error;
     const names = new Map((statusUsers || []).map(user => [Number(user.id), user.username]));
+    const avatars = new Map((statusUsers || []).map(user => [Number(user.id), avatarProxyUrl(user.id, user.avatar)]));
     const approvedIds = new Set(names.keys());
     const viewerId = Number(req.currentUser.id);
     const viewed = new Set((viewResult.data || []).filter(row => Number(row.viewer_id) === viewerId).map(row => Number(row.status_id)));
@@ -1822,6 +1844,7 @@ app.get("/api/statuses", auth, async (req, res) => {
         ...status,
         user_id: userId,
         username: names.get(userId) || "User",
+        avatar: avatars.get(userId) || null,
         isOwn,
         viewed: isOwn || viewed.has(Number(status.id)),
         viewCount: isOwn ? (viewCounts.get(Number(status.id)) || 0) : undefined

@@ -56,12 +56,18 @@ function saveAppearance(settings){
 function avatarHtml(user, fallbackText){
   const fallback=escapeHtml(fallbackText||initials(user?.username||"User"));
   const url=user?.avatar?safeFileUrl(user.avatar):"";
-  return url?`<img src="${escapeHtml(url)}" alt="${escapeHtml(user?.username||"Profile photo")}">`:fallback;
+  return url?`<img src="${escapeHtml(url)}" data-avatar-fallback="${fallback}" alt="${escapeHtml(user?.username||"Profile photo")}">`:fallback;
 }
 function setAvatarElement(element,user,fallbackText){
   if(!element)return;
   element.innerHTML=avatarHtml(user,fallbackText);
 }
+
+document.addEventListener("error",event=>{
+  const image=event.target;
+  if(!(image instanceof HTMLImageElement)||!image.dataset.avatarFallback)return;
+  image.replaceWith(document.createTextNode(image.dataset.avatarFallback));
+},true);
 
 function synchronizeCurrentAccount(){
   if(!me)return;
@@ -224,7 +230,7 @@ function renderStatuses(){
     if(status.kind==="video"&&fileUrl)content=`<video class="status-media" src="${fileUrl}" controls playsinline preload="metadata"></video>`;
     const caption=status.kind!=="text"&&status.body?`<div class="status-caption">${escapeHtml(status.body)}</div>`:"";
     const details=status.isOwn?`${statusTimeLeft(status.expires_at)} · ${Number(status.viewCount||0)} view${Number(status.viewCount||0)===1?"":"s"}`:`${statusTimeLeft(status.expires_at)}${status.viewed?" · Viewed":""}`;
-    card.innerHTML=`<div class="status-card-head"><div class="avatar ${status.isOwn?"saved-avatar":""}">${status.isOwn?"★":escapeHtml(initials(status.username))}</div><div><strong>${escapeHtml(status.isOwn?`${status.username} (You)`:status.username)}</strong><span>${details}</span></div>${status.isOwn||me.isAdmin?'<button type="button" class="status-delete">Delete</button>':""}</div>${content||'<div class="status-empty">Media unavailable</div>'}${caption}`;
+    card.innerHTML=`<div class="status-card-head"><div class="avatar ${status.isOwn?"saved-avatar":""}">${avatarHtml(status,status.isOwn?"★":initials(status.username))}</div><div><strong>${escapeHtml(status.isOwn?`${status.username} (You)`:status.username)}</strong><span>${details}</span></div>${status.isOwn||me.isAdmin?'<button type="button" class="status-delete">Delete</button>':""}</div>${content||'<div class="status-empty">Media unavailable</div>'}${caption}`;
     const deleteButton=card.querySelector(".status-delete");
     if(deleteButton)deleteButton.onclick=()=>deleteStatus(status,deleteButton);
     $("statusesList").appendChild(card);
@@ -970,7 +976,7 @@ function refreshProfilePage(){
   $("profilePageRole").textContent=role;
   $("profileUsername").textContent=user.username;
   $("profileRole").textContent=role;
-  $("profileStatus").textContent=user.online?"Online":lastSeenText(user.lastSeenAt);
+  $("profileStatus").textContent=isOwner||user.online?"Online":lastSeenText(user.lastSeenAt);
   $("profileOwnerActions").classList.toggle("hidden",!isOwner);
   $("profileViewerActions").classList.toggle("hidden",isOwner||user.isSelf||user.isAI);
   $("profilePhotoHelp").textContent=isOwner
