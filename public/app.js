@@ -7,7 +7,9 @@ let callsEnabled=true;
 let aiBusy=false;
 let aiStatus=null;
 let activeConversation=[];
-let currentCalculationPreviewId=null,calculationPreviewObjectUrl=null;
+let archivedUserIds=new Set();
+let currentInsightTab="overview";
+let currentCalculationPreviewId=null,currentCalculationPreviewCanDownload=false,calculationPreviewObjectUrl=null;
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
@@ -59,6 +61,22 @@ function avatarHtml(user, fallbackText){
 function setAvatarElement(element,user,fallbackText){
   if(!element)return;
   element.innerHTML=avatarHtml(user,fallbackText);
+}
+
+function synchronizeCurrentAccount(){
+  if(!me)return;
+  const self=users.find(user=>Number(user.id)===Number(me.id));
+  if(self){
+    me.avatar=self.avatar||null;
+    me.username=self.username||me.username;
+  }
+  if($("railInitials"))setAvatarElement($("railInitials"),me,initials(me.username));
+  if($("accountAvatar"))setAvatarElement($("accountAvatar"),me,initials(me.username));
+  if($("workspaceProfileAvatar"))setAvatarElement($("workspaceProfileAvatar"),me,initials(me.username));
+  if(profileTarget&&Number(profileTarget.id)===Number(me.id)){
+    profileTarget={...profileTarget,...me};
+    refreshProfilePage();
+  }
 }
 
 function toast(text){
@@ -253,6 +271,8 @@ async function startApp(){
   if($("railInitials"))setAvatarElement($("railInitials"),me,initials(me.username));
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
+  await loadArchivedConversations();
+  synchronizeCurrentAccount();
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
@@ -275,6 +295,12 @@ function connectSocket(){
     removeMessage(payload?.messageId);
     refreshUsers();
   });
+  socket.on("conversation:cleared",payload=>{
+    if(activeUser&&[Number(payload?.userId),Number(payload?.otherId)].includes(Number(activeUser.id))){
+      activeConversation=[];$("messages").innerHTML="";updateWorkspaceOverview();
+    }
+    refreshUsers();
+  });
   socket.on("presence",p=>{
     const u=users.find(x=>x.id===p.userId);
     if(u){u.online=p.online;if(p.lastSeenAt)u.lastSeenAt=p.lastSeenAt;renderUsers();updateHeader()}else refreshUsers()
@@ -285,6 +311,9 @@ function connectSocket(){
     renderUsers();updateHeader();
   });
   socket.on("users:changed",()=>{refreshUsers();if(!$("adminOverlay").classList.contains("hidden"))loadAdminUsers()});
+  socket.on("profile:updated",payload=>{
+    if(Number(payload?.userId)===Number(me?.id)||users.some(user=>Number(user.id)===Number(payload?.userId)))refreshUsers();
+  });
   socket.on("status:changed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:deleted",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
@@ -311,6 +340,8 @@ function connectSocket(){
 async function refreshUsers(){
   try{
     users=await api("/api/users");
+    await loadArchivedConversations();
+    synchronizeCurrentAccount();
     if(activeUser){
       const refreshed=users.find(u=>u.id===activeUser.id);
       if(refreshed)activeUser=refreshed;
@@ -320,10 +351,22 @@ async function refreshUsers(){
   }catch{}
 }
 
+window.addEventListener("focus",()=>{if(me)refreshUsers()});
+document.addEventListener("visibilitychange",()=>{if(me&&document.visibilityState==="visible")refreshUsers()});
+
 function resetConversation(){
   $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
   $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
   $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
+  if($("chatAiBtn"))$("chatAiBtn").disabled=true;
+  $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
+}
+
+async function loadArchivedConversations(){
+  try{
+    const data=await api("/api/conversations/archived");
+    archivedUserIds=new Set((data.userIds||[]).map(Number));
+  }catch{archivedUserIds=new Set()}
 }
 
 function initials(name){return name.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
@@ -358,6 +401,23 @@ function updateWorkspaceOverview(){
   if($("workspaceOnlineCount"))$("workspaceOnlineCount").textContent=String(online);
   if($("workspaceUnreadCount"))$("workspaceUnreadCount").textContent=String(unread);
   if($("workspaceCallStatus"))$("workspaceCallStatus").textContent=callsEnabled?"Ready":"Off";
+  if($("workspaceConversationSummary"))$("workspaceConversationSummary").textContent=activeUser
+    ? `${activeUser.displayName||activeUser.username} · ${activeConversation.length} visible message${activeConversation.length===1?"":"s"}`
+    : "Select a real contact from the left panel.";
+  renderWorkspaceInsightTab(currentInsightTab);
+}
+
+function renderWorkspaceInsightTab(tab="overview"){
+  currentInsightTab=tab;
+  document.querySelectorAll("[data-insight-tab]").forEach(button=>button.classList.toggle("active",button.dataset.insightTab===tab));
+  ["overview","files","media"].forEach(name=>$(`insight${name[0].toUpperCase()+name.slice(1)}Panel`)?.classList.toggle("hidden",name!==tab));
+  if(tab==="overview")return;
+  const attachments=activeConversation.filter(item=>item.file_url);
+  const selected=tab==="media"
+    ? attachments.filter(item=>["image","voice","audio"].includes(item.kind))
+    : attachments.filter(item=>!["image","voice","audio"].includes(item.kind));
+  const panel=$(tab==="media"?"insightMediaPanel":"insightFilesPanel");
+  panel.innerHTML=selected.length?`<div class="insight-file-list">${selected.map(item=>`<a href="${escapeHtml(safeFileUrl(item.file_url))}" target="_blank" rel="noopener"><b>${tab==="media"?(item.kind==="image"?"🖼":"🎤"):"📄"}</b><span>${escapeHtml(item.file_name||item.kind||"Attachment")}<small>${escapeHtml(time(item.created_at))}</small></span></a>`).join("")}</div>`:`<div class="insight-empty">No ${tab} in the selected conversation.</div>`;
 }
 
 function renderUsers(){
@@ -365,6 +425,9 @@ function renderUsers(){
   const filtered=users.filter(u=>{
     const matches=(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q);
     if(!matches)return false;
+    const archived=archivedUserIds.has(Number(u.id));
+    if(currentUserFilter==="archived")return archived&&!u.isAI&&!u.isSelf;
+    if(archived&&!u.isAI&&!u.isSelf)return false;
     if(currentUserFilter==="unread")return Number(u.unreadCount||u.unread_count||0)>0;
     if(currentUserFilter==="groups")return Boolean(u.isGroup);
     if(currentUserFilter==="pinned")return Boolean(u.pinned);
@@ -379,8 +442,10 @@ function renderUsers(){
     const preview=u.isSelf&&!u.lastPreview?"Notes and messages to yourself":(u.lastPreview||"Start a conversation");
     const unread=Number(u.unreadCount||u.unread_count||0);
     const stamp=u.lastMessageAt||u.last_message_at;
-    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div><div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
+    d.innerHTML=`<div class="avatar ${u.isSelf?"saved-avatar":""} ${u.isAI?"ai-avatar":""}">${avatar}</div><div class="user-info"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(preview)}</span></div>${!u.isAI?`<button type="button" class="user-ai-tool" title="AI tools for ${escapeHtml(name)}">✦</button>`:""}<div class="user-side">${stamp?`<time>${time(stamp)}</time>`:""}${unread?`<b class="unread-count">${Math.min(unread,99)}</b>`:`<i class="dot ${u.online?"online":""}"></i>`}</div>`;
     d.onclick=()=>selectUser(u);
+    const aiTool=d.querySelector(".user-ai-tool");
+    if(aiTool)aiTool.onclick=async event=>{event.stopPropagation();await selectUser(u);toggleSmartPopup(true)};
     const listAvatar=d.querySelector(".avatar");
     if(listAvatar&&!u.isAI){
       listAvatar.title=`View ${name} profile`;
@@ -426,7 +491,7 @@ $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
   activeUser=u;renderUsers();updateHeader();
-  if($("smartStrip"))$("smartStrip").classList.remove("hidden");
+  $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
   if($("aiProviderControl"))$("aiProviderControl").classList.toggle("hidden",!u.isAI);
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
@@ -441,6 +506,7 @@ async function selectUser(u){
     activeConversation=history;
     history.forEach(addMessage);
   }
+  updateWorkspaceOverview();
   if(window.innerWidth<=760){$("sidebar").classList.add("mobile-hidden");$("chatPanel").classList.remove("mobile-hidden")}
   $("messageInput").focus();
 }
@@ -586,6 +652,13 @@ function updateHeader(){
   $("activeAvatar").innerHTML=activeUser.isAI?"AI":avatarHtml(activeUser,activeUser.isSelf?"★":initials(activeUser.username));
   $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
+  if($("chatAiBtn"))$("chatAiBtn").disabled=false;
+  if($("archiveChatBtn")){
+    const archived=archivedUserIds.has(Number(activeUser.id));
+    $("archiveChatBtn").textContent=archived?"📤 Restore chat":"🗃 Archive chat";
+    $("archiveChatBtn").disabled=Boolean(activeUser.isAI)||Boolean(activeUser.isSelf);
+  }
+  if($("deleteConversationBtn"))$("deleteConversationBtn").disabled=Boolean(activeUser.isAI);
 }
 
 if($("activeAvatar"))$("activeAvatar").onclick=()=>{if(activeUser&&!activeUser.isAI)openProfilePage(activeUser)};
@@ -618,6 +691,10 @@ function updateMessageReceipt(payload){
   const info=receiptInfo(payload);receipt.textContent=info.text;receipt.className=info.className;
 }
 function addMessage(msg){
+  if(!activeUser?.isAI&&msg?.id&&!activeConversation.some(item=>Number(item.id)===Number(msg.id))){
+    activeConversation.push(msg);
+    if(currentInsightTab!=="overview")renderWorkspaceInsightTab(currentInsightTab);
+  }
   const own=Number(msg.sender_id)===Number(me.id);
   const canDelete=!msg.ai&&(own||me.isAdmin);
   const receipt=receiptInfo(msg);
@@ -651,6 +728,8 @@ async function exportAiMessage(msg,format,button){
 function removeMessage(messageId){
   const id=Number(messageId);
   if(!Number.isSafeInteger(id)||id<=0)return;
+  activeConversation=activeConversation.filter(item=>Number(item.id)!==id);
+  updateWorkspaceOverview();
   const row=[...$("messages").querySelectorAll(".msg")].find(item=>Number(item.dataset.messageId)===id);
   if(row)row.remove();
   if(activeUser&&!$("messages").querySelector(".msg")){
@@ -924,7 +1003,7 @@ $("profilePhotoInput").onchange=async e=>{
     const data=await api("/api/profile/avatar",{method:"POST",body:form});
     me.avatar=data.avatar||null;
     users=await api("/api/users");
-    renderUsers();refreshProfilePage();updateHeader();
+    synchronizeCurrentAccount();renderUsers();refreshProfilePage();updateHeader();
     result.textContent="Profile photo updated.";toast("Profile photo updated");
   }catch(error){result.textContent=error.message}
 };
@@ -934,7 +1013,7 @@ $("removeProfilePhotoBtn").onclick=async()=>{
   const result=$("profilePhotoResult");
   try{
     await api("/api/profile/avatar",{method:"DELETE"});
-    me.avatar=null;users=await api("/api/users");renderUsers();refreshProfilePage();updateHeader();
+    me.avatar=null;users=await api("/api/users");synchronizeCurrentAccount();renderUsers();refreshProfilePage();updateHeader();
     result.textContent="Profile photo removed.";toast("Profile photo removed");
   }catch(error){result.textContent=error.message}
 };
@@ -987,7 +1066,44 @@ document.querySelectorAll(".chat-filter").forEach(button=>button.onclick=()=>{
 if($("refreshUsersBtn"))$("refreshUsersBtn").onclick=refreshUsers;
 if($("newChatBtn"))$("newChatBtn").onclick=()=>{$("userSearch").focus();toast("Search and select a user to start a new conversation.")};
 if($("searchChatBtn"))$("searchChatBtn").onclick=()=>{const term=prompt("Search visible messages for:");if(!term)return;const found=[...$("messages").querySelectorAll(".bubble")].find(x=>x.textContent.toLowerCase().includes(term.toLowerCase()));if(found){found.scrollIntoView({behavior:"smooth",block:"center"});found.classList.add("search-hit");setTimeout(()=>found.classList.remove("search-hit"),1600)}else toast("No matching visible message.")};
-if($("moreChatBtn"))$("moreChatBtn").onclick=()=>toast("Conversation options: attachments, status and delete controls are available in the workspace.");
+function toggleSmartPopup(forceOpen){
+  if(!activeUser)return toast("Select a conversation first.");
+  $("conversationMenu")?.classList.add("hidden");
+  const shouldOpen=forceOpen===true||$("smartStrip").classList.contains("hidden");
+  $("smartStrip").classList.toggle("hidden",!shouldOpen);
+}
+if($("chatAiBtn"))$("chatAiBtn").onclick=()=>toggleSmartPopup();
+if($("moreChatBtn"))$("moreChatBtn").onclick=()=>{
+  if(!activeUser)return toast("Select a conversation first.");
+  $("smartStrip")?.classList.add("hidden");
+  $("conversationMenu").classList.toggle("hidden");
+};
+if($("archiveChatBtn"))$("archiveChatBtn").onclick=async()=>{
+  if(!activeUser||activeUser.isAI||activeUser.isSelf)return;
+  const archived=archivedUserIds.has(Number(activeUser.id));
+  try{
+    await api(`/api/conversations/${activeUser.id}/archive`,{method:archived?"DELETE":"POST",body:archived?undefined:"{}"});
+    if(archived)archivedUserIds.delete(Number(activeUser.id));else archivedUserIds.add(Number(activeUser.id));
+    $("conversationMenu").classList.add("hidden");renderUsers();updateHeader();
+    toast(archived?"Chat restored.":"Chat archived.");
+  }catch(error){toast(error.message)}
+};
+if($("deleteConversationBtn"))$("deleteConversationBtn").onclick=async()=>{
+  if(!activeUser||activeUser.isAI)return;
+  const name=activeUser.isSelf?"Saved Messages":(activeUser.displayName||activeUser.username);
+  if(!confirm(`Delete all messages and attachments in “${name}”? This removes the conversation for both participants and cannot be undone.`))return;
+  try{
+    await api(`/api/conversations/${activeUser.id}`,{method:"DELETE",body:JSON.stringify({confirm:"DELETE ALL"})});
+    activeConversation=[];$("messages").innerHTML="";$("conversationMenu").classList.add("hidden");
+    updateWorkspaceOverview();await refreshUsers();toast("All chat messages were deleted.");
+  }catch(error){toast(error.message)}
+};
+
+document.addEventListener("click",event=>{
+  if(!event.target.closest("#smartStrip,#chatAiBtn,.user-ai-tool"))$("smartStrip")?.classList.add("hidden");
+  if(!event.target.closest("#conversationMenu,#moreChatBtn"))$("conversationMenu")?.classList.add("hidden");
+});
+document.querySelectorAll("[data-insight-tab]").forEach(button=>button.onclick=()=>renderWorkspaceInsightTab(button.dataset.insightTab));
 
 const LOCAL_GROUPS_KEY="connectchat-local-groups-v1";
 const LOCAL_CHANNELS_KEY="connectchat-local-channels-v1";
@@ -1105,10 +1221,12 @@ function readableBytes(value){
   return `${(bytes/(1024*1024)).toFixed(1)} MB`;
 }
 
-async function openCalculationPreview(sheetId,sheetName=""){
+async function openCalculationPreview(sheetId,sheetName="",canDownload=currentCalculationPreviewCanDownload){
   const id=Number(sheetId);if(!Number.isSafeInteger(id)||id<=0)return;
   const overlay=$("calculationPreviewOverlay"),content=$("calculationPreviewContent"),tabs=$("calculationPreviewTabs");
-  currentCalculationPreviewId=id;content.innerHTML='<div class="workspace-loading">Opening calculation sheet…</div>';tabs.innerHTML="";$("calculationPreviewNote").textContent="";
+  currentCalculationPreviewId=id;currentCalculationPreviewCanDownload=Boolean(canDownload);
+  $("calculationPreviewDownload").classList.toggle("hidden",!currentCalculationPreviewCanDownload);
+  content.innerHTML='<div class="workspace-loading">Opening calculation sheet…</div>';tabs.innerHTML="";$("calculationPreviewNote").textContent="";
   overlay.classList.remove("hidden");
   try{
     const suffix=sheetName?`?sheet=${encodeURIComponent(sheetName)}`:"";
@@ -1128,14 +1246,14 @@ async function openCalculationPreview(sheetId,sheetName=""){
     tabs.innerHTML=(data.sheetNames||[]).map(name=>`<button type="button" class="${name===data.activeSheet?"active":""}" data-preview-sheet="${sectionEscape(name)}">${sectionEscape(name)}</button>`).join("");
     const maxColumns=Math.max(0,...(data.rows||[]).map(row=>row.length));
     content.innerHTML=data.rows?.length?`<div class="calculation-table-wrap"><table><tbody>${data.rows.map((row,rowIndex)=>`<tr>${Array.from({length:maxColumns},(_,columnIndex)=>`${rowIndex===0?"<th>":"<td>"}${sectionEscape(row[columnIndex]??"")}${rowIndex===0?"</th>":"</td>"}`).join("")}</tr>`).join("")}</tbody></table></div>${data.truncated?'<p class="preview-warning">Preview limited to 500 rows and 100 columns. Download the original file for the complete workbook.</p>':""}`:workspaceEmpty("📊","Empty worksheet","This worksheet does not contain saved display values.");
-    tabs.querySelectorAll("[data-preview-sheet]").forEach(button=>button.onclick=()=>openCalculationPreview(id,button.dataset.previewSheet));
+    tabs.querySelectorAll("[data-preview-sheet]").forEach(button=>button.onclick=()=>openCalculationPreview(id,button.dataset.previewSheet,currentCalculationPreviewCanDownload));
   }catch(error){content.innerHTML=workspaceEmpty("⚠️","Preview unavailable",error.message)}
 }
 
 function closeCalculationPreview(){
   $("calculationPreviewOverlay").classList.add("hidden");
   if(calculationPreviewObjectUrl){URL.revokeObjectURL(calculationPreviewObjectUrl);calculationPreviewObjectUrl=null}
-  currentCalculationPreviewId=null;
+  currentCalculationPreviewId=null;currentCalculationPreviewCanDownload=false;
 }
 if($("closeCalculationPreview"))$("closeCalculationPreview").onclick=closeCalculationPreview;
 if($("calculationPreviewOverlay"))$("calculationPreviewOverlay").onclick=event=>{if(event.target===$("calculationPreviewOverlay"))closeCalculationPreview()};
@@ -1152,11 +1270,11 @@ async function renderCalculationSheetsWorkspace(){
     const shareableUsers=users.filter(user=>!user.isAI&&!user.isSelf&&!user.isGroup);
     const permissionControls=me.isAdmin?`
       <div class="calculation-permissions">
-        <label>Who can open or download?<select id="calculationAccessScope"><option value="all" selected>All approved users</option><option value="admins">Administrators only</option><option value="selected">Selected users</option></select></label>
+        <label>Who can preview?<select id="calculationAccessScope"><option value="all" selected>All approved users</option><option value="admins">Administrators only</option><option value="selected">Selected users</option></select></label>
         <div id="calculationSelectedUsers" class="calculation-selected-users hidden">${shareableUsers.map(user=>`<label><input type="checkbox" value="${Number(user.id)}"> ${sectionEscape(user.displayName||user.username)}</label>`).join("")||"<small>No other approved users are available.</small>"}</div>
       </div>`:"";
     $("sectionContent").innerHTML=`
-      <div class="workspace-toolbar"><div><h2>Shared calculation sheets</h2><p>Approved users can open shared engineering calculations by double-clicking a file.</p></div></div>
+      <div class="workspace-toolbar"><div><h2>Shared calculation sheets</h2><p>Approved users can preview results by double-clicking. Administrator originals remain download-protected.</p></div></div>
       <form id="calculationUploadForm" class="calculation-upload-card">
         <div><label>Sheet title<input id="calculationTitle" maxlength="120" placeholder="Example: FAHU cooling-load calculation" required></label><label>Description<input id="calculationDescription" maxlength="500" placeholder="Optional revision, project, or design note"></label></div>
         <div><label>Calculation file<input id="calculationFile" type="file" accept=".xlsx,.xls,.csv,.pdf" required></label><button id="calculationUploadBtn" class="primary" type="submit">Upload sheet</button></div>
@@ -1167,12 +1285,12 @@ async function renderCalculationSheetsWorkspace(){
         <article data-sheet-id="${sheet.id}">
           <div class="calculation-file-icon">${sheet.mimeType==="application/pdf"?"PDF":"XLS"}</div>
           <div><h3>${sectionEscape(sheet.title)}</h3><p>${sectionEscape(sheet.description||sheet.fileName)}</p><small>${sectionEscape(sheet.uploaderName)} · ${readableBytes(sheet.fileSize)} · ${sectionEscape(time(sheet.createdAt))} · ${sheet.accessScope==="admins"?"Administrators only":sheet.accessScope==="selected"?"Selected users":"All users"}</small></div>
-          <div class="calculation-actions"><button type="button" data-sheet-open="${sheet.id}">Open</button><button type="button" data-sheet-download="${sheet.id}">Download</button>${Number(sheet.uploaderId)===Number(me.id)||me.isAdmin?`<button type="button" class="danger-link" data-sheet-delete="${sheet.id}">Delete</button>`:""}</div>
+          <div class="calculation-actions"><button type="button" data-sheet-open="${sheet.id}" data-can-download="${sheet.canDownload?"1":"0"}">Open</button>${sheet.canDownload?`<button type="button" data-sheet-download="${sheet.id}">Download</button>`:"<span class=\"preview-only-badge\">Preview only</span>"}${Number(sheet.uploaderId)===Number(me.id)||me.isAdmin?`<button type="button" class="danger-link" data-sheet-delete="${sheet.id}">Delete</button>`:""}</div>
         </article>`).join("")}</div>`:workspaceEmpty("📊","No calculation sheets","Upload the first calculation sheet for the team.")}`;
     $("calculationUploadForm").onsubmit=uploadCalculationSheet;
     if($("calculationAccessScope"))$("calculationAccessScope").onchange=()=>$("calculationSelectedUsers").classList.toggle("hidden",$("calculationAccessScope").value!=="selected");
-    document.querySelectorAll("[data-sheet-open]").forEach(button=>button.onclick=()=>openCalculationPreview(button.dataset.sheetOpen));
-    document.querySelectorAll(".calculation-sheet-grid article").forEach(card=>card.ondblclick=event=>{if(!event.target.closest("button"))openCalculationPreview(card.dataset.sheetId)});
+    document.querySelectorAll("[data-sheet-open]").forEach(button=>button.onclick=()=>openCalculationPreview(button.dataset.sheetOpen,"",button.dataset.canDownload==="1"));
+    document.querySelectorAll(".calculation-sheet-grid article").forEach(card=>card.ondblclick=event=>{if(!event.target.closest("button")){const open=card.querySelector("[data-sheet-open]");openCalculationPreview(card.dataset.sheetId,"",open?.dataset.canDownload==="1")}});
     document.querySelectorAll("[data-sheet-download]").forEach(button=>button.onclick=async()=>{
       try{button.disabled=true;await downloadApiFile(`/api/calculation-sheets/${button.dataset.sheetDownload}/download`,{}, "calculation-sheet");}
       catch(error){toast(error.message)}finally{button.disabled=false}
@@ -1264,7 +1382,7 @@ async function openWorkspaceSection(section){
     groups:["Groups","Multi-user private conversations."],
     channels:["Channels","Organized project and announcement spaces."],
     files:["Files","All attachments shared in your conversations."],
-    calculations:["Calculation Sheets","Upload and download shared engineering calculation files."],
+    calculations:["Calculation Sheets","Preview shared engineering results; administrator originals are download-protected."],
     calls:["Calls","Voice and video calling workspace."],
     settings:["Settings","Profile, appearance, privacy, account and administration."]
   };

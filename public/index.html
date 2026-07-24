@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#182132">
-  <title>ConnectChat Pro Enterprise v6.2.2</title>
+  <title>ConnectChat Pro Enterprise v6.3.1</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css?v=50">
@@ -61,6 +61,7 @@
         <button class="chat-filter" type="button" data-filter="unread">Unread</button>
         <button class="chat-filter" type="button" data-filter="groups">Groups</button>
         <button class="chat-filter" type="button" data-filter="pinned">Pinned</button>
+        <button class="chat-filter" type="button" data-filter="archived">Archived</button>
       </div>
       <div id="quickContacts" class="quick-contacts"></div>
       <div class="section-label"><span>RECENT</span><button id="refreshUsersBtn" class="plain-icon" type="button" title="Refresh">↻</button></div>
@@ -95,12 +96,17 @@
           <button id="searchChatBtn" class="header-btn" title="Search conversation">⌕</button>
           <button id="audioCallBtn" class="header-btn" title="Audio call" disabled>☎</button>
           <button id="videoCallBtn" class="header-btn" title="Video call" disabled>▣</button>
+          <button id="chatAiBtn" class="header-btn" title="AI tools for this conversation" disabled>✦</button>
           <button id="moreChatBtn" class="header-btn" title="More">⋮</button>
         </div>
       </header>
+      <div id="conversationMenu" class="conversation-menu hidden">
+        <button id="archiveChatBtn" type="button">🗃 Archive chat</button>
+        <button id="deleteConversationBtn" class="danger-link" type="button">🗑 Delete all chat</button>
+      </div>
       <div class="date-chip">Today</div>
       <div id="messages" class="messages empty-state"><div><h3>Your messages</h3><p>Select a user to start chatting.</p></div></div>
-      <div id="smartStrip" class="smart-strip hidden" aria-label="Smart actions"><span>✦ Smart workspace</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
+      <div id="smartStrip" class="smart-strip smart-popup hidden" aria-label="AI conversation tools"><span>✦ Conversation AI</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
       <div id="typingText" class="typing"></div><div id="uploadStatus" class="upload-status hidden">Uploading…</div>
       <footer class="composer">
         <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" hidden>
@@ -132,20 +138,24 @@
     </main>
 
     <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
-      <div class="insights-head"><div><small>CONNECTCHAT PRO v6.2.2</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
-      <div class="insight-tabs"><button class="active" type="button">Overview</button><button type="button">Files</button><button type="button">Media</button></div>
-      <div class="workspace-profile-card">
-        <div id="workspaceProfileAvatar" class="workspace-profile-avatar">ME</div>
-        <div><small>Signed in as</small><h3 id="workspaceProfileName">User</h3><span id="workspaceProfileRole">Member</span></div>
+      <div class="insights-head"><div><small>CONNECTCHAT PRO v6.3.1</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
+      <div class="insight-tabs"><button class="active" type="button" data-insight-tab="overview">Overview</button><button type="button" data-insight-tab="files">Files</button><button type="button" data-insight-tab="media">Media</button></div>
+      <div id="insightOverviewPanel" class="insight-panel-content">
+        <div class="workspace-profile-card">
+          <div id="workspaceProfileAvatar" class="workspace-profile-avatar">ME</div>
+          <div><small>Signed in as</small><h3 id="workspaceProfileName">User</h3><span id="workspaceProfileRole">Member</span></div>
+        </div>
+        <div class="workspace-stat-grid">
+          <div><b id="workspaceContactCount">0</b><small>Contacts</small></div>
+          <div><b id="workspaceOnlineCount">0</b><small>Online now</small></div>
+          <div><b id="workspaceUnreadCount">0</b><small>Unread</small></div>
+          <div><b id="workspaceCallStatus">Ready</b><small>Calls</small></div>
+        </div>
+        <div class="workspace-help-card"><b>Current conversation</b><p id="workspaceConversationSummary">Select a real contact from the left panel.</p></div>
+        <div class="security-card"><b>🔒 Secure workspace</b><p>Protected sessions, validated uploads, encrypted transport and account recovery are enabled.</p></div>
       </div>
-      <div class="workspace-stat-grid">
-        <div><b id="workspaceContactCount">0</b><small>Contacts</small></div>
-        <div><b id="workspaceOnlineCount">0</b><small>Online now</small></div>
-        <div><b id="workspaceUnreadCount">0</b><small>Unread</small></div>
-        <div><b id="workspaceCallStatus">Ready</b><small>Calls</small></div>
-      </div>
-      <div class="workspace-help-card"><b>Start a conversation</b><p>Select a real contact from the left panel. Your recent messages, files and media will appear here.</p></div>
-      <div class="security-card"><b>🔒 Secure workspace</b><p>Protected sessions, validated uploads, encrypted transport and account recovery are enabled.</p></div>
+      <div id="insightFilesPanel" class="insight-panel-content hidden"></div>
+      <div id="insightMediaPanel" class="insight-panel-content hidden"></div>
     </aside>
   </section>
 

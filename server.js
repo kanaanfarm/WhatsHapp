@@ -715,8 +715,9 @@ app.post("/api/profile/avatar", auth, upload.single("avatar"), async (req, res) 
       if (removeError) console.error("Could not remove previous avatar:", removeError.message);
     }
     const avatar = await signedAvatarUrl(storagePath);
+    io.emit("profile:updated", { userId: Number(req.currentUser.id), changedAt: new Date().toISOString() });
     io.emit("users:changed");
-    res.json({ ok: true, avatar });
+    res.json({ ok: true, avatar, userId: Number(req.currentUser.id) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message || "Could not upload profile photo." });
@@ -732,6 +733,7 @@ app.delete("/api/profile/avatar", auth, async (req, res) => {
       const { error: removeError } = await supabase.storage.from(STORAGE_BUCKET).remove([oldAvatar]);
       if (removeError) console.error("Could not remove avatar:", removeError.message);
     }
+    io.emit("profile:updated", { userId: Number(req.currentUser.id), changedAt: new Date().toISOString() });
     io.emit("users:changed");
     res.json({ ok: true });
   } catch (error) {
@@ -1284,9 +1286,8 @@ const calculationSheetMimeTypes = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]);
 
-async function calculationSheetView(row, usernames = new Map()) {
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_SECONDS);
-  if (error) console.error("Could not sign calculation sheet:", error.message);
+async function calculationSheetView(row, usernames = new Map(), adminIds = new Set(), viewer = null) {
+  const uploaderIsAdmin = adminIds.has(Number(row.uploader_id));
   return {
     id: Number(row.id),
     uploaderId: Number(row.uploader_id),
@@ -1298,7 +1299,7 @@ async function calculationSheetView(row, usernames = new Map()) {
     fileSize: Number(row.file_size || 0),
     accessScope: row.access_scope || "all",
     createdAt: row.created_at,
-    downloadUrl: data?.signedUrl || null
+    canDownload: Boolean(viewer?.is_admin) || Number(row.uploader_id) === Number(viewer?.id) || !uploaderIsAdmin
   };
 }
 
@@ -1371,11 +1372,12 @@ app.get("/api/calculation-sheets", auth, async (req, res) => {
     }
     const ids = [...new Set(visibleSheets.map(row => Number(row.uploader_id)))];
     const { data: people, error: peopleError } = ids.length
-      ? await supabase.from("users").select("id,username").in("id", ids)
+      ? await supabase.from("users").select("id,username,is_admin").in("id", ids)
       : { data: [], error: null };
     if (peopleError) throw peopleError;
     const usernames = new Map((people || []).map(person => [Number(person.id), person.username]));
-    res.json(await Promise.all(visibleSheets.map(row => calculationSheetView(row, usernames))));
+    const adminIds = new Set((people || []).filter(person => person.is_admin).map(person => Number(person.id)));
+    res.json(await Promise.all(visibleSheets.map(row => calculationSheetView(row, usernames, adminIds, req.currentUser))));
   } catch (error) {
     console.error("Calculation sheets failed:", error);
     res.status(500).json({ error: "Calculation sheets are unavailable. Run v6-calculation-sheets-migration.sql once." });
@@ -1439,7 +1441,12 @@ app.post("/api/calculation-sheets", uploadLimiter, auth, upload.single("sheet"),
         throw grantError;
       }
     }
-    res.json(await calculationSheetView(row, new Map([[Number(req.currentUser.id), req.currentUser.username]])));
+    res.json(await calculationSheetView(
+      row,
+      new Map([[Number(req.currentUser.id), req.currentUser.username]]),
+      new Set(req.currentUser.is_admin ? [Number(req.currentUser.id)] : []),
+      req.currentUser
+    ));
   } catch (error) {
     if (storagePath) await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]).catch(() => {});
     console.error("Calculation sheet upload failed:", error);
@@ -1456,6 +1463,10 @@ app.get("/api/calculation-sheets/:id/download", auth, async (req, res) => {
     if (error) throw error;
     if (!row) return res.status(404).json({ error: "Calculation sheet not found." });
     if (!await calculationSheetAllowed(row, req.currentUser)) return res.status(403).json({ error: "This calculation sheet was not shared with your account." });
+    const uploader = await getUserById(Number(row.uploader_id), "id,is_admin");
+    if (uploader?.is_admin && !req.currentUser.is_admin) {
+      return res.status(403).json({ error: "Administrator calculation sheets are preview-only. You may view the sheet and its saved results, but downloading the original file is restricted." });
+    }
     const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(row.storage_path);
     if (downloadError) throw downloadError;
     const buffer = Buffer.from(await data.arrayBuffer());
@@ -1607,6 +1618,85 @@ app.get("/api/users", auth, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not load users." });
+  }
+});
+
+app.get("/api/conversations/archived", auth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("conversation_preferences")
+      .select("other_user_id").eq("user_id", req.currentUser.id).not("archived_at", "is", null);
+    if (error) throw error;
+    res.json({ userIds: (data || []).map(row => Number(row.other_user_id)) });
+  } catch (error) {
+    console.error("Archived conversations failed:", error);
+    res.status(500).json({ error: "Archived chats are unavailable. Run v6.3-conversation-controls-migration.sql once." });
+  }
+});
+
+app.post("/api/conversations/:otherId/archive", auth, async (req, res) => {
+  try {
+    const otherId = Number(req.params.otherId);
+    if (!Number.isSafeInteger(otherId) || otherId <= 0 || otherId === Number(req.currentUser.id)) {
+      return res.status(400).json({ error: "Choose another approved user to archive." });
+    }
+    const other = await getUserById(otherId, "id,status");
+    if (!other || other.status !== "approved") return res.status(404).json({ error: "Approved user not found." });
+    const { error } = await supabase.from("conversation_preferences").upsert({
+      user_id: req.currentUser.id,
+      other_user_id: otherId,
+      archived_at: new Date().toISOString()
+    }, { onConflict: "user_id,other_user_id" });
+    if (error) throw error;
+    res.json({ ok: true, archived: true });
+  } catch (error) {
+    console.error("Archive conversation failed:", error);
+    res.status(500).json({ error: "The chat could not be archived. Run v6.3-conversation-controls-migration.sql once." });
+  }
+});
+
+app.delete("/api/conversations/:otherId/archive", auth, async (req, res) => {
+  try {
+    const otherId = Number(req.params.otherId);
+    if (!Number.isSafeInteger(otherId) || otherId <= 0) return res.status(400).json({ error: "Invalid conversation." });
+    const { error } = await supabase.from("conversation_preferences")
+      .delete().eq("user_id", req.currentUser.id).eq("other_user_id", otherId);
+    if (error) throw error;
+    res.json({ ok: true, archived: false });
+  } catch (error) {
+    console.error("Restore conversation failed:", error);
+    res.status(500).json({ error: "The chat could not be restored. Run v6.3-conversation-controls-migration.sql once." });
+  }
+});
+
+app.delete("/api/conversations/:otherId", auth, async (req, res) => {
+  try {
+    const userId = Number(req.currentUser.id);
+    const otherId = Number(req.params.otherId);
+    if (!Number.isSafeInteger(otherId) || otherId <= 0) return res.status(400).json({ error: "Invalid conversation." });
+    if (req.body?.confirm !== "DELETE ALL") return res.status(400).json({ error: "Conversation deletion was not confirmed." });
+    const filter = `and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`;
+    const messages = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data: page, error: findError } = await supabase.from("messages")
+        .select("id,file_url").or(filter).order("id", { ascending: true }).range(offset, offset + 999);
+      if (findError) throw findError;
+      messages.push(...(page || []));
+      if ((page || []).length < 1000) break;
+    }
+    const storagePaths = [...new Set(messages.map(message => message.file_url).filter(Boolean))];
+    for (let index = 0; index < storagePaths.length; index += 100) {
+      const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove(storagePaths.slice(index, index + 100));
+      if (storageError) throw storageError;
+    }
+    const { error: deleteError } = await supabase.from("messages").delete().or(filter);
+    if (deleteError) throw deleteError;
+    await supabase.from("conversation_preferences").delete()
+      .or(`and(user_id.eq.${userId},other_user_id.eq.${otherId}),and(user_id.eq.${otherId},other_user_id.eq.${userId})`);
+    io.to(`user:${userId}`).to(`user:${otherId}`).emit("conversation:cleared", { userId, otherId });
+    res.json({ ok: true, deletedCount: messages.length });
+  } catch (error) {
+    console.error("Delete conversation failed:", error);
+    res.status(500).json({ error: "The conversation or one of its attachments could not be deleted." });
   }
 });
 
