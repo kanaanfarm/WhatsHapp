@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v6",
-  "version": "6.4.1",
+  "version": "6.6.0",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v6.4.1 with visible multi-file photo and document sharing in user chats",
+  "description": "ConnectChat Pro Enterprise v6.6 with DeepSeek V4 AI integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -36,16 +36,21 @@ const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
+const DEEPSEEK_API_KEY = String(process.env.DEEPSEEK_API_KEY || "").trim();
+const DEEPSEEK_MODEL = String(process.env.DEEPSEEK_MODEL || "deepseek-v4-flash").trim();
+const DEEPSEEK_BASE_URL = String(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/$/, "");
 const OLLAMA_URL = String(process.env.OLLAMA_URL || (AI_PROVIDER === "ollama" ? "http://127.0.0.1:11434" : "")).trim().replace(/\/$/, "");
 const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
-const AI_DEFAULT_PROVIDER = String(process.env.AI_DEFAULT_PROVIDER || "ollama").trim().toLowerCase() === "openai" ? "openai" : "ollama";
+const AI_DEFAULT_PROVIDER_RAW = String(process.env.AI_DEFAULT_PROVIDER || "ollama").trim().toLowerCase();
+const AI_DEFAULT_PROVIDER = ["openai", "deepseek", "ollama"].includes(AI_DEFAULT_PROVIDER_RAW) ? AI_DEFAULT_PROVIDER_RAW : "ollama";
 const AI_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60000, 10000), 180000);
 const AI_AUTO_FALLBACK_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_AUTO_FALLBACK_TIMEOUT_MS) || 12000, 5000), 30000);
 const OPENAI_CONFIGURED = Boolean(OPENAI_API_KEY && OPENAI_MODEL);
+const DEEPSEEK_CONFIGURED = Boolean(DEEPSEEK_API_KEY && DEEPSEEK_MODEL);
 const OLLAMA_CONFIGURED = Boolean(OLLAMA_URL && OLLAMA_MODEL && !/example\.com|replace-me|your-secured/i.test(OLLAMA_URL));
 const AI_CONFIGURED = AI_PROVIDER === "hybrid"
-  ? OPENAI_CONFIGURED || OLLAMA_CONFIGURED
-  : AI_PROVIDER === "ollama" ? OLLAMA_CONFIGURED : OPENAI_CONFIGURED;
+  ? OPENAI_CONFIGURED || DEEPSEEK_CONFIGURED || OLLAMA_CONFIGURED
+  : AI_PROVIDER === "ollama" ? OLLAMA_CONFIGURED : AI_PROVIDER === "deepseek" ? DEEPSEEK_CONFIGURED : OPENAI_CONFIGURED;
 const AI_ENABLED = process.env.AI_ENABLED !== "false" && AI_CONFIGURED;
 const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are ConnectChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
 const SESSION_COOKIE_OPTIONS = {
@@ -877,16 +882,17 @@ function extractOpenAIText(data) {
 }
 
 function aiPublicStatus() {
-  const activeProvider = AI_PROVIDER === "hybrid" ? "Hybrid" : AI_PROVIDER === "ollama" ? "Ollama" : "OpenAI";
+  const activeProvider = AI_PROVIDER === "hybrid" ? "Hybrid" : AI_PROVIDER === "ollama" ? "Ollama" : AI_PROVIDER === "deepseek" ? "DeepSeek" : "OpenAI";
   return {
     enabled: AI_ENABLED,
     mode: AI_PROVIDER,
     provider: activeProvider,
-    model: AI_PROVIDER === "hybrid" ? "Automatic selection" : AI_PROVIDER === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
+    model: AI_PROVIDER === "hybrid" ? "Automatic selection" : AI_PROVIDER === "ollama" ? OLLAMA_MODEL : AI_PROVIDER === "deepseek" ? DEEPSEEK_MODEL : OPENAI_MODEL,
     defaultProvider: AI_DEFAULT_PROVIDER,
     configured: AI_CONFIGURED,
     providers: {
       openai: { available: OPENAI_CONFIGURED, label: "OpenAI", model: OPENAI_MODEL },
+      deepseek: { available: DEEPSEEK_CONFIGURED, label: "DeepSeek", model: DEEPSEEK_MODEL },
       ollama: { available: OLLAMA_CONFIGURED, label: "Ollama", model: OLLAMA_MODEL }
     },
     autoFallbackSeconds: Math.round(AI_AUTO_FALLBACK_TIMEOUT_MS / 1000)
@@ -894,12 +900,12 @@ function aiPublicStatus() {
 }
 
 function aiFailureText(provider, error) {
-  const label = provider === "ollama" ? "Ollama" : "OpenAI";
+  const label = provider === "ollama" ? "Ollama" : provider === "deepseek" ? "DeepSeek" : "OpenAI";
   if (error?.name === "AbortError") return `${label} timed out`;
   if (error?.status === 401) return `${label} rejected its credentials`;
   if (error?.status === 429) return `${label} quota or rate limit reached`;
   if (provider === "ollama") return "Ollama server is unreachable";
-  return "OpenAI request failed";
+  return `${label} request failed`;
 }
 
 async function requestOpenAI(message, history, signal) {
@@ -951,13 +957,42 @@ async function requestOllama(message, history, signal) {
   return String(data?.message?.content || "").trim();
 }
 
+async function requestDeepSeek(message, history, signal) {
+  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages: [
+        { role: "system", content: AI_SYSTEM_PROMPT },
+        ...history,
+        { role: "user", content: message }
+      ],
+      stream: false,
+      max_tokens: 1600,
+      temperature: 0.3
+    }),
+    signal
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || "DeepSeek request failed.");
+    error.status = response.status;
+    throw error;
+  }
+  return String(data?.choices?.[0]?.message?.content || "").trim();
+}
+
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
 
 app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   try {
     if (!AI_ENABLED) {
       return res.status(503).json({
-        error: "ConnectChat AI is not configured. Check the OpenAI or Ollama server settings."
+        error: "ConnectChat AI is not configured. Check the DeepSeek, OpenAI, or Ollama server settings."
       });
     }
     const message = cleanText(req.body?.message, 4000);
@@ -967,13 +1002,14 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
       role: item?.role === "assistant" ? "assistant" : "user",
       content: cleanText(item?.content, 4000)
     })).filter(item => item.content);
-    const requested = ["auto", "openai", "ollama"].includes(req.body?.provider) ? req.body.provider : "auto";
-    const allowed = AI_PROVIDER === "hybrid" ? ["openai", "ollama"] : [AI_PROVIDER === "ollama" ? "ollama" : "openai"];
-    const available = allowed.filter(provider => provider === "openai" ? OPENAI_CONFIGURED : OLLAMA_CONFIGURED);
+    const requested = ["auto", "openai", "deepseek", "ollama"].includes(req.body?.provider) ? req.body.provider : "auto";
+    const allowed = AI_PROVIDER === "hybrid" ? ["deepseek", "openai", "ollama"] : [AI_PROVIDER === "ollama" ? "ollama" : AI_PROVIDER === "deepseek" ? "deepseek" : "openai"];
+    const available = allowed.filter(provider => provider === "openai" ? OPENAI_CONFIGURED : provider === "deepseek" ? DEEPSEEK_CONFIGURED : OLLAMA_CONFIGURED);
     let queue;
     if (requested !== "auto") {
-      if (!allowed.includes(requested)) return res.status(400).json({ error: `${requested === "openai" ? "OpenAI" : "Ollama"} is disabled by the server administrator.` });
-      if (!available.includes(requested)) return res.status(503).json({ error: `${requested === "openai" ? "OpenAI" : "Ollama"} is not configured on the server.` });
+      const requestedLabel = requested === "openai" ? "OpenAI" : requested === "deepseek" ? "DeepSeek" : "Ollama";
+      if (!allowed.includes(requested)) return res.status(400).json({ error: `${requestedLabel} is disabled by the server administrator.` });
+      if (!available.includes(requested)) return res.status(503).json({ error: `${requestedLabel} is not configured on the server.` });
       queue = [requested];
     } else {
       const preferred = available.includes(AI_DEFAULT_PROVIDER) ? AI_DEFAULT_PROVIDER : available[0];
@@ -993,7 +1029,9 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
       try {
         answer = provider === "ollama"
           ? await requestOllama(message, history, controller.signal)
-          : await requestOpenAI(message, history, controller.signal);
+          : provider === "deepseek"
+            ? await requestDeepSeek(message, history, controller.signal)
+            : await requestOpenAI(message, history, controller.signal);
         if (answer) { usedProvider = provider; break; }
       } catch (error) {
         lastError = error;
@@ -1013,8 +1051,8 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
     res.json({
       answer,
-      provider: usedProvider === "ollama" ? "Ollama" : "OpenAI",
-      model: usedProvider === "ollama" ? OLLAMA_MODEL : OPENAI_MODEL,
+      provider: usedProvider === "ollama" ? "Ollama" : usedProvider === "deepseek" ? "DeepSeek" : "OpenAI",
+      model: usedProvider === "ollama" ? OLLAMA_MODEL : usedProvider === "deepseek" ? DEEPSEEK_MODEL : OPENAI_MODEL,
       fallbackUsed: requested === "auto" && queue[0] !== usedProvider,
       status: aiPublicStatus()
     });
@@ -1023,7 +1061,7 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     console.error("AI chat failed:", error);
     if (error?.status === 401) return res.status(502).json({ error: "The AI provider rejected its API key." });
     if (error?.status === 429) return res.status(429).json({ error: "AI usage limit reached. Please try again shortly." });
-    res.status(502).json({ error: "No AI provider could answer. Check the OpenAI key and confirm that the Ollama server is reachable." });
+    res.status(502).json({ error: "No AI provider could answer. Check the DeepSeek/OpenAI key and confirm that the Ollama server is reachable." });
   }
 });
 
@@ -1139,6 +1177,7 @@ app.post("/api/groups", auth, async (req, res) => {
       ...memberIds.map(user_id => ({ group_id: group.id, user_id, role: "member" }))];
     const { error: memberError } = await supabase.from("group_members").insert(rows);
     if (memberError) throw memberError;
+    rows.forEach(row => io.in(`user:${row.user_id}`).socketsJoin(`group:${group.id}`));
     res.status(201).json({ ...group, role: "owner" });
   } catch (error) {
     console.error("Create group failed:", error);
@@ -1151,13 +1190,53 @@ app.get("/api/groups/:groupId/messages", auth, async (req, res) => {
     const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
     if (!Number.isSafeInteger(groupId) || !(await groupAccess(groupId, userId))) return res.status(403).json({ error: "Access denied." });
     const { data, error } = await supabase.from("group_messages")
-      .select("id,group_id,sender_id,body,created_at,users!group_messages_sender_id_fkey(username,avatar_url)")
+      .select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at,users!group_messages_sender_id_fkey(username,avatar_url)")
       .eq("group_id", groupId).order("created_at", { ascending: true }).limit(500);
     if (error) throw error;
-    res.json((data || []).map(m => ({ ...m, sender_name: m.users?.username || "User", avatar_url: m.users?.avatar_url || null, users: undefined })));
+    const prepared = await signedMessages((data || []).map(m => ({ ...m, sender_name: m.users?.username || "User", avatar_url: m.users?.avatar_url || null, users: undefined })));
+    res.json(prepared);
   } catch (error) {
     console.error("Group messages failed:", error);
     res.status(500).json({ error: "Group messages could not be loaded." });
+  }
+});
+
+app.post("/api/groups/:groupId/upload", auth, upload.single("file"), async (req, res) => {
+  let storagePath;
+  try {
+    const groupId = Number(req.params.groupId), senderId = Number(req.session.userId);
+    if (!req.file || !Number.isSafeInteger(groupId) || !(await groupAccess(groupId, senderId))) {
+      return res.status(403).json({ error: "Group access or file is missing." });
+    }
+    const verified = await verifyUpload(req.file);
+    const extension = verified.ext ? `.${verified.ext}` : "";
+    storagePath = `groups/${groupId}/${senderId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
+    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
+      contentType: verified.mime, cacheControl: "900", upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { data, error } = await supabase.from("group_messages").insert({
+      group_id: groupId,
+      sender_id: senderId,
+      kind: verified.kind,
+      body: cleanText(req.body.caption, 500),
+      file_url: storagePath,
+      file_name: cleanFileName(req.file.originalname),
+      mime_type: verified.mime
+    }).select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at").single();
+    if (error) throw error;
+    const outgoing = await signedMessage({ ...data, sender_name: req.session.username || "User" });
+    io.to(`group:${groupId}`).emit("group:message", outgoing);
+    res.status(201).json(outgoing);
+  } catch (error) {
+    if (storagePath) await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]).catch(() => {});
+    console.error("Group upload failed:", error);
+    const safeMessages = new Set([
+      "The file content does not match an allowed type.",
+      "This file type is not allowed.",
+      "Text files must use UTF-8 encoding."
+    ]);
+    res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Group file upload failed. Run v6.5.1-group-attachments-migration.sql." });
   }
 });
 
@@ -2021,6 +2100,8 @@ io.on("connection", async socket => {
   }
   if (!socketUser || socketUser.status !== "approved") return socket.disconnect(true);
   const username = socketUser.username;
+  socket.data.userId = userId;
+  socket.data.username = username;
   socket.join(`user:${userId}`);
   try {
     const [{ data: gm }, { data: cm }] = await Promise.all([
@@ -2152,6 +2233,67 @@ io.on("connection", async socket => {
       closeCallPair(userId, receiverId);
       io.to(`user:${receiverId}`).emit("call:ended", { userId });
     }
+  });
+
+  // Small-group conference signaling. Media remains peer-to-peer; the server
+  // only verifies group membership and relays WebRTC descriptions/candidates.
+  socket.on("group-call:join", async payload => {
+    try {
+      if (!CALLS_ENABLED || !eventAllowed(socket, "group-call", 20, 60 * 1000)) return;
+      const groupId = Number(payload?.groupId);
+      if (!Number.isSafeInteger(groupId) || groupId <= 0 || !(await groupAccess(groupId, userId))) return;
+      const room = `group-call:${groupId}`;
+      const present = (await io.in(room).fetchSockets())
+        .filter(item => Number(item.data.userId) !== userId)
+        .map(item => ({ userId: Number(item.data.userId), username: String(item.data.username || "Member") }));
+      const unique = [...new Map(present.map(item => [item.userId, item])).values()].slice(0, 5);
+      if (unique.length >= 5) return socket.emit("group-call:full", { groupId });
+      socket.join(room);
+      socket.emit("group-call:participants", { groupId, participants: unique });
+      socket.to(room).emit("group-call:participant-joined", { groupId, userId, username });
+      if (unique.length === 0) {
+        socket.to(`group:${groupId}`).emit("group-call:invite", {
+          groupId, callerId: userId, callerName: username,
+          mode: payload?.mode === "audio" ? "audio" : "video"
+        });
+      }
+    } catch (error) {
+      console.error("Group call join failed:", error.message);
+    }
+  });
+  socket.on("group-call:offer", async payload => {
+    try {
+      const groupId = Number(payload?.groupId), receiverId = Number(payload?.receiverId);
+      if (!CALLS_ENABLED || !Number.isSafeInteger(groupId) || !Number.isSafeInteger(receiverId)
+        || !(await groupAccess(groupId, userId)) || !(await groupAccess(groupId, receiverId))
+        || !validDescription(payload?.offer, "offer")) return;
+      io.to(`user:${receiverId}`).emit("group-call:offer", { groupId, userId, username, offer: payload.offer });
+    } catch {}
+  });
+  socket.on("group-call:answer", async payload => {
+    try {
+      const groupId = Number(payload?.groupId), receiverId = Number(payload?.receiverId);
+      if (!CALLS_ENABLED || !Number.isSafeInteger(groupId) || !Number.isSafeInteger(receiverId)
+        || !(await groupAccess(groupId, userId)) || !(await groupAccess(groupId, receiverId))
+        || !validDescription(payload?.answer, "answer")) return;
+      io.to(`user:${receiverId}`).emit("group-call:answer", { groupId, userId, answer: payload.answer });
+    } catch {}
+  });
+  socket.on("group-call:ice", async payload => {
+    try {
+      const groupId = Number(payload?.groupId), receiverId = Number(payload?.receiverId);
+      if (!CALLS_ENABLED || !Number.isSafeInteger(groupId) || !Number.isSafeInteger(receiverId)
+        || !(await groupAccess(groupId, userId)) || !(await groupAccess(groupId, receiverId))
+        || !validIceCandidate(payload?.candidate)) return;
+      io.to(`user:${receiverId}`).emit("group-call:ice", { groupId, userId, candidate: payload.candidate });
+    } catch {}
+  });
+  socket.on("group-call:leave", payload => {
+    const groupId = Number(payload?.groupId);
+    if (!Number.isSafeInteger(groupId) || groupId <= 0) return;
+    const room = `group-call:${groupId}`;
+    socket.leave(room);
+    socket.to(room).emit("group-call:participant-left", { groupId, userId });
   });
   socket.on("disconnect", () => {
     closeUserCallPairs(userId);

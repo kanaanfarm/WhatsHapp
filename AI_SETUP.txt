@@ -1,8 +1,8 @@
-CONNECTCHAT HYBRID AI SETUP — v5.3
-==================================
+CONNECTCHAT AI SETUP — v6.6
+============================
 
-HYBRID MODE — OLLAMA FIRST, OPENAI FALLBACK
---------------------------------------------
+HYBRID MODE — DEEPSEEK, OLLAMA, AND OPENAI
+-------------------------------------------
 Add these server environment variables:
 
    AI_ENABLED=true
@@ -10,13 +10,16 @@ Add these server environment variables:
    AI_DEFAULT_PROVIDER=ollama
    OPENAI_API_KEY=your_private_OpenAI_API_key
    OPENAI_MODEL=gpt-4.1-mini
+   DEEPSEEK_API_KEY=your_private_DeepSeek_API_key
+   DEEPSEEK_MODEL=deepseek-v4-flash
+   DEEPSEEK_BASE_URL=https://api.deepseek.com
    OLLAMA_URL=https://your-secured-ollama-server.example.com
    OLLAMA_MODEL=qwen2.5:7b
    AI_REQUEST_TIMEOUT_MS=120000
    AI_AUTO_FALLBACK_TIMEOUT_MS=12000
 
-In ConnectChat AI, users can select Auto, Ollama, or OpenAI. Auto tries the
-default provider first and uses the other configured provider if it fails.
+In ConnectChat AI, users can select Auto, DeepSeek, Ollama, or OpenAI. Auto
+tries the default provider first and uses other configured providers if it fails.
 If an AI request fails, the reason now remains visible in the conversation.
 
 IMPORTANT FOR RENDER
@@ -25,8 +28,21 @@ OLLAMA_URL=http://127.0.0.1:11434 does not connect Render to Ollama on your
 Windows PC. Render requires an HTTPS address for a separately hosted, secured
 Ollama server. Never publish an unprotected Ollama endpoint on the internet.
 
-OPTION A — OPENAI (RECOMMENDED FOR RENDER / WEB / MOBILE)
----------------------------------------------------------
+OPTION A — DEEPSEEK (RENDER / WEB / MOBILE)
+--------------------------------------------
+1. Create a DeepSeek API key at https://platform.deepseek.com/api_keys
+2. Add these Render environment variables:
+   AI_ENABLED=true
+   AI_PROVIDER=deepseek
+   DEEPSEEK_API_KEY=your_private_DeepSeek_API_key
+   DEEPSEEK_MODEL=deepseek-v4-flash
+3. Restart or redeploy the server.
+
+Use `deepseek-v4-pro` instead when you prefer the stronger model. Do not use
+the retired `deepseek-chat` or `deepseek-reasoner` model names.
+
+OPTION B — OPENAI
+-----------------
 1. Open your hosting service environment variables.
 2. Add:
    AI_ENABLED=true
@@ -36,7 +52,7 @@ OPTION A — OPENAI (RECOMMENDED FOR RENDER / WEB / MOBILE)
 3. Restart or redeploy the server.
 4. Log in. "ConnectChat AI" will appear at the top of the contacts list.
 
-OPTION B — OLLAMA (FREE LOCAL AI)
+OPTION C — OLLAMA (FREE LOCAL AI)
 ---------------------------------
 1. Install Ollama on the same computer that runs server.js.
 2. Run: ollama pull qwen2.5:7b
@@ -48,12 +64,13 @@ OPTION B — OLLAMA (FREE LOCAL AI)
 4. Restart ConnectChat.
 
 Important: Render cannot normally reach Ollama running on your private PC.
-Use OpenAI for a public Render deployment, or host Ollama on a reachable,
-secured server.
+Use DeepSeek or OpenAI for a public Render deployment, or host Ollama on a
+reachable, secured server.
 
 SECURITY
 --------
-- Never put OPENAI_API_KEY in public/app.js, index.html, GitHub, or screenshots.
+- Never put DEEPSEEK_API_KEY or OPENAI_API_KEY in public/app.js, index.html,
+  GitHub, or screenshots.
 - The key is used only by server.js.
 - AI requests require a logged-in and approved ConnectChat account.
 - The server applies an AI rate limit.
@@ -68,9 +85,9 @@ CURRENT AI FEATURES
 - Action-item extraction
 - Latest-message Arabic/English translation
 - Visible provider/model status and useful setup errors
-- OpenAI and Ollama provider support
-- Auto / Ollama / OpenAI selector
-- Ollama-first automatic fallback to OpenAI
+- DeepSeek, OpenAI and Ollama provider support
+- Auto / DeepSeek / Ollama / OpenAI selector
+- Configurable automatic fallback across all configured providers
 - Provider and model label on each response
 
 NOT INCLUDED IN THIS RELEASE
