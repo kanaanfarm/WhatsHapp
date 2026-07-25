@@ -11,6 +11,9 @@ let archivedUserIds=new Set();
 let currentInsightTab="overview";
 let currentCalculationPreviewId=null,currentCalculationPreviewCanDownload=false,calculationPreviewObjectUrl=null;
 let avatarCropImage=null,avatarCropObjectUrl=null,avatarCropBaseScale=1,avatarCropZoom=1,avatarCropX=0,avatarCropY=0,avatarCropDragging=false,avatarCropPointerX=0,avatarCropPointerY=0;
+let profilePhotoViewerScale=1;
+let currentGroupId=null,currentGroup=null,groupCallMode=null,groupCallStream=null;
+const groupPeers=new Map(),groupPendingIce=new Map();
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
@@ -326,6 +329,41 @@ function connectSocket(){
   socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("typing",p=>{
     if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
+  });
+  socket.on("group:message",msg=>{
+    if(Number(msg?.group_id)!==Number(currentGroupId))return;
+    appendGroupMessage(msg);
+  });
+  socket.on("group-call:invite",async payload=>{
+    if(groupCallStream||Number(payload?.callerId)===Number(me.id))return;
+    if(!confirm(`${payload.callerName} started a group ${payload.mode} call. Join now?`))return;
+    if(Number(payload.groupId)!==Number(currentGroupId)){
+      const groups=await api("/api/groups");
+      const group=groups.find(item=>Number(item.id)===Number(payload.groupId));
+      if(!group)return toast("This group is unavailable.");
+      setMainWorkspaceVisible(false);
+      $("sectionTitle").textContent=group.name;
+      await openGroupConversation(Number(group.id),group);
+    }
+    joinGroupCall(payload.mode);
+  });
+  socket.on("group-call:participants",async payload=>{
+    if(Number(payload?.groupId)!==Number(currentGroupId))return;
+    for(const participant of payload.participants||[])await createGroupOffer(participant.userId,participant.username);
+    updateGroupCallStatus();
+  });
+  socket.on("group-call:participant-joined",payload=>{
+    if(Number(payload?.groupId)===Number(currentGroupId)&&groupCallStream)updateGroupCallStatus();
+  });
+  socket.on("group-call:offer",handleGroupCallOffer);
+  socket.on("group-call:answer",handleGroupCallAnswer);
+  socket.on("group-call:ice",handleGroupCallIce);
+  socket.on("group-call:participant-left",payload=>{
+    if(Number(payload?.groupId)!==Number(currentGroupId))return;
+    removeGroupPeer(Number(payload.userId));updateGroupCallStatus();
+  });
+  socket.on("group-call:full",payload=>{
+    if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
   socket.on("call:incoming",showIncomingCall);
   socket.on("call:answered",async p=>{
@@ -784,6 +822,7 @@ async function loadAiStatus(){
       selector.value=localStorage.getItem(AI_PROVIDER_KEY)||"auto";
       [...selector.options].forEach(option=>{
         if(option.value==="openai")option.disabled=!aiStatus.providers?.openai?.available;
+        if(option.value==="deepseek")option.disabled=!aiStatus.providers?.deepseek?.available;
         if(option.value==="ollama")option.disabled=!aiStatus.providers?.ollama?.available;
       });
     }
@@ -940,14 +979,20 @@ $("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)uploadFile(f,"image
 
 const chatDropTarget=$("chatPanel");
 ["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
-  if(![...(event.dataTransfer?.types||[])].includes("Files")||!activeUser||activeUser.isAI)return;
+  if(!activeUser||activeUser.isAI)return;
   event.preventDefault();event.dataTransfer.dropEffect="copy";chatDropTarget.classList.add("file-drop-active");
 }));
 ["dragleave","drop"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
-  if(type==="drop"&&event.dataTransfer?.files?.length&&!activeUser?.isAI){event.preventDefault();uploadFiles(event.dataTransfer.files)}
+  if(type==="drop"){event.preventDefault();event.stopPropagation();if(event.dataTransfer?.files?.length&&activeUser&&!activeUser.isAI)uploadFiles(event.dataTransfer.files)}
   if(type==="dragleave"&&event.relatedTarget&&chatDropTarget.contains(event.relatedTarget))return;
   chatDropTarget.classList.remove("file-drop-active");
 }));
+document.addEventListener("dragover",event=>{
+  if(activeUser&&!activeUser.isAI&&$("chatPanel")?.contains(event.target))event.preventDefault();
+});
+document.addEventListener("drop",event=>{
+  if($("chatPanel")?.contains(event.target))event.preventDefault();
+});
 
 $("messageInput").addEventListener("paste",e=>{
   const items=[...(e.clipboardData?.items||[])];
@@ -1030,6 +1075,47 @@ $("closeProfilePageBtn").onclick=()=>{$("profilePage").classList.add("hidden");p
 $("profileMessageBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user)selectUser(user)};
 $("profileVoiceBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("audioCallBtn").click())}};
 $("profileVideoBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("videoCallBtn").click())}};
+function updateProfilePhotoViewerZoom(){
+  const image=$("profilePhotoViewerImage");
+  if(!image)return;
+  profilePhotoViewerScale=Math.min(4,Math.max(.5,profilePhotoViewerScale));
+  image.style.transform=`scale(${profilePhotoViewerScale})`;
+  $("profilePhotoZoomReset").textContent=`${Math.round(profilePhotoViewerScale*100)}%`;
+}
+function openProfilePhotoViewer(){
+  const user=profileTarget||me;
+  const url=user?.avatar?safeFileUrl(user.avatar):"";
+  if(!url)return toast("This user has no profile photo.");
+  profilePhotoViewerScale=1;
+  $("profilePhotoViewerName").textContent=user.username||"User";
+  $("profilePhotoViewerImage").src=url;
+  $("profilePhotoViewer").classList.remove("hidden");
+  updateProfilePhotoViewerZoom();
+  $("closeProfilePhotoViewer").focus();
+}
+function closeProfilePhotoViewer(){
+  $("profilePhotoViewer").classList.add("hidden");
+  $("profilePhotoViewerImage").removeAttribute("src");
+  profilePhotoViewerScale=1;
+}
+$("profilePhotoPreview").onclick=openProfilePhotoViewer;
+$("profilePhotoPreview").onkeydown=event=>{
+  if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfilePhotoViewer()}
+};
+$("closeProfilePhotoViewer").onclick=closeProfilePhotoViewer;
+$("profilePhotoZoomOut").onclick=()=>{profilePhotoViewerScale-=.25;updateProfilePhotoViewerZoom()};
+$("profilePhotoZoomIn").onclick=()=>{profilePhotoViewerScale+=.25;updateProfilePhotoViewerZoom()};
+$("profilePhotoZoomReset").onclick=()=>{profilePhotoViewerScale=1;updateProfilePhotoViewerZoom()};
+$("profilePhotoViewer").onclick=event=>{if(event.target===$("profilePhotoViewer"))closeProfilePhotoViewer()};
+$("profilePhotoViewerImage").oncontextmenu=event=>event.preventDefault();
+$("profilePhotoViewerStage").onwheel=event=>{
+  event.preventDefault();
+  profilePhotoViewerScale+=event.deltaY<0?.15:-.15;
+  updateProfilePhotoViewerZoom();
+};
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"&&!$("profilePhotoViewer").classList.contains("hidden"))closeProfilePhotoViewer();
+});
 function avatarCropScale(){return avatarCropBaseScale*avatarCropZoom}
 function clampAvatarCrop(){
   const canvas=$("avatarCropCanvas"),scale=avatarCropScale();
@@ -1267,16 +1353,28 @@ function bindWorkspaceUserActions(){
 }
 
 async function renderGroupsWorkspace(){
+  if(groupCallStream)leaveGroupCall();
+  currentGroupId=null;currentGroup=null;
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading groups…</div>`;
   try{
     const items=await api("/api/groups");
+    const contacts=users.filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup);
     $("sectionContent").innerHTML=`
-      <div class="workspace-toolbar"><div><h2>Group conversations</h2><p>Server-synchronized private team conversations.</p></div><button id="createGroupBtn" class="primary">＋ Create group</button></div>
+      <div class="workspace-toolbar"><div><h2>Group conversations</h2><p>Private chats with group voice and video conference.</p></div><button id="createGroupBtn" class="primary">＋ Create group</button></div>
+      <form id="createGroupPanel" class="group-create-panel hidden">
+        <label>Group name<input id="newGroupName" maxlength="80" placeholder="Example: DG1 MEP Team" required></label>
+        <label>Description<input id="newGroupDescription" maxlength="500" placeholder="Optional description"></label>
+        <div><b>Select members</b><div class="group-member-picker">${contacts.map(u=>`<label><input type="checkbox" value="${Number(u.id)}"><span class="avatar">${avatarMarkup(u,initials(u.username))}</span>${sectionEscape(u.displayName||u.username)}</label>`).join("")||"<small>No approved contacts are available.</small>"}</div></div>
+        <div class="settings-button-row"><button class="primary" type="submit">Create group</button><button id="cancelGroupCreate" type="button">Cancel</button></div>
+      </form>
       <div class="workspace-list">${items.length?items.map(g=>`<article><div class="workspace-list-icon">👥</div><div><h3>${sectionEscape(g.name)}</h3><p>${sectionEscape(g.description||"Private group")} · ${sectionEscape(g.role)}</p></div><button data-open-group="${g.id}">Open</button>${g.role==="owner"?`<button class="danger-link" data-delete-group="${g.id}">Delete</button>`:""}</article>`).join(""):workspaceEmpty("👥","No groups yet","Create your first synchronized group.")}</div>`;
-    $("createGroupBtn").onclick=async()=>{
-      const name=prompt("Group name:")?.trim(); if(!name)return;
-      const description=prompt("Description (optional):")?.trim()||"";
-      await api("/api/groups",{method:"POST",body:JSON.stringify({name,description})});
+    $("createGroupBtn").onclick=()=>$("createGroupPanel").classList.remove("hidden");
+    $("cancelGroupCreate").onclick=()=>$("createGroupPanel").classList.add("hidden");
+    $("createGroupPanel").onsubmit=async event=>{
+      event.preventDefault();
+      const name=$("newGroupName").value.trim(),description=$("newGroupDescription").value.trim();
+      const memberIds=[...$("createGroupPanel").querySelectorAll('input[type="checkbox"]:checked')].map(input=>Number(input.value));
+      await api("/api/groups",{method:"POST",body:JSON.stringify({name,description,memberIds})});
       await renderGroupsWorkspace();
     };
     $("sectionContent").querySelectorAll("[data-open-group]").forEach(b=>b.onclick=()=>openGroupConversation(Number(b.dataset.openGroup),items.find(x=>Number(x.id)===Number(b.dataset.openGroup))));
@@ -1284,14 +1382,180 @@ async function renderGroupsWorkspace(){
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Groups unavailable",error.message)}
 }
 async function openGroupConversation(groupId,group){
+  currentGroupId=groupId;currentGroup=group;
   $("sectionTitle").textContent=group?.name||"Group";
   $("sectionDescription").textContent=group?.description||"Group conversation";
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading messages…</div>`;
   try{
     const messages=await api(`/api/groups/${groupId}/messages`);
-    $("sectionContent").innerHTML=`<div class="workspace-chat-feed" id="workspaceChatFeed">${messages.map(m=>`<div class="workspace-chat-message"><strong>${sectionEscape(m.sender_name)}</strong><p>${sectionEscape(m.body)}</p><small>${sectionEscape(time(m.created_at))}</small></div>`).join("")||workspaceEmpty("💬","No messages","Send the first group message.")}</div><form id="workspaceChatForm" class="workspace-composer"><input id="workspaceChatInput" maxlength="4000" placeholder="Message the group…" required><button class="primary">Send</button></form>`;
-    $("workspaceChatForm").onsubmit=async e=>{e.preventDefault();const body=$("workspaceChatInput").value.trim();if(!body)return;await api(`/api/groups/${groupId}/messages`,{method:"POST",body:JSON.stringify({body})});await openGroupConversation(groupId,group)};
+    $("sectionContent").innerHTML=`
+      <div class="group-chat-shell">
+        <header class="group-chat-head">
+          <div class="group-chat-avatar">👥</div>
+          <div><h2>${sectionEscape(group?.name||"Group")}</h2><p>${sectionEscape(group?.description||"Private group conversation")}</p></div>
+          <div class="group-call-actions">
+            <button id="groupAudioCallBtn" type="button" title="Start group voice call">☎</button>
+            <button id="groupVideoCallBtn" type="button" title="Start group video call">▣</button>
+          </div>
+        </header>
+        <section id="groupCallPanel" class="group-call-panel hidden">
+          <div class="group-call-title"><b id="groupCallStatus">Group call</b><span>Up to 6 participants</span></div>
+          <div id="groupVideoGrid" class="group-video-grid"></div>
+          <div class="group-call-controls"><button id="groupMuteBtn" type="button">🎤 Mute</button><button id="groupCameraBtn" type="button">📹 Camera</button><button id="groupLeaveCallBtn" class="danger-link" type="button">End call</button></div>
+        </section>
+        <div class="whatsapp-group-feed" id="workspaceChatFeed"></div>
+        <form id="workspaceChatForm" class="whatsapp-group-composer">
+          <input id="groupFileInput" type="file" accept="image/*,audio/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
+          <button id="groupEmojiBtn" type="button" title="Emoji">😊</button>
+          <button id="groupAttachBtn" type="button" title="Attachment">📎</button>
+          <input id="workspaceChatInput" maxlength="4000" placeholder="Type a message" autocomplete="off" required>
+          <button class="group-send-arrow" type="submit" title="Send message" aria-label="Send message">➤</button>
+        </form>
+      </div>`;
+    messages.forEach(appendGroupMessage);
+    if(!messages.length)$("workspaceChatFeed").innerHTML='<div class="group-chat-empty">No messages yet. Send the first message.</div>';
+    $("workspaceChatForm").onsubmit=async event=>{
+      event.preventDefault();const input=$("workspaceChatInput"),body=input.value.trim();if(!body)return;
+      input.value="";
+      const saved=await api(`/api/groups/${groupId}/messages`,{method:"POST",body:JSON.stringify({body})});
+      appendGroupMessage({...saved,sender_name:me.username});
+    };
+    $("groupEmojiBtn").onclick=()=>{$("workspaceChatInput").value+="😊";$("workspaceChatInput").focus()};
+    $("groupAttachBtn").onclick=()=>$("groupFileInput").click();
+    $("groupFileInput").onchange=event=>{uploadGroupFiles(event.target.files);event.target.value=""};
+    bindGroupDropZone();
+    $("groupAudioCallBtn").onclick=()=>joinGroupCall("audio");
+    $("groupVideoCallBtn").onclick=()=>joinGroupCall("video");
+    $("groupLeaveCallBtn").onclick=()=>leaveGroupCall();
+    $("groupMuteBtn").onclick=toggleGroupMute;
+    $("groupCameraBtn").onclick=toggleGroupCamera;
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Group unavailable",error.message)}
+}
+
+function appendGroupMessage(message){
+  const feed=$("workspaceChatFeed");if(!feed)return;
+  feed.querySelector(".group-chat-empty")?.remove();
+  if(message.id&&feed.querySelector(`[data-group-message-id="${Number(message.id)}"]`))return;
+  const own=Number(message.sender_id)===Number(me.id);
+  const item=document.createElement("article");
+  item.className=`group-message-bubble ${own?"own":"other"}`;
+  if(message.id)item.dataset.groupMessageId=Number(message.id);
+  item.innerHTML=`${own?"":`<strong>${sectionEscape(message.sender_name||"Member")}</strong>`}<div class="group-message-content">${messageContent(message)}</div><small>${sectionEscape(time(message.created_at||new Date().toISOString()))} ${own?"✓✓":""}</small>`;
+  feed.appendChild(item);feed.scrollTop=feed.scrollHeight;
+}
+
+async function uploadGroupFile(file){
+  if(!currentGroupId)return false;
+  if(file.size>12*1024*1024){toast(`${file.name} is larger than 12 MB.`);return false}
+  const caption=$("workspaceChatInput")?.value.trim()||"";
+  const form=new FormData();form.append("file",file);form.append("caption",caption);
+  const input=$("workspaceChatInput"),attach=$("groupAttachBtn");
+  if(attach)attach.disabled=true;
+  try{
+    const saved=await api(`/api/groups/${currentGroupId}/upload`,{method:"POST",body:form});
+    appendGroupMessage(saved);
+    if(caption&&input)input.value="";
+    toast(`${file.name} sent`);return true;
+  }catch(error){toast(error.message);return false}
+  finally{if(attach)attach.disabled=false}
+}
+async function uploadGroupFiles(fileList){
+  const files=[...fileList].slice(0,10);
+  for(const file of files)await uploadGroupFile(file);
+  if(fileList.length>10)toast("A maximum of 10 files can be added at one time.");
+}
+function bindGroupDropZone(){
+  const shell=document.querySelector(".group-chat-shell");if(!shell)return;
+  ["dragenter","dragover"].forEach(type=>shell.addEventListener(type,event=>{
+    event.preventDefault();event.stopPropagation();event.dataTransfer.dropEffect="copy";shell.classList.add("file-drop-active");
+  }));
+  shell.addEventListener("dragleave",event=>{
+    if(event.relatedTarget&&shell.contains(event.relatedTarget))return;
+    shell.classList.remove("file-drop-active");
+  });
+  shell.addEventListener("drop",event=>{
+    event.preventDefault();event.stopPropagation();shell.classList.remove("file-drop-active");
+    if(event.dataTransfer?.files?.length)uploadGroupFiles(event.dataTransfer.files);
+  });
+}
+
+async function createGroupPeer(userId,username){
+  const id=Number(userId);if(groupPeers.has(id))return groupPeers.get(id).pc;
+  const config=await getIceConfig(),pc=new RTCPeerConnection({iceServers:config.iceServers});
+  const state={pc,username,pending:[]};groupPeers.set(id,state);
+  state.pending.push(...(groupPendingIce.get(id)||[]));groupPendingIce.delete(id);
+  groupCallStream.getTracks().forEach(track=>pc.addTrack(track,groupCallStream));
+  pc.onicecandidate=event=>{if(event.candidate)socket.emit("group-call:ice",{groupId:currentGroupId,receiverId:id,candidate:event.candidate})};
+  pc.ontrack=event=>addGroupVideoTile(id,username,event.streams[0],false);
+  pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState))removeGroupPeer(id);updateGroupCallStatus()};
+  return pc;
+}
+async function createGroupOffer(userId,username){
+  const pc=await createGroupPeer(userId,username),offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit("group-call:offer",{groupId:currentGroupId,receiverId:Number(userId),offer});
+}
+async function handleGroupCallOffer(payload){
+  if(Number(payload?.groupId)!==Number(currentGroupId)||!groupCallStream)return;
+  const pc=await createGroupPeer(payload.userId,payload.username);
+  await pc.setRemoteDescription(payload.offer);
+  const state=groupPeers.get(Number(payload.userId));
+  for(const candidate of state.pending.splice(0))await pc.addIceCandidate(candidate).catch(()=>{});
+  const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
+  socket.emit("group-call:answer",{groupId:currentGroupId,receiverId:Number(payload.userId),answer});
+}
+async function handleGroupCallAnswer(payload){
+  if(Number(payload?.groupId)!==Number(currentGroupId))return;
+  const state=groupPeers.get(Number(payload.userId));if(!state)return;
+  await state.pc.setRemoteDescription(payload.answer);
+  for(const candidate of state.pending.splice(0))await state.pc.addIceCandidate(candidate).catch(()=>{});
+}
+async function handleGroupCallIce(payload){
+  if(Number(payload?.groupId)!==Number(currentGroupId))return;
+  const state=groupPeers.get(Number(payload.userId));
+  if(!state)return groupPendingIce.set(Number(payload.userId),[...(groupPendingIce.get(Number(payload.userId))||[]),payload.candidate]);
+  if(!state.pc.remoteDescription)state.pending.push(payload.candidate);
+  else await state.pc.addIceCandidate(payload.candidate).catch(()=>{});
+}
+function addGroupVideoTile(userId,username,stream,local=false){
+  const grid=$("groupVideoGrid");if(!grid)return;
+  const tileId=`group-video-${local?"local":Number(userId)}`;
+  let tile=$(tileId);
+  if(!tile){tile=document.createElement("div");tile.id=tileId;tile.className="group-video-tile";tile.innerHTML=`<video autoplay playsinline ${local?"muted":""}></video><span>${sectionEscape(username)}${local?" (You)":""}</span>`;grid.appendChild(tile)}
+  tile.querySelector("video").srcObject=stream;
+}
+async function joinGroupCall(mode){
+  if(!callsEnabled)return toast("Calls are disabled in the server settings.");
+  if(!currentGroupId||groupCallStream)return;
+  try{
+    groupCallMode=mode;groupCallStream=await getMedia(mode);
+    $("groupCallPanel").classList.remove("hidden");
+    $("groupCameraBtn").classList.toggle("hidden",mode==="audio");
+    addGroupVideoTile(me.id,me.username,groupCallStream,true);
+    socket.emit("group-call:join",{groupId:currentGroupId,mode});
+    updateGroupCallStatus();
+  }catch{groupCallStream=null;toast("Allow camera and microphone access to join the group call.")}
+}
+function removeGroupPeer(userId){
+  const state=groupPeers.get(Number(userId));if(state){state.pc.close();groupPeers.delete(Number(userId))}
+  $(`group-video-${Number(userId)}`)?.remove();
+}
+function leaveGroupCall(notify=true){
+  if(notify&&currentGroupId)socket.emit("group-call:leave",{groupId:currentGroupId});
+  groupPeers.forEach(state=>state.pc.close());groupPeers.clear();groupPendingIce.clear();
+  groupCallStream?.getTracks().forEach(track=>track.stop());groupCallStream=null;groupCallMode=null;
+  $("groupVideoGrid")?.replaceChildren();$("groupCallPanel")?.classList.add("hidden");
+}
+function updateGroupCallStatus(){
+  if($("groupCallStatus"))$("groupCallStatus").textContent=`Group ${groupCallMode==="audio"?"voice":"video"} call · ${groupPeers.size+1} participant${groupPeers.size?"s":""}`;
+}
+function toggleGroupMute(){
+  const track=groupCallStream?.getAudioTracks()[0];if(!track)return;
+  track.enabled=!track.enabled;$("groupMuteBtn").textContent=track.enabled?"🎤 Mute":"🔇 Unmute";
+}
+function toggleGroupCamera(){
+  const track=groupCallStream?.getVideoTracks()[0];if(!track)return;
+  track.enabled=!track.enabled;$("groupCameraBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera";
 }
 
 async function renderChannelsWorkspace(){

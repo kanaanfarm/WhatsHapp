@@ -131,7 +131,7 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 .premium-card{padding:18px;border-radius:18px;color:#fff;background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:0 16px 35px rgba(var(--accent-rgb),.25)}.premium-card>span{font-size:22px}.premium-card h3{margin:9px 0 5px}.premium-card p{font-size:12px;line-height:1.5;opacity:.88}.premium-card button{border:0;border-radius:10px;padding:9px 11px;background:#fff;color:#222;font-weight:800;cursor:pointer}
 .tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.tool-grid button{min-height:82px;text-align:left;border:1px solid var(--border);border-radius:14px;background:var(--soft);color:var(--text);padding:12px;cursor:pointer}.tool-grid b,.tool-grid small{display:block}.tool-grid b{font-size:12px}.tool-grid small{color:var(--muted);margin-top:7px;font-size:10px}
 .ad-card,.security-card{border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:12px}.ad-card>small{font-size:9px;letter-spacing:.12em;color:var(--muted)}.ad-placeholder{height:90px;display:grid;place-items:center;margin:10px 0;border-radius:12px;background:linear-gradient(135deg,var(--soft),rgba(var(--accent-rgb),.10));color:var(--muted);font-weight:700}.ad-card h4{margin:9px 0 5px}.ad-card p,.security-card p{font-size:11px;color:var(--muted);line-height:1.5;margin:0}.security-card b{display:block;margin-bottom:6px;font-size:12px}
-.auth-card{position:relative;overflow:hidden}.auth-card:before{content:"PRO v6.4.1";position:absolute;right:-30px;top:18px;transform:rotate(35deg);background:var(--accent);color:#fff;padding:6px 42px;font-size:10px;font-weight:900}.auth-card:after{content:"Secure real-time workspace";display:block;text-align:center;color:var(--muted);font-size:10px;margin-top:14px}
+.auth-card{position:relative;overflow:hidden}.auth-card:before{content:"PRO v6.4.2";position:absolute;right:-30px;top:18px;transform:rotate(35deg);background:var(--accent);color:#fff;padding:6px 42px;font-size:10px;font-weight:900}.auth-card:after{content:"Secure real-time workspace";display:block;text-align:center;color:var(--muted);font-size:10px;margin-top:14px}
 .ai-provider-control{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:var(--muted);font-size:11px;font-weight:700;pointer-events:auto}.ai-provider-control select{border:0;background:transparent;color:var(--text);font:inherit;outline:0}.ai-provider-control.hidden{display:none}
 @media(max-width:1180px){.app{grid-template-columns:300px minmax(0,1fr)}.insights-panel{display:none}}
 @media(max-width:760px){.app{grid-template-columns:1fr}.smart-strip{padding-inline:10px}.chat-head:after{display:none}.composer{margin:0;border-width:1px 0 0;border-radius:0}.workspace-nav{padding-top:8px}}
@@ -412,3 +412,66 @@ body{position:fixed;inset:0;overflow:hidden}
 .attach-btn:disabled{opacity:.4;cursor:not-allowed}
 .workspace-chat.file-drop-active:after{content:"Drop photos or documents to send";position:absolute;inset:84px 22px 82px;z-index:40;display:grid;place-items:center;border:3px dashed var(--accent);border-radius:20px;background:rgba(247,249,255,.94);color:var(--accent);font-size:18px;font-weight:900;pointer-events:none}
 .upload-status{z-index:45}
+
+/* v6.4.2 large profile photo viewer */
+.profile-photo-preview{cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease}
+.profile-photo-preview:hover,.profile-photo-preview:focus-visible{transform:scale(1.035);box-shadow:0 12px 34px rgba(37,99,235,.34);outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:3px}
+.profile-photo-viewer.hidden{display:none}
+.profile-photo-viewer{position:fixed;inset:0;z-index:1800;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:rgba(7,12,24,.94);color:#fff;backdrop-filter:blur(12px)}
+.profile-photo-viewer-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;background:rgba(10,17,32,.72);border-bottom:1px solid rgba(255,255,255,.13)}
+.profile-photo-viewer-head small{display:block;color:#aeb9d2;font-size:10px;font-weight:900;letter-spacing:.12em}.profile-photo-viewer-head h2{margin:3px 0 0;font-size:20px}
+.profile-photo-viewer-head button{width:42px;height:42px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:26px;cursor:pointer}
+.profile-photo-viewer-stage{min-height:0;display:grid;place-items:center;overflow:auto;padding:22px;overscroll-behavior:contain}
+.profile-photo-viewer-stage img{display:block;max-width:min(88vw,1100px);max-height:74vh;width:auto;height:auto;object-fit:contain;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.55);transform-origin:center;transition:transform .14s ease;user-select:none}
+.profile-photo-viewer-controls{display:flex;justify-content:center;gap:10px;padding:14px 20px 22px;background:rgba(10,17,32,.72);border-top:1px solid rgba(255,255,255,.13)}
+.profile-photo-viewer-controls button{min-width:50px;height:42px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:18px;font-weight:800;cursor:pointer}
+.profile-photo-viewer-controls #profilePhotoZoomReset{min-width:82px;font-size:13px}
+@media(max-width:640px){.profile-photo-viewer-head{padding:13px 15px}.profile-photo-viewer-stage{padding:12px}.profile-photo-viewer-stage img{max-width:94vw;max-height:72vh;border-radius:13px}.profile-photo-viewer-controls{padding:11px 12px 16px}}
+
+/* v6.4.3: keep workspace pages in the main content area.
+   Narrow windows previously placed Settings below the rail and squeezed its
+   text into one tiny column. */
+.section-page{
+  grid-column:3 / -1;
+  grid-row:1;
+  width:100%;
+  max-width:100%;
+}
+@media(max-width:800px){
+  .section-page{
+    position:fixed;
+    left:64px;
+    right:0;
+    top:0;
+    bottom:0;
+    z-index:5;
+    width:auto;
+    max-width:none;
+  }
+  .section-page-content,
+  .settings-workspace-grid,
+  .settings-workspace-grid section{
+    min-width:0;
+    max-width:100%;
+  }
+  .settings-workspace-grid{
+    grid-template-columns:1fr;
+  }
+  .appearance-settings{
+    grid-column:auto;
+  }
+}
+
+/* v6.5 WhatsApp-style group chat and small-group conference */
+.group-create-panel{display:grid;gap:14px;padding:16px;margin-bottom:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface,#fff)}
+.group-create-panel>label{display:grid;gap:6px;font-weight:800;font-size:12px}.group-create-panel input[type="text"],.group-create-panel>label input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.group-member-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.group-member-picker label{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer}.group-member-picker .avatar{width:28px;height:28px;font-size:10px}.group-member-picker input{accent-color:var(--accent)}
+.group-chat-shell{height:calc(100dvh - 145px);min-height:480px;display:grid;grid-template-rows:auto auto minmax(180px,1fr) auto;overflow:hidden;border:1px solid #d9e0e6;border-radius:18px;background:#efeae2;box-shadow:0 12px 32px rgba(27,39,63,.10)}
+.group-chat-head{display:flex;align-items:center;gap:12px;padding:11px 15px;background:#f7f8fa;border-bottom:1px solid #dce2e7}.group-chat-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#d9e1e7;font-size:21px}.group-chat-head>div:nth-child(2){min-width:0;flex:1}.group-chat-head h2{margin:0;font-size:16px}.group-chat-head p{margin:3px 0 0;color:#66717d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.group-call-actions{display:flex;gap:7px}.group-call-actions button{width:39px;height:39px;border:0;border-radius:50%;background:#fff;color:#54606b;font-size:18px;cursor:pointer}
+.group-call-panel{padding:10px;background:#18212b;color:#fff}.group-call-title{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}.group-call-title span{font-size:11px;color:#bac5d0}.group-video-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;max-height:300px;overflow:auto}.group-video-tile{position:relative;min-height:120px;border-radius:12px;overflow:hidden;background:#0d141b}.group-video-tile video{display:block;width:100%;height:100%;min-height:120px;object-fit:cover}.group-video-tile span{position:absolute;left:7px;bottom:7px;padding:4px 7px;border-radius:8px;background:rgba(0,0,0,.58);font-size:10px}.group-call-controls{display:flex;justify-content:center;gap:8px;margin-top:8px}.group-call-controls button{border:1px solid #45515e;border-radius:999px;background:#2c3742;color:#fff;padding:7px 11px;cursor:pointer}.group-call-controls .danger-link{background:#b6293c!important;color:#fff!important}
+.whatsapp-group-feed{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:18px;background-color:#efeae2;background-image:radial-gradient(circle at 1px 1px,rgba(70,79,85,.07) 1px,transparent 0);background-size:22px 22px}.group-chat-empty{margin:auto;color:#66717d;background:rgba(255,255,255,.72);border-radius:10px;padding:9px 12px;font-size:12px}
+.group-message-bubble{width:max-content;max-width:min(76%,620px);padding:7px 9px 5px;border-radius:9px;box-shadow:0 1px 2px rgba(28,39,49,.14);overflow-wrap:anywhere}.group-message-bubble.other{align-self:flex-start;background:#fff;border-top-left-radius:3px}.group-message-bubble.own{align-self:flex-end;background:#d9fdd3;border-top-right-radius:3px}.group-message-bubble strong{display:block;margin-bottom:2px;color:#536dfe;font-size:11px}.group-message-bubble p{margin:0;white-space:pre-wrap;line-height:1.38;font-size:14px}.group-message-bubble small{display:block;text-align:right;margin-top:2px;color:#71808a;font-size:9px}
+.group-message-content{white-space:pre-wrap;line-height:1.38;font-size:14px}.group-message-content .chat-image{max-width:min(320px,62vw)}.group-message-content .voice-note{max-width:min(320px,62vw)}
+.whatsapp-group-composer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:6px;padding:9px;background:#f0f2f5;border-top:1px solid #d8dee3}.whatsapp-group-composer>button{width:39px;height:39px;border:0;border-radius:50%;background:transparent;color:#596670;font-size:20px;cursor:pointer}.whatsapp-group-composer input{min-width:0;width:100%;height:42px;border:0;border-radius:999px;background:#fff;padding:0 16px;outline:none}.whatsapp-group-composer .group-send-arrow{background:#00a884;color:#fff;font-size:19px;transform:rotate(-8deg)}
+.group-chat-shell{position:relative}.group-chat-shell.file-drop-active:after{content:"Drop files here to send to the group";position:absolute;inset:72px 14px 64px;z-index:60;display:grid;place-items:center;border:3px dashed #00a884;border-radius:18px;background:rgba(239,250,247,.94);color:#007c63;font-size:18px;font-weight:900;pointer-events:none}
+@media(max-width:800px){.group-chat-shell{height:calc(100dvh - 125px);border-radius:12px}.whatsapp-group-feed{padding:12px}.group-message-bubble{max-width:88%}.group-call-panel{padding:8px}.group-video-grid{grid-template-columns:1fr 1fr}.whatsapp-group-composer{grid-template-columns:auto minmax(0,1fr) auto}.whatsapp-group-composer #groupAttachBtn{display:none}}

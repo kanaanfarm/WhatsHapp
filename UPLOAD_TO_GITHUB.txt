@@ -1,0 +1,29 @@
+CONNECTCHAT v6.6 — GITHUB / RENDER UPLOAD
+=========================================
+
+This folder contains fewer than 100 files.
+
+1. Open this ConnectChat_v6.6_RENDER_ONLY folder.
+2. Select everything INSIDE the folder.
+3. Drag the selected files and the public folder into the GitHub upload page.
+4. Do not drag the outer ConnectChat_v6.6_RENDER_ONLY folder.
+5. Commit the uploaded files.
+6. In Render, select Manual Deploy > Deploy latest commit.
+7. Wait until the deployment status is Live.
+8. Close and reopen ConnectChat, or press Ctrl+F5 in the browser.
+
+VERIFY
+------
+The GitHub repository main page must directly show:
+
+  server.js
+  package.json
+  package-lock.json
+  public
+
+The application must display CONNECTCHAT PRO v6.6 after deployment.
+
+SECURITY
+--------
+The .env file is intentionally not included. Never upload .env to GitHub.
+Add private keys only in Render > Environment.
