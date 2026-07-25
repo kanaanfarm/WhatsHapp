@@ -1,4 +1,4 @@
-# ConnectChat Pro v6.7.2 — mobile redesign
+# ConnectChat Pro v6.7.3 — mobile redesign
 
 Version 6.7 replaces the compressed desktop layout on phones with a
 WhatsApp-inspired mobile experience while retaining ConnectChat branding.
@@ -10,6 +10,18 @@ front/rear mobile camera switch.
 Version 6.7.2 adds a WhatsApp-inspired mobile You/Settings page and reduces
 duplicate network refreshes, hidden-panel rendering, repeated image decoding
 and expensive mobile paint effects.
+
+Version 6.7.3 renders Settings before displaying the page and pauses background
+conversation-list updates while any other workspace is open.
+
+The updated v6.7.3 package also restores the mobile emoji picker, makes Create
+Group prominent on mobile, and adds optional email/phone password sign-in under
+Settings. Username remains the default identifier. The included
+`v6.7.3-email-phone-signin-migration.sql` must be run once in Supabase.
+
+Group owners and group administrators can now send invitations, add approved
+users and remove members. The owner can promote or demote group administrators.
+Run `v6.7.3-group-invitations-migration.sql` once in Supabase.
 
 ## Mobile improvements
 

@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#182132">
-  <title>ConnectChat Pro Enterprise v6.7.2</title>
+  <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=672">
+  <link rel="stylesheet" href="style.css?v=6732">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -23,7 +23,7 @@
         </div>
 
         <label class="auth-label" for="authUsername">Username</label>
-        <input id="authUsername" placeholder="Enter your username" maxlength="30" autocomplete="username" required>
+        <input id="authUsername" placeholder="Username, email or phone" maxlength="254" autocomplete="username" required>
         <label class="auth-label" for="authPassword">Password</label>
         <div class="password-field">
           <input id="authPassword" type="password" placeholder="Enter your password" minlength="10" maxlength="128" autocomplete="current-password" required>
@@ -140,7 +140,7 @@
     </main>
 
     <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
-      <div class="insights-head"><div><small>CONNECTCHAT PRO v6.7.2</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
+      <div class="insights-head"><div><small>CONNECTCHAT PRO v6.7.3</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
       <div class="insight-tabs"><button class="active" type="button" data-insight-tab="overview">Overview</button><button type="button" data-insight-tab="files">Files</button><button type="button" data-insight-tab="media">Media</button></div>
       <div id="insightOverviewPanel" class="insight-panel-content">
         <div class="workspace-profile-card">
@@ -324,6 +324,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=672"></script>
+  <script src="app.js?v=6732"></script>
 </body>
 </html>

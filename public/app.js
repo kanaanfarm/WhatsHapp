@@ -2,6 +2,7 @@ let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let currentUserFilter="all";
+let currentWorkspaceSection="chats";
 let profileTarget=null;
 let callsEnabled=true;
 let aiBusy=false;
@@ -103,6 +104,8 @@ function setMode(mode){
   $("registerTab").classList.toggle("active",mode==="register");
   $("authSubmit").textContent=mode==="login"?"Login":"Create account";
   $("authSubtitle").textContent=mode==="login"?"Welcome back. Sign in to continue.":"Create a private account in a few seconds.";
+  $("authUsername").placeholder=mode==="login"?"Username, email or phone":"Choose a username";
+  $("authUsername").maxLength=mode==="login"?254:30;
   $("authPassword").autocomplete=mode==="login"?"current-password":"new-password";
   $("authError").textContent="";
 }
@@ -139,7 +142,7 @@ $("authForm").onsubmit=async e=>{
   e.preventDefault();
   const username=$("authUsername").value.trim();
   const password=$("authPassword").value;
-  if(username.length<3){$("authError").textContent="Username must contain at least 3 characters.";return}
+  if(username.length<3){$("authError").textContent=authMode==="login"?"Enter your username, email or phone.":"Username must contain at least 3 characters.";return}
   if(authMode==="register"&&password.length<10){$("authError").textContent="New passwords must contain at least 10 characters.";return}
   const submit=$("authSubmit");
   try{
@@ -329,6 +332,24 @@ function connectSocket(){
   socket.on("profile:updated",payload=>{
     if(Number(payload?.userId)===Number(me?.id)||users.some(user=>Number(user.id)===Number(payload?.userId)))refreshUsers();
   });
+  socket.on("group:invitation",payload=>{
+    toast(`${payload?.inviterName||"A group administrator"} invited you to a group.`);
+    if(currentWorkspaceSection==="groups")renderGroupsWorkspace();
+  });
+  socket.on("group:added",()=>{
+    toast("You were added to a group.");
+    if(currentWorkspaceSection==="groups")renderGroupsWorkspace();
+  });
+  socket.on("group:removed",payload=>{
+    toast("You were removed from a group.");
+    if(currentWorkspaceSection==="groups"){
+      if(Number(currentGroupId)===Number(payload?.groupId))renderGroupsWorkspace();
+      else renderGroupsWorkspace();
+    }
+  });
+  socket.on("group:members-changed",payload=>{
+    if(Number(currentGroupId)===Number(payload?.groupId)&&$("groupMemberPanel")&&!$("groupMemberPanel").classList.contains("hidden"))loadGroupMemberPanel();
+  });
   socket.on("status:changed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:deleted",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
   socket.on("status:viewed",()=>{if(!$("statusOverlay").classList.contains("hidden"))loadStatuses()});
@@ -413,6 +434,7 @@ function refreshUsers(force=false){
   return refreshUsersPromise;
 }
 function scheduleUsersRender(){
+  if(currentWorkspaceSection!=="chats")return;
   if(usersRenderFrame)return;
   usersRenderFrame=requestAnimationFrame(()=>{
     usersRenderFrame=0;
@@ -493,6 +515,12 @@ function renderWorkspaceInsightTab(tab="overview"){
 }
 
 function renderUsers(){
+  const totalUnread=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
+  if($("railUnread")){
+    $("railUnread").textContent=String(Math.min(totalUnread,99));
+    $("railUnread").classList.toggle("hidden",!totalUnread);
+  }
+  if(currentWorkspaceSection!=="chats")return;
   const q=$("userSearch").value.toLowerCase();
   const filtered=users.filter(u=>{
     const matches=(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q);
@@ -530,8 +558,6 @@ function renderUsers(){
   list.appendChild(fragment);
   renderQuickContacts();
   updateWorkspaceOverview();
-  const total=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
-  if($("railUnread")){ $("railUnread").textContent=String(Math.min(total,99)); $("railUnread").classList.toggle("hidden",!total); }
 }
 function renderQuickContacts(){
   const box=$("quickContacts");
@@ -1396,6 +1422,7 @@ function workspaceEmpty(icon,title,description,action=""){
 }
 
 function openChatsWorkspace(){
+  currentWorkspaceSection="chats";
   setMainWorkspaceVisible(true);
   $("workspaceHeading").textContent="Messages";
   currentUserFilter="all";
@@ -1431,7 +1458,7 @@ async function renderGroupsWorkspace(){
   currentGroupId=null;currentGroup=null;
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading groups…</div>`;
   try{
-    const items=await api("/api/groups");
+    const [items,invitations]=await Promise.all([api("/api/groups"),api("/api/group-invitations")]);
     const contacts=users.filter(u=>!u.isSelf&&!u.isAI&&!u.isGroup);
     $("sectionContent").innerHTML=`
       <div class="workspace-toolbar"><div><h2>Group conversations</h2><p>Private chats with group voice and video conference.</p></div><button id="createGroupBtn" class="primary">＋ Create group</button></div>
@@ -1441,6 +1468,12 @@ async function renderGroupsWorkspace(){
         <div><b>Select members</b><div class="group-member-picker">${contacts.map(u=>`<label><input type="checkbox" value="${Number(u.id)}"><span class="avatar">${avatarMarkup(u,initials(u.username))}</span>${sectionEscape(u.displayName||u.username)}</label>`).join("")||"<small>No approved contacts are available.</small>"}</div></div>
         <div class="settings-button-row"><button class="primary" type="submit">Create group</button><button id="cancelGroupCreate" type="button">Cancel</button></div>
       </form>
+      ${invitations.length?`<section class="group-invitations"><h3>Group invitations</h3>${invitations.map(invitation=>`
+        <article>
+          <div><b>${sectionEscape(invitation.group?.name||"Group")}</b><small>Invited by ${sectionEscape(invitation.inviterName||"administrator")}</small></div>
+          <button type="button" data-invitation-action="accept" data-invitation-id="${Number(invitation.id)}">Accept</button>
+          <button type="button" data-invitation-action="decline" data-invitation-id="${Number(invitation.id)}" class="danger-link">Decline</button>
+        </article>`).join("")}</section>`:""}
       <div class="workspace-list">${items.length?items.map(g=>`<article><div class="workspace-list-icon">👥</div><div><h3>${sectionEscape(g.name)}</h3><p>${sectionEscape(g.description||"Private group")} · ${sectionEscape(g.role)}</p></div><button data-open-group="${g.id}">Open</button>${g.role==="owner"?`<button class="danger-link" data-delete-group="${g.id}">Delete</button>`:""}</article>`).join(""):workspaceEmpty("👥","No groups yet","Create your first synchronized group.")}</div>`;
     $("createGroupBtn").onclick=()=>$("createGroupPanel").classList.remove("hidden");
     $("cancelGroupCreate").onclick=()=>$("createGroupPanel").classList.add("hidden");
@@ -1451,6 +1484,14 @@ async function renderGroupsWorkspace(){
       await api("/api/groups",{method:"POST",body:JSON.stringify({name,description,memberIds})});
       await renderGroupsWorkspace();
     };
+    $("sectionContent").querySelectorAll("[data-invitation-action]").forEach(button=>button.onclick=async()=>{
+      try{
+        button.disabled=true;
+        await api(`/api/group-invitations/${button.dataset.invitationId}/respond`,{method:"POST",body:JSON.stringify({action:button.dataset.invitationAction})});
+        toast(button.dataset.invitationAction==="accept"?"Group invitation accepted.":"Group invitation declined.");
+        await renderGroupsWorkspace();
+      }catch(error){toast(error.message);button.disabled=false}
+    });
     $("sectionContent").querySelectorAll("[data-open-group]").forEach(b=>b.onclick=()=>openGroupConversation(Number(b.dataset.openGroup),items.find(x=>Number(x.id)===Number(b.dataset.openGroup))));
     $("sectionContent").querySelectorAll("[data-delete-group]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this group?")){await api(`/api/groups/${b.dataset.deleteGroup}`,{method:"DELETE"});await renderGroupsWorkspace()}});
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Groups unavailable",error.message)}
@@ -1468,10 +1509,12 @@ async function openGroupConversation(groupId,group){
           <div class="group-chat-avatar">👥</div>
           <div><h2>${sectionEscape(group?.name||"Group")}</h2><p>${sectionEscape(group?.description||"Private group conversation")}</p></div>
           <div class="group-call-actions">
+            ${["owner","admin"].includes(group?.role)?'<button id="groupManageMembersBtn" type="button" title="Manage members">👤＋</button>':""}
             <button id="groupAudioCallBtn" type="button" title="Start group voice call">☎</button>
             <button id="groupVideoCallBtn" type="button" title="Start group video call">▣</button>
           </div>
         </header>
+        <section id="groupMemberPanel" class="group-member-panel hidden"></section>
         <section id="groupCallPanel" class="group-call-panel hidden">
           <div class="group-call-title"><b id="groupCallStatus">Group call</b><span>Up to 6 participants</span></div>
           <div id="groupVideoGrid" class="group-video-grid"></div>
@@ -1495,6 +1538,12 @@ async function openGroupConversation(groupId,group){
       appendGroupMessage({...saved,sender_name:me.username});
     };
     $("groupEmojiBtn").onclick=()=>{$("workspaceChatInput").value+="😊";$("workspaceChatInput").focus()};
+    if($("groupManageMembersBtn"))$("groupManageMembersBtn").onclick=async()=>{
+      const panel=$("groupMemberPanel"),shell=panel.closest(".group-chat-shell");
+      const opening=panel.classList.contains("hidden");
+      panel.classList.toggle("hidden",!opening);shell.classList.toggle("member-panel-open",opening);
+      if(opening)await loadGroupMemberPanel();
+    };
     $("groupAttachBtn").onclick=()=>$("groupFileInput").click();
     $("groupFileInput").onchange=event=>{uploadGroupFiles(event.target.files);event.target.value=""};
     bindGroupDropZone();
@@ -1504,6 +1553,76 @@ async function openGroupConversation(groupId,group){
     $("groupMuteBtn").onclick=toggleGroupMute;
     $("groupCameraBtn").onclick=toggleGroupCamera;
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Group unavailable",error.message)}
+}
+
+async function loadGroupMemberPanel(){
+  const panel=$("groupMemberPanel");
+  if(!panel||!currentGroupId)return;
+  panel.innerHTML='<div class="workspace-loading">Loading members…</div>';
+  try{
+    const data=await api(`/api/groups/${currentGroupId}/members`);
+    const memberIds=new Set(data.members.map(member=>Number(member.id)));
+    const invitationByUser=new Map((data.invitations||[]).map(invitation=>[Number(invitation.userId),invitation]));
+    const available=users.filter(user=>!user.isSelf&&!user.isAI&&!user.isGroup&&!memberIds.has(Number(user.id)));
+    const canManage=["owner","admin"].includes(data.viewerRole);
+    panel.innerHTML=`
+      <div class="group-member-panel-head"><div><b>Group members</b><small>${data.members.length} member${data.members.length===1?"":"s"}</small></div><button id="closeGroupMemberPanel" type="button">×</button></div>
+      <div class="group-member-list">${data.members.map(member=>{
+        const protectedOwner=member.role==="owner";
+        const adminProtected=data.viewerRole==="admin"&&member.role==="admin";
+        const canChangeRole=data.viewerRole==="owner"&&!protectedOwner;
+        return `<article>
+          <span class="avatar">${avatarHtml({username:member.username,avatar:member.avatar},initials(member.username))}</span>
+          <span><b>${sectionEscape(member.username)}</b><small>${sectionEscape(member.role)}</small></span>
+          ${canChangeRole?`<select data-group-role-user="${member.id}"><option value="member" ${member.role==="member"?"selected":""}>Member</option><option value="admin" ${member.role==="admin"?"selected":""}>Admin</option></select>`:`<em>${sectionEscape(member.role)}</em>`}
+          ${canManage&&!protectedOwner&&!adminProtected?`<button type="button" class="danger-link" data-remove-group-user="${member.id}">Remove</button>`:""}
+        </article>`;
+      }).join("")}</div>
+      ${canManage?`<div class="group-add-members"><h3>Invite or add approved users</h3>${available.length?available.map(user=>{
+        const pending=invitationByUser.get(Number(user.id));
+        return `<article>
+          <span class="avatar">${avatarHtml(user,initials(user.username))}</span>
+          <span><b>${sectionEscape(user.displayName||user.username)}</b><small>${pending?"Invitation pending":"Not in this group"}</small></span>
+          <button type="button" data-invite-group-user="${user.id}" ${pending?"disabled":""}>${pending?"Invited":"Invite"}</button>
+          <button type="button" data-add-group-user="${user.id}">Add now</button>
+        </article>`;
+      }).join(""):"<p>All approved contacts are already members.</p>"}</div>`:""}`;
+    $("closeGroupMemberPanel").onclick=()=>{
+      panel.classList.add("hidden");
+      panel.closest(".group-chat-shell").classList.remove("member-panel-open");
+    };
+    panel.querySelectorAll("[data-invite-group-user]").forEach(button=>button.onclick=async()=>{
+      try{
+        button.disabled=true;button.textContent="Sending…";
+        await api(`/api/groups/${currentGroupId}/invitations`,{method:"POST",body:JSON.stringify({userId:Number(button.dataset.inviteGroupUser)})});
+        toast("Group invitation sent.");await loadGroupMemberPanel();
+      }catch(error){toast(error.message);button.disabled=false;button.textContent="Invite"}
+    });
+    panel.querySelectorAll("[data-add-group-user]").forEach(button=>button.onclick=async()=>{
+      try{
+        button.disabled=true;button.textContent="Adding…";
+        await api(`/api/groups/${currentGroupId}/members`,{method:"POST",body:JSON.stringify({userId:Number(button.dataset.addGroupUser)})});
+        toast("Member added.");await loadGroupMemberPanel();
+      }catch(error){toast(error.message);button.disabled=false;button.textContent="Add now"}
+    });
+    panel.querySelectorAll("[data-remove-group-user]").forEach(button=>button.onclick=async()=>{
+      const member=data.members.find(item=>Number(item.id)===Number(button.dataset.removeGroupUser));
+      if(!confirm(`Remove ${member?.username||"this user"} from the group?`))return;
+      try{
+        button.disabled=true;
+        await api(`/api/groups/${currentGroupId}/members/${button.dataset.removeGroupUser}`,{method:"DELETE"});
+        toast("Member removed.");await loadGroupMemberPanel();
+      }catch(error){toast(error.message);button.disabled=false}
+    });
+    panel.querySelectorAll("[data-group-role-user]").forEach(select=>select.onchange=async()=>{
+      try{
+        select.disabled=true;
+        await api(`/api/groups/${currentGroupId}/members/${select.dataset.groupRoleUser}/role`,{method:"PATCH",body:JSON.stringify({role:select.value})});
+        toast(select.value==="admin"?"Group administrator assigned.":"Administrator changed to member.");
+        await loadGroupMemberPanel();
+      }catch(error){toast(error.message);select.disabled=false}
+    });
+  }catch(error){panel.innerHTML=`<div class="group-member-error">${sectionEscape(error.message)}</div>`}
 }
 
 function appendGroupMessage(message){
@@ -1796,8 +1915,19 @@ function renderSettingsWorkspace(){
       <section class="settings-mobile-card">
         <button id="settingsStatusBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Status</b><small>Set or view your current status</small></span><i>›</i></button>
         <button id="settingsPrivacyBtn" type="button" class="settings-mobile-row"><span>🔒</span><span><b>Profile & privacy</b><small>Photo and account information</small></span><i>›</i></button>
+        <button id="settingsSignInBtn" type="button" class="settings-mobile-row"><span>📱</span><span><b>Email or phone sign-in</b><small>Optional now; username remains the default</small></span><i>›</i></button>
         <button id="settingsRecoveryBtn" type="button" class="settings-mobile-row"><span>🔑</span><span><b>Account recovery</b><small>View your recovery code</small></span><i>›</i></button>
         <button id="settingsAppearanceBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Chats & appearance</b><small>Text, icons and message controls</small></span><i>›</i></button>
+      </section>
+      <section id="settingsSignInPanel" class="settings-signin-panel hidden">
+        <h2>Email or phone sign-in</h2>
+        <p>Add either option now. Your existing username and password will continue working.</p>
+        <form id="settingsSignInForm">
+          <label>Email address<input id="settingsEmail" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com" value="${sectionEscape(me.email||"")}"></label>
+          <label>Phone with country code<input id="settingsPhone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="+971501234567" value="${sectionEscape(me.phone||"")}"></label>
+          <button id="settingsSaveSignIn" type="submit" class="primary">Save sign-in options</button>
+          <small id="settingsSignInResult">${me.signInOptionsMigrationRequired?"Run the included Supabase migration before saving.":""}</small>
+        </form>
       </section>
       <section class="appearance-settings"><h2>My page appearance</h2><p>These settings belong to your account on this device.</p>
         <label>Layout density<select id="appearanceDensity"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
@@ -1817,6 +1947,21 @@ function renderSettingsWorkspace(){
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
   $("settingsPrivacyBtn").onclick=()=>openProfilePage(me);
+  $("settingsSignInBtn").onclick=()=>{
+    $("settingsSignInPanel").classList.toggle("hidden");
+    if(!$("settingsSignInPanel").classList.contains("hidden"))$("settingsSignInPanel").scrollIntoView({block:"center"});
+  };
+  $("settingsSignInForm").onsubmit=async event=>{
+    event.preventDefault();
+    const button=$("settingsSaveSignIn"),result=$("settingsSignInResult");
+    try{
+      button.disabled=true;button.textContent="Saving…";result.textContent="";
+      const data=await api("/api/account/sign-in-options",{method:"PATCH",body:JSON.stringify({email:$("settingsEmail").value,phone:$("settingsPhone").value})});
+      me.email=data.email;me.phone=data.phone;me.signInOptionsMigrationRequired=false;
+      result.textContent="Saved. You can now log in using your username, email or phone.";
+    }catch(error){result.textContent=error.message}
+    finally{button.disabled=false;button.textContent="Save sign-in options"}
+  };
   $("settingsAppearanceBtn").onclick=()=>$("appearanceDensity")?.closest(".appearance-settings")?.scrollIntoView({block:"start"});
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
@@ -1842,8 +1987,18 @@ function renderAIWorkspace(){
 async function openWorkspaceSection(section){
   document.querySelectorAll(".rail-item[data-section]").forEach(x=>x.classList.toggle("active",x.dataset.section===section));
   if(section==="chats"){openChatsWorkspace();return}
-  setMainWorkspaceVisible(false);
+  currentWorkspaceSection=section;
+  if(usersRenderFrame){cancelAnimationFrame(usersRenderFrame);usersRenderFrame=0}
   $("sectionPage").dataset.section=section;
+  if(section==="settings"){
+    $("workspaceHeading").textContent="Settings";
+    $("sectionTitle").textContent="Settings";
+    $("sectionDescription").textContent="Profile, appearance, privacy, account and administration.";
+    renderSettingsWorkspace();
+    setMainWorkspaceVisible(false);
+    return;
+  }
+  setMainWorkspaceVisible(false);
   const titles={
     ai:["AI Assistant","Ask questions, translate text and work with documents."],
     groups:["Groups","Multi-user private conversations."],

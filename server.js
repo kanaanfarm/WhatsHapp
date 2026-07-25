@@ -402,9 +402,40 @@ function safeUser(row) {
     id: Number(row.id),
     username: row.username,
     avatar: row.avatar || null,
+    email: row.email || null,
+    phone: row.phone || null,
     status: row.status || "approved",
     isAdmin: Boolean(row.is_admin)
   };
+}
+
+function normalizeEmail(value) {
+  return cleanText(value, 254).toLowerCase();
+}
+
+function normalizePhone(value) {
+  const source = cleanText(value, 32);
+  const hasPlus = source.startsWith("+");
+  const digits = source.replace(/\D/g, "");
+  return digits ? `${hasPlus ? "+" : ""}${digits}` : "";
+}
+
+function validEmail(value) {
+  return !value || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(value);
+}
+
+function validPhone(value) {
+  return !value || /^\+?[0-9]{8,15}$/.test(value);
+}
+
+async function attachSignInOptions(user) {
+  if (!user?.id) return user;
+  const { data, error } = await supabase.from("users").select("email,phone").eq("id", user.id).maybeSingle();
+  if (error) {
+    if (error.code === "42703" || /email|phone/i.test(error.message || "")) return { ...user, email: null, phone: null, signInOptionsMigrationRequired: true };
+    throw error;
+  }
+  return { ...user, email: data?.email || null, phone: data?.phone || null };
 }
 
 function normalizeRecoveryCode(value) {
@@ -587,13 +618,25 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const username = cleanText(req.body.username, 30);
+    const identifier = cleanText(req.body.username, 254);
     const password = String(req.body.password || "");
-    const { data: user, error } = await supabase.from("users").select("id,username,avatar,password_hash,status,is_admin").eq("username", username).maybeSingle();
+    const columns = "id,username,avatar,password_hash,status,is_admin";
+    let { data: user, error } = await supabase.from("users").select(columns).eq("username", identifier.slice(0,30)).maybeSingle();
     if (error) throw error;
+    if (!user && validEmail(normalizeEmail(identifier)) && identifier.includes("@")) {
+      ({ data: user, error } = await supabase.from("users").select(columns).eq("email", normalizeEmail(identifier)).maybeSingle());
+    } else if (!user && validPhone(normalizePhone(identifier)) && normalizePhone(identifier)) {
+      ({ data: user, error } = await supabase.from("users").select(columns).eq("phone", normalizePhone(identifier)).maybeSingle());
+    }
+    if (error) {
+      if (error.code === "42703" || /email|phone/i.test(error.message || "")) {
+        return res.status(503).json({ error: "Email and phone sign-in require the v6.7.3 Supabase migration." });
+      }
+      throw error;
+    }
     const passwordMatches = password.length <= 128 && await bcrypt.compare(password, user?.password_hash || dummyPasswordHash);
     if (!user || !passwordMatches) {
-      return res.status(401).json({ error: "Invalid username or password." });
+      return res.status(401).json({ error: "Invalid username, email, phone or password." });
     }
     if (user.status !== "approved") {
       return res.status(403).json({
@@ -601,7 +644,7 @@ app.post("/api/login", async (req, res) => {
         code: String(user.status || "pending").toUpperCase()
       });
     }
-    const responseUser = await safeUserWithAvatar(user);
+    const responseUser = await attachSignInOptions(await safeUserWithAvatar(user));
     req.session.regenerate(regenerateError => {
       if (regenerateError) return res.status(500).json({ error: "Login failed." });
       req.session.userId = Number(user.id);
@@ -687,10 +730,35 @@ app.get("/api/me", async (req, res) => {
         error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval."
       });
     }
-    res.json(await safeUserWithAvatar(user));
+    res.json(await attachSignInOptions(await safeUserWithAvatar(user)));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not load account." });
+  }
+});
+
+app.patch("/api/account/sign-in-options", auth, async (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  const phone = normalizePhone(req.body.phone);
+  if (!validEmail(email)) return res.status(400).json({ error: "Enter a valid email address or leave it empty." });
+  if (!validPhone(phone)) return res.status(400).json({ error: "Enter a phone number with 8–15 digits, including country code." });
+  try {
+    const { data, error } = await supabase.from("users")
+      .update({ email: email || null, phone: phone || null })
+      .eq("id", req.currentUser.id)
+      .select("email,phone")
+      .single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ error: "That email address or phone number is already used by another account." });
+      if (error.code === "42703" || /email|phone/i.test(error.message || "")) {
+        return res.status(503).json({ error: "Run the v6.7.3 email and phone sign-in migration in Supabase first." });
+      }
+      throw error;
+    }
+    res.json({ email: data.email || null, phone: data.phone || null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not update sign-in options." });
   }
 });
 
@@ -1141,6 +1209,10 @@ async function groupAccess(groupId, userId) {
   if (error) throw error;
   return data;
 }
+async function groupManagerAccess(groupId, userId) {
+  const access = await groupAccess(groupId, userId);
+  return access && ["owner", "admin"].includes(access.role) ? access : null;
+}
 async function channelAccess(channelId, userId) {
   const { data, error } = await supabase.from("channel_members")
     .select("role").eq("channel_id", channelId).eq("user_id", userId).maybeSingle();
@@ -1182,6 +1254,201 @@ app.post("/api/groups", auth, async (req, res) => {
   } catch (error) {
     console.error("Create group failed:", error);
     res.status(500).json({ error: "Group could not be created." });
+  }
+});
+
+app.get("/api/group-invitations", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data: invitations, error } = await supabase.from("group_invitations")
+      .select("id,group_id,invited_by,status,created_at")
+      .eq("invitee_id", userId).eq("status", "pending").order("created_at", { ascending: false });
+    if (error) throw error;
+    const groupIds = [...new Set((invitations || []).map(item => Number(item.group_id)))];
+    const inviterIds = [...new Set((invitations || []).map(item => Number(item.invited_by)))];
+    const [{ data: groups, error: groupError }, { data: inviters, error: inviterError }] = await Promise.all([
+      groupIds.length ? supabase.from("groups").select("id,name,description").in("id", groupIds) : Promise.resolve({ data: [] }),
+      inviterIds.length ? supabase.from("users").select("id,username").in("id", inviterIds) : Promise.resolve({ data: [] })
+    ]);
+    if (groupError || inviterError) throw groupError || inviterError;
+    const groupMap = new Map((groups || []).map(item => [Number(item.id), item]));
+    const inviterMap = new Map((inviters || []).map(item => [Number(item.id), item.username]));
+    res.json((invitations || []).map(item => ({
+      ...item,
+      group: groupMap.get(Number(item.group_id)) || null,
+      inviterName: inviterMap.get(Number(item.invited_by)) || "Group administrator"
+    })));
+  } catch (error) {
+    console.error("List group invitations failed:", error);
+    res.status(500).json({ error: "Invitations could not be loaded. Run v6.7.3-group-invitations-migration.sql." });
+  }
+});
+
+app.post("/api/groups/:groupId/invitations", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), inviterId = Number(req.session.userId), inviteeId = Number(req.body?.userId);
+    if (!Number.isSafeInteger(groupId) || !Number.isSafeInteger(inviteeId) || inviteeId <= 0) return res.status(400).json({ error: "Choose a valid user." });
+    if (!(await groupManagerAccess(groupId, inviterId))) return res.status(403).json({ error: "Only the group owner or an administrator can invite users." });
+    const [{ data: invitee, error: userError }, { data: membership, error: memberError }] = await Promise.all([
+      supabase.from("users").select("id,username,status").eq("id", inviteeId).maybeSingle(),
+      supabase.from("group_members").select("role").eq("group_id", groupId).eq("user_id", inviteeId).maybeSingle()
+    ]);
+    if (userError || memberError) throw userError || memberError;
+    if (!invitee || invitee.status !== "approved") return res.status(400).json({ error: "Only approved users can be invited." });
+    if (membership) return res.status(409).json({ error: "This user is already a group member." });
+    const { data, error } = await supabase.from("group_invitations").insert({
+      group_id: groupId, invitee_id: inviteeId, invited_by: inviterId, status: "pending"
+    }).select("id,group_id,invitee_id,invited_by,status,created_at").single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ error: "A pending invitation already exists for this user." });
+      throw error;
+    }
+    io.to(`user:${inviteeId}`).emit("group:invitation", { ...data, inviterName: req.currentUser.username });
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Create group invitation failed:", error);
+    res.status(500).json({ error: "Invitation could not be sent. Run v6.7.3-group-invitations-migration.sql." });
+  }
+});
+
+app.post("/api/group-invitations/:invitationId/respond", auth, async (req, res) => {
+  try {
+    const invitationId = Number(req.params.invitationId), userId = Number(req.session.userId);
+    const action = req.body?.action === "accept" ? "accepted" : req.body?.action === "decline" ? "declined" : "";
+    if (!Number.isSafeInteger(invitationId) || !action) return res.status(400).json({ error: "Choose Accept or Decline." });
+    const { data: invitation, error } = await supabase.from("group_invitations")
+      .select("id,group_id,invitee_id,status").eq("id", invitationId).eq("invitee_id", userId).maybeSingle();
+    if (error) throw error;
+    if (!invitation || invitation.status !== "pending") return res.status(404).json({ error: "This invitation is no longer pending." });
+    if (action === "accepted") {
+      const { error: memberError } = await supabase.from("group_members")
+        .upsert({ group_id: invitation.group_id, user_id: userId, role: "member" }, { onConflict: "group_id,user_id", ignoreDuplicates: true });
+      if (memberError) throw memberError;
+      io.in(`user:${userId}`).socketsJoin(`group:${invitation.group_id}`);
+    }
+    const { error: updateError } = await supabase.from("group_invitations")
+      .update({ status: action, responded_at: new Date().toISOString() }).eq("id", invitationId).eq("status", "pending");
+    if (updateError) throw updateError;
+    res.json({ ok: true, status: action, groupId: invitation.group_id });
+  } catch (error) {
+    console.error("Respond to group invitation failed:", error);
+    res.status(500).json({ error: "Invitation response could not be saved." });
+  }
+});
+
+app.get("/api/groups/:groupId/members", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
+    const access = await groupAccess(groupId, userId);
+    if (!access) return res.status(403).json({ error: "Access denied." });
+    const { data: rows, error } = await supabase.from("group_members")
+      .select("user_id,role,joined_at").eq("group_id", groupId).order("joined_at");
+    if (error) throw error;
+    let pendingInvitations = [];
+    if (["owner", "admin"].includes(access.role)) {
+      const { data: invitations, error: invitationError } = await supabase.from("group_invitations")
+        .select("id,invitee_id,invited_by,created_at").eq("group_id", groupId).eq("status", "pending").order("created_at");
+      if (invitationError) throw invitationError;
+      pendingInvitations = invitations || [];
+    }
+    const ids = [...new Set([
+      ...(rows || []).map(row => Number(row.user_id)),
+      ...pendingInvitations.map(row => Number(row.invitee_id))
+    ])];
+    const { data: people, error: peopleError } = ids.length
+      ? await supabase.from("users").select("id,username,avatar,status").in("id", ids)
+      : { data: [], error: null };
+    if (peopleError) throw peopleError;
+    const peopleMap = new Map((people || []).map(person => [Number(person.id), person]));
+    res.json({
+      viewerRole: access.role,
+      members: (rows || []).map(row => {
+        const person = peopleMap.get(Number(row.user_id)) || {};
+        return {
+          id: Number(row.user_id),
+          username: person.username || "User",
+          avatar: avatarProxyUrl(row.user_id, person.avatar),
+          role: row.role,
+          joinedAt: row.joined_at
+        };
+      }),
+      invitations: pendingInvitations.map(invitation => {
+        const person = peopleMap.get(Number(invitation.invitee_id)) || {};
+        return {
+          id: Number(invitation.id),
+          userId: Number(invitation.invitee_id),
+          username: person.username || "User",
+          createdAt: invitation.created_at
+        };
+      })
+    });
+  } catch (error) {
+    console.error("List group members failed:", error);
+    res.status(500).json({ error: "Group members could not be loaded." });
+  }
+});
+
+app.post("/api/groups/:groupId/members", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), managerId = Number(req.session.userId), newUserId = Number(req.body?.userId);
+    if (!(await groupManagerAccess(groupId, managerId))) return res.status(403).json({ error: "Only the owner or a group administrator can add members." });
+    const { data: user, error: userError } = await supabase.from("users").select("id,status").eq("id", newUserId).maybeSingle();
+    if (userError) throw userError;
+    if (!user || user.status !== "approved") return res.status(400).json({ error: "Choose an approved user." });
+    const { error } = await supabase.from("group_members").insert({ group_id: groupId, user_id: newUserId, role: "member" });
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ error: "This user is already a member." });
+      throw error;
+    }
+    await supabase.from("group_invitations").update({ status: "accepted", responded_at: new Date().toISOString() })
+      .eq("group_id", groupId).eq("invitee_id", newUserId).eq("status", "pending");
+    io.in(`user:${newUserId}`).socketsJoin(`group:${groupId}`);
+    io.to(`user:${newUserId}`).emit("group:added", { groupId });
+    io.to(`group:${groupId}`).emit("group:members-changed", { groupId });
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error("Add group member failed:", error);
+    res.status(500).json({ error: "Member could not be added." });
+  }
+});
+
+app.delete("/api/groups/:groupId/members/:memberId", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), managerId = Number(req.session.userId), memberId = Number(req.params.memberId);
+    const manager = await groupManagerAccess(groupId, managerId);
+    if (!manager) return res.status(403).json({ error: "Only the owner or a group administrator can remove members." });
+    const target = await groupAccess(groupId, memberId);
+    if (!target) return res.status(404).json({ error: "Member not found." });
+    if (target.role === "owner") return res.status(403).json({ error: "The group owner cannot be removed." });
+    if (manager.role === "admin" && target.role === "admin") return res.status(403).json({ error: "Only the owner can remove another administrator." });
+    const { error } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId);
+    if (error) throw error;
+    io.to(`user:${memberId}`).emit("group:removed", { groupId });
+    io.in(`user:${memberId}`).socketsLeave(`group:${groupId}`);
+    io.to(`group:${groupId}`).emit("group:members-changed", { groupId });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Remove group member failed:", error);
+    res.status(500).json({ error: "Member could not be removed." });
+  }
+});
+
+app.patch("/api/groups/:groupId/members/:memberId/role", auth, async (req, res) => {
+  try {
+    const groupId = Number(req.params.groupId), ownerId = Number(req.session.userId), memberId = Number(req.params.memberId);
+    const owner = await groupAccess(groupId, ownerId);
+    if (!owner || owner.role !== "owner") return res.status(403).json({ error: "Only the group owner can change administrator roles." });
+    const role = req.body?.role === "admin" ? "admin" : req.body?.role === "member" ? "member" : "";
+    if (!role) return res.status(400).json({ error: "Choose Admin or Member." });
+    const target = await groupAccess(groupId, memberId);
+    if (!target || target.role === "owner") return res.status(400).json({ error: "The owner role cannot be changed." });
+    const { error } = await supabase.from("group_members").update({ role }).eq("group_id", groupId).eq("user_id", memberId);
+    if (error) throw error;
+    io.to(`group:${groupId}`).emit("group:members-changed", { groupId });
+    res.json({ ok: true, role });
+  } catch (error) {
+    console.error("Change group role failed:", error);
+    res.status(500).json({ error: "Member role could not be changed." });
   }
 });
 
