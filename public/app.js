@@ -143,7 +143,7 @@ $("authForm").onsubmit=async e=>{
   const username=$("authUsername").value.trim();
   const password=$("authPassword").value;
   if(username.length<3){$("authError").textContent=authMode==="login"?"Enter your username, email or phone.":"Username must contain at least 3 characters.";return}
-  if(authMode==="register"&&password.length<10){$("authError").textContent="New passwords must contain at least 10 characters.";return}
+  if(authMode==="register"&&password.length<6){$("authError").textContent="New passwords must contain at least 6 characters.";return}
   const submit=$("authSubmit");
   try{
     $("authError").textContent="";
