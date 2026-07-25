@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v6",
-  "version": "6.6.0",
+  "version": "6.7.0",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v6.6 with DeepSeek V4 AI integration",
+  "description": "ConnectChat Pro Enterprise v6.7 with WhatsApp-inspired mobile chat and hybrid AI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
