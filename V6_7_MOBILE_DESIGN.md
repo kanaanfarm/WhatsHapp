@@ -1,7 +1,15 @@
-# ConnectChat Pro v6.7 — mobile redesign
+# ConnectChat Pro v6.7.2 — mobile redesign
 
 Version 6.7 replaces the compressed desktop layout on phones with a
 WhatsApp-inspired mobile experience while retaining ConnectChat branding.
+
+Version 6.7.1 centers and reduces the send icon, isolates the call screen from
+the bottom navigation, shows a clear remote-camera waiting state, and adds a
+front/rear mobile camera switch.
+
+Version 6.7.2 adds a WhatsApp-inspired mobile You/Settings page and reduces
+duplicate network refreshes, hidden-panel rendering, repeated image decoding
+and expensive mobile paint effects.
 
 ## Mobile improvements
 

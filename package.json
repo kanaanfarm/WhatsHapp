@@ -1,8 +1,8 @@
 {
   "name": "connectchat-pro-enterprise-v6",
-  "version": "6.7.0",
+  "version": "6.7.2",
   "private": true,
-  "description": "ConnectChat Pro Enterprise v6.7 with WhatsApp-inspired mobile chat and hybrid AI",
+  "description": "ConnectChat Pro Enterprise v6.7.2 with optimized WhatsApp-inspired mobile experience and hybrid AI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

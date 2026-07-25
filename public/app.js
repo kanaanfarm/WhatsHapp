@@ -13,6 +13,7 @@ let currentCalculationPreviewId=null,currentCalculationPreviewCanDownload=false,
 let avatarCropImage=null,avatarCropObjectUrl=null,avatarCropBaseScale=1,avatarCropZoom=1,avatarCropX=0,avatarCropY=0,avatarCropDragging=false,avatarCropPointerX=0,avatarCropPointerY=0;
 let profilePhotoViewerScale=1;
 let currentGroupId=null,currentGroup=null,groupCallMode=null,groupCallStream=null;
+let refreshUsersPromise=null,refreshUsersTimer=null,lastUsersRefreshAt=0,usersRenderFrame=0;
 const groupPeers=new Map(),groupPendingIce=new Map();
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
@@ -60,10 +61,13 @@ function saveAppearance(settings){
 function avatarHtml(user, fallbackText){
   const fallback=escapeHtml(fallbackText||initials(user?.username||"User"));
   const url=user?.avatar?safeFileUrl(user.avatar):"";
-  return url?`<img src="${escapeHtml(url)}" data-avatar-fallback="${fallback}" alt="${escapeHtml(user?.username||"Profile photo")}">`:fallback;
+  return url?`<img src="${escapeHtml(url)}" loading="lazy" decoding="async" data-avatar-fallback="${fallback}" alt="${escapeHtml(user?.username||"Profile photo")}">`:fallback;
 }
 function setAvatarElement(element,user,fallbackText){
   if(!element)return;
+  const signature=`${user?.avatar||""}|${fallbackText||""}`;
+  if(element.dataset.avatarSignature===signature)return;
+  element.dataset.avatarSignature=signature;
   element.innerHTML=avatarHtml(user,fallbackText);
 }
 
@@ -282,6 +286,7 @@ async function startApp(){
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
   await loadArchivedConversations();
+  lastUsersRefreshAt=Date.now();
   synchronizeCurrentAccount();
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
@@ -313,12 +318,12 @@ function connectSocket(){
   });
   socket.on("presence",p=>{
     const u=users.find(x=>x.id===p.userId);
-    if(u){u.online=p.online;if(p.lastSeenAt)u.lastSeenAt=p.lastSeenAt;renderUsers();updateHeader()}else refreshUsers()
+    if(u){u.online=p.online;if(p.lastSeenAt)u.lastSeenAt=p.lastSeenAt;scheduleUsersRender()}else refreshUsers()
   });
   socket.on("presence:snapshot",p=>{
     const activeIds=new Set((p.userIds||[]).map(Number));
     users.forEach(u=>u.online=u.isSelf||activeIds.has(Number(u.id)));
-    renderUsers();updateHeader();
+    scheduleUsersRender();
   });
   socket.on("users:changed",()=>{refreshUsers();if(!$("adminOverlay").classList.contains("hidden"))loadAdminUsers()});
   socket.on("profile:updated",payload=>{
@@ -382,18 +387,38 @@ function connectSocket(){
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
-async function refreshUsers(){
-  try{
-    users=await api("/api/users");
-    await loadArchivedConversations();
-    synchronizeCurrentAccount();
-    if(activeUser){
-      const refreshed=users.find(u=>u.id===activeUser.id);
-      if(refreshed)activeUser=refreshed;
-      else{activeUser=null;resetConversation()}
-    }
-    renderUsers();updateHeader();
-  }catch{}
+function refreshUsers(force=false){
+  force=force===true;
+  if(refreshUsersPromise)return refreshUsersPromise;
+  const remaining=1200-(Date.now()-lastUsersRefreshAt);
+  if(!force&&remaining>0){
+    if(!refreshUsersTimer)refreshUsersTimer=setTimeout(()=>{refreshUsersTimer=null;refreshUsers(true)},remaining);
+    return Promise.resolve();
+  }
+  refreshUsersPromise=(async()=>{
+    try{
+      users=await api("/api/users");
+      await loadArchivedConversations();
+      synchronizeCurrentAccount();
+      if(activeUser){
+        const refreshed=users.find(u=>u.id===activeUser.id);
+        if(refreshed)activeUser=refreshed;
+        else{activeUser=null;resetConversation()}
+      }
+      renderUsers();updateHeader();
+      lastUsersRefreshAt=Date.now();
+    }catch{}
+    finally{refreshUsersPromise=null}
+  })();
+  return refreshUsersPromise;
+}
+function scheduleUsersRender(){
+  if(usersRenderFrame)return;
+  usersRenderFrame=requestAnimationFrame(()=>{
+    usersRenderFrame=0;
+    renderUsers();
+    updateHeader();
+  });
 }
 
 window.addEventListener("focus",()=>{if(me)refreshUsers()});
@@ -451,7 +476,7 @@ function updateWorkspaceOverview(){
   if($("workspaceConversationSummary"))$("workspaceConversationSummary").textContent=activeUser
     ? `${activeUser.displayName||activeUser.username} · ${activeConversation.length} visible message${activeConversation.length===1?"":"s"}`
     : "Select a real contact from the left panel.";
-  renderWorkspaceInsightTab(currentInsightTab);
+  if(window.innerWidth>1200&&document.documentElement.dataset.insights!=="hide")renderWorkspaceInsightTab(currentInsightTab);
 }
 
 function renderWorkspaceInsightTab(tab="overview"){
@@ -480,10 +505,12 @@ function renderUsers(){
     if(currentUserFilter==="pinned")return Boolean(u.pinned);
     return true;
   });
-  $("usersList").innerHTML="";
+  const list=$("usersList"),fragment=document.createDocumentFragment();
+  list.innerHTML="";
   filtered.forEach(u=>{
     const d=document.createElement("div");
     d.className=`user-item ${activeUser&&activeUser.id===u.id?"active":""}`;
+    d.dataset.userId=String(u.id);
     const name=u.isSelf?"Saved Messages":(u.displayName||u.username);
     const avatar=u.isAI?"AI":(u.isSelf&&!u.avatar?"★":avatarHtml(u,initials(u.username)));
     const preview=u.isSelf&&!u.lastPreview?"Notes and messages to yourself":(u.lastPreview||"Start a conversation");
@@ -498,8 +525,9 @@ function renderUsers(){
       listAvatar.title=`View ${name} profile`;
       listAvatar.onclick=event=>{event.stopPropagation();openProfilePage(u)};
     }
-    $("usersList").appendChild(d);
+    fragment.appendChild(d);
   });
+  list.appendChild(fragment);
   renderQuickContacts();
   updateWorkspaceOverview();
   const total=users.reduce((n,u)=>n+Number(u.unreadCount||u.unread_count||0),0);
@@ -509,6 +537,7 @@ function renderQuickContacts(){
   const box=$("quickContacts");
   if(!box)return;
   box.innerHTML="";
+  if(window.innerWidth<=800){box.classList.add("hidden");return}
 
   // Show only real approved human accounts returned by the server.
   // Demo names and placeholder contacts are never rendered here.
@@ -537,7 +566,9 @@ function renderQuickContacts(){
 $("userSearch").oninput=renderUsers;
 
 async function selectUser(u){
-  activeUser=u;renderUsers();updateHeader();
+  activeUser=u;
+  document.querySelectorAll("#usersList .user-item").forEach(item=>item.classList.toggle("active",Number(item.dataset.userId)===Number(u.id)));
+  updateHeader();
   $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
   if($("aiProviderControl"))$("aiProviderControl").classList.toggle("hidden",!u.isAI);
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
@@ -563,15 +594,27 @@ async function getIceConfig(){
   return iceConfig;
 }
 
+let currentFacingMode="user";
 async function getMedia(mode){
-  return navigator.mediaDevices.getUserMedia({audio:true,video:mode==="video"});
+  const video=mode==="video"
+    ?{facingMode:{ideal:currentFacingMode},width:{ideal:1280},height:{ideal:720}}
+    :false;
+  return navigator.mediaDevices.getUserMedia({audio:true,video});
 }
 
 async function createPeer(peerId){
   const config=await getIceConfig();
   const pc=new RTCPeerConnection({iceServers:config.iceServers});
   pc.onicecandidate=e=>{if(e.candidate)socket.emit("call:ice",{receiverId:peerId,candidate:e.candidate})};
-  pc.ontrack=e=>{$("remoteVideo").srcObject=e.streams[0]};
+  pc.ontrack=e=>{
+    $("remoteVideo").srcObject=e.streams[0];
+    $("remoteVideo").play().catch(()=>{});
+    if(e.track.kind==="video"){
+      $("videoStage").classList.remove("waiting-remote");
+      e.track.onmute=()=>$("videoStage").classList.add("waiting-remote");
+      e.track.onunmute=()=>$("videoStage").classList.remove("waiting-remote");
+    }
+  };
   pc.onconnectionstatechange=()=>{
     if(pc.connectionState==="connected")$("callStatus").textContent="Connected";
     if(["failed","disconnected"].includes(pc.connectionState))$("callStatus").textContent="Connection interrupted";
@@ -590,10 +633,14 @@ function showCallUi(name,status,mode,incoming=false){
   $("callName").textContent=name;$("callStatus").textContent=status;
   $("callOverlay").classList.remove("hidden");
   $("videoStage").classList.toggle("audio-only",mode==="audio");
+  $("videoStage").classList.toggle("waiting-remote",mode==="video");
+  $("videoStage").classList.remove("local-camera-off");
+  $("cameraToggleBtn").textContent="📹 Camera";
   $("acceptCallBtn").classList.toggle("hidden",!incoming);
   $("declineCallBtn").classList.toggle("hidden",!incoming);
   $("muteBtn").classList.toggle("hidden",incoming);
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
+  $("switchCameraBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
@@ -604,7 +651,7 @@ async function startCall(mode){
   try{
     callPeerId=activeUser.id;callMode=mode;
     showCallUi(activeUser.username,"Calling…",mode);
-    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;
+    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;$("localVideo").play().catch(()=>{});
     peer=await createPeer(callPeerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -623,7 +670,7 @@ async function acceptIncomingCall(){
   pendingCall=null;
   try{
     showCallUi(data.callerName,"Connecting…",data.mode);
-    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;
+    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;$("localVideo").play().catch(()=>{});
     peer=await createPeer(data.callerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     await peer.setRemoteDescription(data.offer);
@@ -671,7 +718,7 @@ function finishCall(message="Call ended",notify=true){
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
-  cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing")
+  cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off")
   $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
@@ -690,7 +737,34 @@ $("muteBtn").onclick=()=>{
 $("shareScreenBtn").onclick=toggleScreenShare;
 $("cameraToggleBtn").onclick=()=>{
   const track=localStream?.getVideoTracks()[0];if(!track)return;
-  track.enabled=!track.enabled;$("cameraToggleBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera";
+  track.enabled=!track.enabled;
+  $("videoStage").classList.toggle("local-camera-off",!track.enabled);
+  $("cameraToggleBtn").textContent=track.enabled?"📹 Camera":"🚫 Camera off";
+};
+$("switchCameraBtn").onclick=async()=>{
+  if(!peer||callMode!=="video"||screenStream)return;
+  const button=$("switchCameraBtn"),previous=currentFacingMode;
+  try{
+    button.disabled=true;
+    currentFacingMode=currentFacingMode==="user"?"environment":"user";
+    const replacement=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:currentFacingMode},width:{ideal:1280},height:{ideal:720}},
+      audio:false
+    });
+    const newTrack=replacement.getVideoTracks()[0];
+    const sender=peer.getSenders().find(item=>item.track?.kind==="video");
+    if(!newTrack||!sender)throw new Error("Camera track unavailable");
+    await sender.replaceTrack(newTrack);
+    localStream?.getVideoTracks().forEach(track=>{localStream.removeTrack(track);track.stop()});
+    localStream.addTrack(newTrack);
+    $("localVideo").srcObject=localStream;
+    $("localVideo").play().catch(()=>{});
+    $("videoStage").classList.remove("local-camera-off");
+    $("cameraToggleBtn").textContent="📹 Camera";
+  }catch(error){
+    currentFacingMode=previous;
+    toast("Could not switch camera on this device.");
+  }finally{button.disabled=false}
 };
 function updateHeader(){
   if(!activeUser)return;
@@ -1711,8 +1785,20 @@ async function renderCallsWorkspace(){
 function renderSettingsWorkspace(){
   const appearance=loadAppearance();
   $("sectionContent").innerHTML=`
-    <div class="settings-workspace-grid">
-      <section><h2>Profile</h2><p>View your profile and manage your own profile photo.</p><button id="settingsProfileBtn" class="primary">Open my profile</button></section>
+    <div class="settings-workspace-grid settings-whatsapp">
+      <section class="settings-mobile-identity">
+        <button id="settingsProfileBtn" type="button" class="settings-identity-button">
+          <span class="settings-profile-avatar">${avatarHtml(me,initials(me.username))}</span>
+          <span><b>${sectionEscape(me.displayName||me.username)}</b><small>@${sectionEscape(me.username)}</small><em>${me.isAdmin?"Administrator":"Workspace member"}</em></span>
+          <i>›</i>
+        </button>
+      </section>
+      <section class="settings-mobile-card">
+        <button id="settingsStatusBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Status</b><small>Set or view your current status</small></span><i>›</i></button>
+        <button id="settingsPrivacyBtn" type="button" class="settings-mobile-row"><span>🔒</span><span><b>Profile & privacy</b><small>Photo and account information</small></span><i>›</i></button>
+        <button id="settingsRecoveryBtn" type="button" class="settings-mobile-row"><span>🔑</span><span><b>Account recovery</b><small>View your recovery code</small></span><i>›</i></button>
+        <button id="settingsAppearanceBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Chats & appearance</b><small>Text, icons and message controls</small></span><i>›</i></button>
+      </section>
       <section class="appearance-settings"><h2>My page appearance</h2><p>These settings belong to your account on this device.</p>
         <label>Layout density<select id="appearanceDensity"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
         <label>Text size<select id="appearanceText"><option value="small">Small</option><option value="standard">Standard</option><option value="large">Large</option></select></label>
@@ -1723,10 +1809,15 @@ function renderSettingsWorkspace(){
         <label>Profile-photo display<select id="appearanceAvatarFit"><option value="cover">Crop to fill</option><option value="contain">Fit full photo</option></select></label>
         <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
       </section>
-      <section><h2>Account</h2><p>Status, recovery, switching accounts and logout.</p><div class="settings-button-row"><button id="settingsStatusBtn">Status</button><button id="settingsRecoveryBtn">Recovery code</button><button id="settingsSwitchBtn">Switch account</button><button id="settingsLogoutBtn" class="danger-link">Logout</button></div></section>
-      ${me.isAdmin?`<section><h2>Administration</h2><p>Approve, block or remove user accounts.</p><button id="settingsAdminBtn">Manage users</button></section>`:""}
+      <section class="settings-mobile-card settings-account-card">
+        <button id="settingsSwitchBtn" type="button" class="settings-mobile-row"><span>💻</span><span><b>Switch account</b><small>Sign in using another account</small></span><i>›</i></button>
+        ${me.isAdmin?`<button id="settingsAdminBtn" type="button" class="settings-mobile-row"><span>👥</span><span><b>Administration</b><small>Approve and manage users</small></span><i>›</i></button>`:""}
+        <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of ConnectChat</small></span><i>›</i></button>
+      </section>
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
+  $("settingsPrivacyBtn").onclick=()=>openProfilePage(me);
+  $("settingsAppearanceBtn").onclick=()=>$("appearanceDensity")?.closest(".appearance-settings")?.scrollIntoView({block:"start"});
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
   const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights",appearanceComposer:"composer",appearanceAvatarFit:"avatarFit"};
@@ -1752,6 +1843,7 @@ async function openWorkspaceSection(section){
   document.querySelectorAll(".rail-item[data-section]").forEach(x=>x.classList.toggle("active",x.dataset.section===section));
   if(section==="chats"){openChatsWorkspace();return}
   setMainWorkspaceVisible(false);
+  $("sectionPage").dataset.section=section;
   const titles={
     ai:["AI Assistant","Ask questions, translate text and work with documents."],
     groups:["Groups","Multi-user private conversations."],
