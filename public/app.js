@@ -1435,7 +1435,7 @@ function renderPeopleCards(actionLabel,actionName){
   if(!contacts.length)return workspaceEmpty("👤","No contacts yet","Approved users will appear here.");
   return `<div class="workspace-card-grid">${contacts.map(u=>`
     <article class="workspace-person-card">
-      <div class="avatar">${avatarMarkup(u,initials(u.username))}</div>
+      <div class="avatar">${avatarHtml(u,initials(u.username))}</div>
       <div><h3>${sectionEscape(u.username)}</h3><p>${u.online?"Online":sectionEscape(lastSeenText(u.lastSeenAt))}</p></div>
       <button type="button" data-work-action="${actionName}" data-user-id="${u.id}">${actionLabel}</button>
     </article>`).join("")}</div>`;
@@ -1465,7 +1465,7 @@ async function renderGroupsWorkspace(){
       <form id="createGroupPanel" class="group-create-panel hidden">
         <label>Group name<input id="newGroupName" maxlength="80" placeholder="Example: DG1 MEP Team" required></label>
         <label>Description<input id="newGroupDescription" maxlength="500" placeholder="Optional description"></label>
-        <div><b>Select members</b><div class="group-member-picker">${contacts.map(u=>`<label><input type="checkbox" value="${Number(u.id)}"><span class="avatar">${avatarMarkup(u,initials(u.username))}</span>${sectionEscape(u.displayName||u.username)}</label>`).join("")||"<small>No approved contacts are available.</small>"}</div></div>
+        <div><b>Select members</b><div class="group-member-picker">${contacts.map(u=>`<label><input type="checkbox" value="${Number(u.id)}"><span class="avatar">${avatarHtml(u,initials(u.username))}</span>${sectionEscape(u.displayName||u.username)}</label>`).join("")||"<small>No approved contacts are available.</small>"}</div></div>
         <div class="settings-button-row"><button class="primary" type="submit">Create group</button><button id="cancelGroupCreate" type="button">Cancel</button></div>
       </form>
       ${invitations.length?`<section class="group-invitations"><h3>Group invitations</h3>${invitations.map(invitation=>`
@@ -1994,8 +1994,13 @@ async function openWorkspaceSection(section){
     $("workspaceHeading").textContent="Settings";
     $("sectionTitle").textContent="Settings";
     $("sectionDescription").textContent="Profile, appearance, privacy, account and administration.";
-    renderSettingsWorkspace();
     setMainWorkspaceVisible(false);
+    // Change to the Settings screen before constructing its controls. This
+    // gives mobile browsers an immediate visual response instead of leaving
+    // the previous chat visible while the settings DOM is being created.
+    $("sectionContent").innerHTML=`<div class="workspace-loading">Opening Settings…</div>`;
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    if(currentWorkspaceSection==="settings")renderSettingsWorkspace();
     return;
   }
   setMainWorkspaceVisible(false);
