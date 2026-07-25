@@ -600,6 +600,13 @@ async function selectUser(u){
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
   $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
+  // Reveal the selected conversation immediately on phones. Message history
+  // may continue loading, but the header and composer should never wait for it.
+  if(window.innerWidth<=760){
+    $("sidebar").classList.add("mobile-hidden");
+    $("chatPanel").classList.remove("mobile-hidden");
+  }
+  updateComposer();
   if(u.isAI){
     activeConversation=[];
     loadAiHistory().forEach(addMessage);
@@ -611,7 +618,6 @@ async function selectUser(u){
     history.forEach(addMessage);
   }
   updateWorkspaceOverview();
-  if(window.innerWidth<=760){$("sidebar").classList.add("mobile-hidden");$("chatPanel").classList.remove("mobile-hidden")}
   $("messageInput").focus();
 }
 

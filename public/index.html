@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6736">
+  <link rel="stylesheet" href="style.css?v=6737">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -120,9 +120,7 @@
           <small class="composer-hint">Enter to send · Shift+Enter for new line</small>
         </div>
         <button id="recordBtn" class="circle-btn record-btn" type="button" title="Record voice">🎤</button>
-        <button id="sendBtn" class="send-btn" type="button" title="Send" aria-label="Send message" disabled>
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3.4 20.4 21.8 12 3.4 3.6l-.1 6.5 12.1 1.9-12.1 1.9.1 6.5Z"/></svg>
-        </button>
+        <button id="sendBtn" class="send-btn" type="button" title="Send" aria-label="Send message" disabled><span aria-hidden="true">➤</span></button>
       </footer>
     </main>
 
@@ -324,6 +322,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6736"></script>
+  <script src="app.js?v=6737"></script>
 </body>
 </html>
