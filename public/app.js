@@ -1023,6 +1023,7 @@ if($("emojiBtn"))$("emojiBtn").onclick=()=>{
 };
 document.addEventListener("click",e=>{
   if($("emojiPicker")&&!e.target.closest("#emojiPicker")&&!e.target.closest("#emojiBtn"))$("emojiPicker").classList.add("hidden");
+  if($("groupEmojiPicker")&&!e.target.closest("#groupEmojiPicker")&&!e.target.closest("#groupEmojiBtn"))$("groupEmojiPicker").classList.add("hidden");
   if($("accountMenu")&&!e.target.closest("#accountMenu")&&!e.target.closest("#accountMenuBtn"))$("accountMenu").classList.add("hidden");
 });
 
@@ -1422,12 +1423,15 @@ function workspaceEmpty(icon,title,description,action=""){
 }
 
 function openChatsWorkspace(){
+  const listNeedsRefresh=currentUserFilter!=="all";
   currentWorkspaceSection="chats";
   setMainWorkspaceVisible(true);
   $("workspaceHeading").textContent="Messages";
   currentUserFilter="all";
   document.querySelectorAll(".chat-filter").forEach(x=>x.classList.toggle("active",x.dataset.filter==="all"));
-  renderUsers();
+  // Workspace pages only cover the conversation list; the list remains
+  // current underneath them and does not need rebuilding on every mobile tap.
+  if(listNeedsRefresh)renderUsers();
 }
 
 function renderPeopleCards(actionLabel,actionName){
@@ -1468,20 +1472,30 @@ async function renderGroupsWorkspace(){
         <div><b>Select members</b><div class="group-member-picker">${contacts.map(u=>`<label><input type="checkbox" value="${Number(u.id)}"><span class="avatar">${avatarHtml(u,initials(u.username))}</span>${sectionEscape(u.displayName||u.username)}</label>`).join("")||"<small>No approved contacts are available.</small>"}</div></div>
         <div class="settings-button-row"><button class="primary" type="submit">Create group</button><button id="cancelGroupCreate" type="button">Cancel</button></div>
       </form>
-      ${invitations.length?`<section class="group-invitations"><h3>Group invitations</h3>${invitations.map(invitation=>`
+      <section class="group-invitations ${invitations.length?"has-invitations":"no-invitations"}">
+        <div class="group-invitations-head">
+          <div><h3>Pending invitations</h3><small>${invitations.length?`${invitations.length} invitation${invitations.length===1?"":"s"} waiting for your answer`:"No invitations are waiting for this account"}</small></div>
+          <button id="refreshGroupInvitationsBtn" type="button" title="Refresh invitations">↻ Refresh</button>
+        </div>
+        ${invitations.map(invitation=>`
         <article>
-          <div><b>${sectionEscape(invitation.group?.name||"Group")}</b><small>Invited by ${sectionEscape(invitation.inviterName||"administrator")}</small></div>
-          <button type="button" data-invitation-action="accept" data-invitation-id="${Number(invitation.id)}">Accept</button>
+          <div><b>Invitation to ${sectionEscape(invitation.group?.name||"Group")}</b><small>Sent by ${sectionEscape(invitation.inviterName||"group administrator")}</small></div>
+          <button type="button" class="accept-invitation" data-invitation-action="accept" data-invitation-id="${Number(invitation.id)}">Accept</button>
           <button type="button" data-invitation-action="decline" data-invitation-id="${Number(invitation.id)}" class="danger-link">Decline</button>
-        </article>`).join("")}</section>`:""}
+        </article>`).join("")}
+      </section>
       <div class="workspace-list">${items.length?items.map(g=>`<article><div class="workspace-list-icon">👥</div><div><h3>${sectionEscape(g.name)}</h3><p>${sectionEscape(g.description||"Private group")} · ${sectionEscape(g.role)}</p></div><button data-open-group="${g.id}">Open</button>${g.role==="owner"?`<button class="danger-link" data-delete-group="${g.id}">Delete</button>`:""}</article>`).join(""):workspaceEmpty("👥","No groups yet","Create your first synchronized group.")}</div>`;
+    $("refreshGroupInvitationsBtn").onclick=()=>renderGroupsWorkspace();
     $("createGroupBtn").onclick=()=>$("createGroupPanel").classList.remove("hidden");
     $("cancelGroupCreate").onclick=()=>$("createGroupPanel").classList.add("hidden");
     $("createGroupPanel").onsubmit=async event=>{
       event.preventDefault();
       const name=$("newGroupName").value.trim(),description=$("newGroupDescription").value.trim();
       const memberIds=[...$("createGroupPanel").querySelectorAll('input[type="checkbox"]:checked')].map(input=>Number(input.value));
-      await api("/api/groups",{method:"POST",body:JSON.stringify({name,description,memberIds})});
+      const created=await api("/api/groups",{method:"POST",body:JSON.stringify({name,description,memberIds})});
+      toast(created.invitationsSent
+        ?`Group created. ${created.invitationsSent} invitation${created.invitationsSent===1?"":"s"} sent.`
+        :"Group created.");
       await renderGroupsWorkspace();
     };
     $("sectionContent").querySelectorAll("[data-invitation-action]").forEach(button=>button.onclick=async()=>{
@@ -1525,7 +1539,10 @@ async function openGroupConversation(groupId,group){
           <input id="groupFileInput" type="file" accept="image/*,audio/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
           <button id="groupEmojiBtn" type="button" title="Emoji">😊</button>
           <button id="groupAttachBtn" type="button" title="Attachment">📎</button>
-          <input id="workspaceChatInput" maxlength="4000" placeholder="Type a message" autocomplete="off" required>
+          <div class="group-message-entry">
+            <div id="groupEmojiPicker" class="emoji-picker group-emoji-picker hidden" aria-label="Group emoji picker"></div>
+            <input id="workspaceChatInput" maxlength="4000" placeholder="Type a message" autocomplete="off" required>
+          </div>
           <button class="group-send-arrow" type="submit" title="Send message" aria-label="Send message">➤</button>
         </form>
       </div>`;
@@ -1537,7 +1554,18 @@ async function openGroupConversation(groupId,group){
       const saved=await api(`/api/groups/${groupId}/messages`,{method:"POST",body:JSON.stringify({body})});
       appendGroupMessage({...saved,sender_name:me.username});
     };
-    $("groupEmojiBtn").onclick=()=>{$("workspaceChatInput").value+="😊";$("workspaceChatInput").focus()};
+    $("groupEmojiPicker").innerHTML=EMOJIS.map(emoji=>`<button type="button" aria-label="${emoji}">${emoji}</button>`).join("");
+    $("groupEmojiPicker").onclick=event=>{
+      const button=event.target.closest("button");if(!button)return;
+      const input=$("workspaceChatInput");
+      const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+      input.value=input.value.slice(0,start)+button.textContent+input.value.slice(end);
+      input.focus();input.selectionStart=input.selectionEnd=start+button.textContent.length;
+    };
+    $("groupEmojiBtn").onclick=event=>{
+      event.stopPropagation();
+      $("groupEmojiPicker").classList.toggle("hidden");
+    };
     if($("groupManageMembersBtn"))$("groupManageMembersBtn").onclick=async()=>{
       const panel=$("groupMemberPanel"),shell=panel.closest(".group-chat-shell");
       const opening=panel.classList.contains("hidden");
@@ -1552,7 +1580,15 @@ async function openGroupConversation(groupId,group){
     $("groupLeaveCallBtn").onclick=()=>leaveGroupCall();
     $("groupMuteBtn").onclick=toggleGroupMute;
     $("groupCameraBtn").onclick=toggleGroupCamera;
-  }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Group unavailable",error.message)}
+  }catch(error){
+    if(error.status===403){
+      currentGroupId=null;currentGroup=null;
+      toast("Accept the group invitation before opening this conversation.");
+      await renderGroupsWorkspace();
+      return;
+    }
+    $("sectionContent").innerHTML=workspaceEmpty("⚠️","Group unavailable",error.message);
+  }
 }
 
 async function loadGroupMemberPanel(){
@@ -2018,6 +2054,10 @@ async function openWorkspaceSection(section){
   $("sectionTitle").textContent=title;
   $("sectionDescription").textContent=description;
   $("sectionContent").innerHTML=`<div class="workspace-loading">Opening ${sectionEscape(title)}…</div>`;
+  // Let the browser paint the selected tab and loading state immediately.
+  // This keeps mobile navigation responsive while a workspace requests data.
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+  if(currentWorkspaceSection!==section)return;
   if(section==="ai")renderAIWorkspace();
   if(section==="groups")await renderGroupsWorkspace();
   if(section==="channels")await renderChannelsWorkspace();

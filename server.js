@@ -19,6 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+const APP_BUILD = "6735";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -839,7 +840,7 @@ app.delete("/api/profile/avatar", auth, async (req, res) => {
 
 app.get("/api/health", async (_, res) => {
   const { error } = await supabase.from("users").select("id", { head: true, count: "exact" });
-  res.status(error ? 503 : 200).json({ ok: !error });
+  res.status(error ? 503 : 200).json({ ok: !error, version: "6.7.3", build: APP_BUILD });
 });
 
 app.get("/api/call-config", auth, (_, res) => {
@@ -1245,12 +1246,31 @@ app.post("/api/groups", auth, async (req, res) => {
     const { data: group, error } = await supabase.from("groups")
       .insert({ name, description, owner_id: ownerId }).select("*").single();
     if (error) throw error;
-    const rows = [{ group_id: group.id, user_id: ownerId, role: "owner" },
-      ...memberIds.map(user_id => ({ group_id: group.id, user_id, role: "member" }))];
-    const { error: memberError } = await supabase.from("group_members").insert(rows);
+    const { error: memberError } = await supabase.from("group_members")
+      .insert({ group_id: group.id, user_id: ownerId, role: "owner" });
     if (memberError) throw memberError;
-    rows.forEach(row => io.in(`user:${row.user_id}`).socketsJoin(`group:${group.id}`));
-    res.status(201).json({ ...group, role: "owner" });
+    io.in(`user:${ownerId}`).socketsJoin(`group:${group.id}`);
+
+    let invitations = [];
+    if (memberIds.length) {
+      const { data: approvedUsers, error: usersError } = await supabase.from("users")
+        .select("id").in("id", memberIds).eq("status", "approved");
+      if (usersError) throw usersError;
+      const approvedIds = (approvedUsers || []).map(user => Number(user.id));
+      if (approvedIds.length) {
+        const invitationRows = approvedIds.map(invitee_id => ({
+          group_id: group.id, invitee_id, invited_by: ownerId, status: "pending"
+        }));
+        const { data, error: invitationError } = await supabase.from("group_invitations")
+          .insert(invitationRows).select("id,group_id,invitee_id,invited_by,status,created_at");
+        if (invitationError) throw invitationError;
+        invitations = data || [];
+        invitations.forEach(invitation => io.to(`user:${invitation.invitee_id}`).emit("group:invitation", {
+          ...invitation, groupName: group.name, inviterName: req.currentUser.username
+        }));
+      }
+    }
+    res.status(201).json({ ...group, role: "owner", invitationsSent: invitations.length });
   } catch (error) {
     console.error("Create group failed:", error);
     res.status(500).json({ error: "Group could not be created." });
@@ -1457,10 +1477,15 @@ app.get("/api/groups/:groupId/messages", auth, async (req, res) => {
     const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
     if (!Number.isSafeInteger(groupId) || !(await groupAccess(groupId, userId))) return res.status(403).json({ error: "Access denied." });
     const { data, error } = await supabase.from("group_messages")
-      .select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at,users!group_messages_sender_id_fkey(username,avatar_url)")
+      .select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at,users!group_messages_sender_id_fkey(username,avatar)")
       .eq("group_id", groupId).order("created_at", { ascending: true }).limit(500);
     if (error) throw error;
-    const prepared = await signedMessages((data || []).map(m => ({ ...m, sender_name: m.users?.username || "User", avatar_url: m.users?.avatar_url || null, users: undefined })));
+    const prepared = await signedMessages((data || []).map(m => ({
+      ...m,
+      sender_name: m.users?.username || "User",
+      avatar_url: avatarProxyUrl(m.sender_id, m.users?.avatar),
+      users: undefined
+    })));
     res.json(prepared);
   } catch (error) {
     console.error("Group messages failed:", error);
