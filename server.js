@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6735";
+const APP_BUILD = "6736";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1476,16 +1476,38 @@ app.get("/api/groups/:groupId/messages", auth, async (req, res) => {
   try {
     const groupId = Number(req.params.groupId), userId = Number(req.session.userId);
     if (!Number.isSafeInteger(groupId) || !(await groupAccess(groupId, userId))) return res.status(403).json({ error: "Access denied." });
-    const { data, error } = await supabase.from("group_messages")
-      .select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at,users!group_messages_sender_id_fkey(username,avatar)")
+    // Read attachment fields when the v6.5.1 migration is installed, while
+    // remaining compatible with older group_messages tables that contain only
+    // id, group_id, sender_id, body and created_at.
+    let result = await supabase.from("group_messages")
+      .select("id,group_id,sender_id,kind,body,file_url,file_name,mime_type,created_at")
       .eq("group_id", groupId).order("created_at", { ascending: true }).limit(500);
-    if (error) throw error;
-    const prepared = await signedMessages((data || []).map(m => ({
-      ...m,
-      sender_name: m.users?.username || "User",
-      avatar_url: avatarProxyUrl(m.sender_id, m.users?.avatar),
-      users: undefined
-    })));
+    if (result.error) {
+      console.warn("Using basic group-message compatibility query:", result.error.message);
+      result = await supabase.from("group_messages")
+        .select("id,group_id,sender_id,body,created_at")
+        .eq("group_id", groupId).order("created_at", { ascending: true }).limit(500);
+    }
+    if (result.error) throw result.error;
+    const messages = result.data || [];
+    const senderIds = [...new Set(messages.map(message => Number(message.sender_id)).filter(Number.isSafeInteger))];
+    const { data: senders, error: sendersError } = senderIds.length
+      ? await supabase.from("users").select("id,username,avatar").in("id", senderIds)
+      : { data: [], error: null };
+    if (sendersError) throw sendersError;
+    const senderMap = new Map((senders || []).map(sender => [Number(sender.id), sender]));
+    const prepared = await signedMessages(messages.map(message => {
+      const sender = senderMap.get(Number(message.sender_id));
+      return {
+      ...message,
+      kind: message.kind || "text",
+      file_url: message.file_url || null,
+      file_name: message.file_name || null,
+      mime_type: message.mime_type || null,
+      sender_name: sender?.username || "User",
+      avatar_url: avatarProxyUrl(message.sender_id, sender?.avatar)
+    };
+    }));
     res.json(prepared);
   } catch (error) {
     console.error("Group messages failed:", error);
