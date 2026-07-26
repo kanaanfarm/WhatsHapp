@@ -60,7 +60,26 @@ button,input{font:inherit}.hidden{display:none!important}
 .composer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:8px;background:var(--panel);border-top:1px solid var(--border);padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
 .composer input{margin:0}.composer button:disabled,.composer input:disabled{opacity:.55;cursor:not-allowed}
 .circle-btn{width:44px;height:44px;border:1px solid var(--border);background:var(--soft);border-radius:50%;cursor:pointer}
-.record-btn.recording{background:var(--danger);color:#fff;animation:pulse 1s infinite}
+.record-btn.recording,.camera-recording{
+  background:var(--soft)!important;
+  color:var(--text)!important;
+  animation:neutralRecordPulse 1s ease-in-out infinite;
+}
+@keyframes neutralRecordPulse{50%{transform:scale(.92);box-shadow:0 0 0 5px rgba(100,110,120,.13)}}
+.apple-control-icon{color:var(--text)}
+.apple-control-icon svg{
+  width:23px;
+  height:23px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  pointer-events:none;
+}
+#recordBtn,#cameraBtn{touch-action:none;-webkit-user-select:none;user-select:none}
+.chat-video{display:block;width:min(360px,65vw);max-height:420px;border-radius:12px;background:#111}
 @keyframes pulse{50%{transform:scale(1.08)}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:11px 16px;border-radius:12px;z-index:30;box-shadow:0 12px 30px rgba(0,0,0,.2)}
 .call-overlay{position:fixed;inset:0;background:#111827;z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden}
@@ -1334,18 +1353,16 @@ html[data-composer="essential"] .workspace-chat #cameraBtn{
   backdrop-filter:blur(12px);
   pointer-events:none;
 }
-.network-quality i{
-  width:9px;
-  height:9px;
-  border-radius:50%;
-  background:#98a2aa;
-  box-shadow:0 0 0 4px rgba(152,162,170,.15);
+.network-wifi-icon{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
 }
-.network-quality.excellent i{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.15)}
-.network-quality.good i{background:#65b741;box-shadow:0 0 0 4px rgba(101,183,65,.15)}
-.network-quality.fair i{background:#f4b740;box-shadow:0 0 0 4px rgba(244,183,64,.17)}
-.network-quality.poor i{background:#f07b36;box-shadow:0 0 0 4px rgba(240,123,54,.16)}
-.network-quality.offline i{background:#d6455d;box-shadow:0 0 0 4px rgba(214,69,93,.15)}
+.network-wifi-icon circle{fill:currentColor;stroke:none}
 .network-quality.excellent{color:#087a4a}
 .network-quality.good{color:#4c7d2e}
 .network-quality.fair{color:#8a6300}
@@ -1360,5 +1377,6 @@ html[data-composer="essential"] .workspace-chat #cameraBtn{
     padding:5px 8px;
     font-size:10px;
   }
-  .network-quality i{width:8px;height:8px}
+  .network-wifi-icon{width:19px;height:19px;flex-basis:19px}
+  .chat-video{width:min(74vw,330px);max-height:52vh}
 }

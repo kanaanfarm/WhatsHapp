@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6746">
+  <link rel="stylesheet" href="style.css?v=6749">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -43,7 +43,13 @@
 
   <section id="appView" class="app app-v4 hidden">
     <div id="networkQuality" class="network-quality checking" role="status" aria-live="polite" title="Checking connection quality">
-      <i></i><span>Checking…</span>
+      <svg class="network-wifi-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 9.5a14.7 14.7 0 0 1 18 0"></path>
+        <path d="M6.3 13a9.7 9.7 0 0 1 11.4 0"></path>
+        <path d="M9.5 16.5a4.4 4.4 0 0 1 5 0"></path>
+        <circle cx="12" cy="20" r="1.25"></circle>
+      </svg>
+      <span>Checking…</span>
     </div>
     <button id="themeBtn" class="hidden" type="button" aria-hidden="true"></button>
     <button id="accentBtn" class="hidden" type="button" aria-hidden="true"></button>
@@ -117,17 +123,21 @@
       <div id="smartStrip" class="smart-strip smart-popup hidden" aria-label="AI conversation tools"><span>✦ Conversation AI</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
       <div id="typingText" class="typing"></div><div id="uploadStatus" class="upload-status hidden">Uploading…</div>
       <footer class="composer">
-        <input id="fileInput" type="file" accept="image/*,audio/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
+        <input id="fileInput" type="file" accept="image/*,audio/*,video/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
         <button id="emojiBtn" class="circle-btn" type="button" title="Emoji">😊</button>
         <button id="attachBtn" class="circle-btn attach-btn" type="button" title="Add photos or documents" aria-label="Add photos or documents" disabled>📎</button>
-        <button id="cameraBtn" class="circle-btn" type="button" title="Take photo">📷</button>
+        <button id="cameraBtn" class="circle-btn apple-control-icon" type="button" title="Tap for photo · Hold for video" aria-label="Tap for photo or hold to record video">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 6.3 9.4 4.5h5.2l1.3 1.8H19a2.5 2.5 0 0 1 2.5 2.5v8.7A2.5 2.5 0 0 1 19 20H5a2.5 2.5 0 0 1-2.5-2.5V8.8A2.5 2.5 0 0 1 5 6.3h3.1Z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
         <div class="message-entry">
           <div id="emojiPicker" class="emoji-picker hidden" aria-label="Emoji picker"></div>
           <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Write a message…" disabled></textarea>
           <small class="composer-hint">Enter to send · Shift+Enter for new line</small>
         </div>
-        <button id="recordBtn" class="circle-btn record-btn" type="button" title="Record voice">🎤</button>
+        <button id="recordBtn" class="circle-btn record-btn apple-control-icon" type="button" title="Hold to record voice" aria-label="Hold to record voice">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5"></rect><path d="M5.5 11.5v.8a6.5 6.5 0 0 0 13 0v-.8M12 18.8v2.7M8.7 21.5h6.6"></path></svg>
+        </button>
         <button id="sendBtn" class="send-btn" type="button" title="Send" aria-label="Send message" disabled><span aria-hidden="true">➤</span></button>
       </footer>
     </main>
@@ -330,6 +340,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6746"></script>
+  <script src="app.js?v=6749"></script>
 </body>
 </html>
