@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6765"}
+    data:{url:"/?v=6766"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1293,10 +1293,14 @@ async function uploadFile(file,kind){
   mediaUploadInFlight=true;
   $("uploadStatus").textContent=`Uploading ${file.name}…`;$("uploadStatus").classList.remove("hidden");$("attachBtn").disabled=true;
   try{
-    await api("/api/upload",{method:"POST",body:fd});
+    const saved=await api("/api/upload",{method:"POST",body:fd});
+    if(!saved?.id)throw new Error(`${kind==="video"?"Video":"Media"} upload did not create a message.`);
     if(caption&&activeUser&&Number(activeUser.id)===receiverId){$("messageInput").value="";updateComposer()}
     toast(kind==="voice"?"Voice sent":kind==="image"?"Photo sent":kind==="video"?"Video sent":"Document sent");return true
-  }catch(e){toast(e.message);return false}
+  }catch(e){
+    console.error("Media upload failed",{kind,name:file.name,size:file.size,type:file.type,error:e});
+    toast(kind==="video"?`Video send failed: ${e.message}`:e.message);return false
+  }
   finally{mediaUploadInFlight=false;$("uploadStatus").classList.add("hidden");$("uploadStatus").textContent="Uploading…";$("attachBtn").disabled=false}
 }
 function attachmentKind(file){return file.type.startsWith("image/")?"image":file.type.startsWith("audio/")?"voice":file.type.startsWith("video/")?"video":"file"}

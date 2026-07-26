@@ -1459,10 +1459,10 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 
 .capture-overlay{position:fixed;inset:0;width:100vw;height:100dvh;z-index:3000;background:#000;color:#fff;overflow:hidden}.capture-shell{width:min(100%,900px);height:100dvh;max-height:100dvh;margin:0 auto;display:flex;flex-direction:column;background:#000;overflow:hidden}.capture-top{flex:0 0 auto;display:grid;grid-template-columns:60px 1fr 70px;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 16px 10px;text-align:center}.capture-top button{width:44px;height:44px;border:0;border-radius:50%;background:#222;color:#fff;font-size:30px}.capture-top span{font-variant-numeric:tabular-nums}.capture-preview{position:relative;flex:1 1 auto;min-height:0;display:grid;place-items:center;overflow:hidden;background:#080808}.capture-preview video,.capture-preview canvas{width:100%;height:100%;max-height:100%;object-fit:contain}.voice-wave{font-size:clamp(24px,7vw,58px);letter-spacing:4px;animation:voicePulse .7s ease-in-out infinite alternate}.capture-tabs{flex:0 0 auto;display:flex;justify-content:center;gap:8px;padding:8px 10px;background:#000}.capture-tabs button{border:0;background:transparent;color:#aaa;font-weight:800;padding:8px 16px}.capture-tabs button.active{color:#fff;border-bottom:3px solid #43ad8c}.capture-actions{flex:0 0 auto;display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;gap:12px;padding:8px 22px calc(12px + env(safe-area-inset-bottom));background:#000;z-index:2}.capture-actions button{border:0;color:#fff;background:#252525;border-radius:999px;padding:12px 18px;font-weight:800}.capture-actions button:disabled{opacity:.55}.capture-actions #captureMainBtn{width:78px;height:78px;border-radius:50%;background:#fff;border:7px solid #333;padding:0}.capture-overlay.video-mode #captureMainBtn{background:#ef1745;border-color:#fff}.capture-overlay.recording #captureMainBtn{border-radius:22px;transform:scale(.72)}.capture-actions #captureSendBtn{background:#43ad8c}.capture-actions #captureSwitchBtn{font-size:25px;padding:10px 15px}@keyframes voicePulse{to{transform:scaleY(.65);opacity:.7}}
 
-/* Build 6765 recorder controls */
+/* Build 6766 recorder controls */
 .capture-actions #captureSendBtn{width:58px;height:58px;padding:0;border-radius:50%;font-size:28px;line-height:1;background:#43ad8c}.capture-actions #captureSendBtn:disabled{opacity:.45}.capture-overlay.recording .capture-tabs{pointer-events:none;opacity:.55}
 
-/* Build 6765: after Stop, Preview and Send are shown together; playback never starts automatically. */
+/* Build 6766: after Stop, Preview and Send are shown together; playback never starts automatically. */
 .capture-actions{grid-template-columns:auto auto 1fr auto auto}
 .capture-actions #capturePreviewBtn{min-width:110px;background:#252525}
 .capture-actions #captureSendBtn{flex:0 0 auto}
@@ -1476,7 +1476,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   .capture-actions #captureSendBtn:not(.hidden) + #captureSwitchBtn{display:none}
 }
 
-/* Build 6765 mobile recorder: keep post-stop actions visible above iPhone safe area. */
+/* Build 6766 mobile recorder: keep post-stop actions visible above iPhone safe area. */
 .capture-actions{position:sticky;bottom:0;min-height:88px;width:100%;box-sizing:border-box;padding-bottom:max(14px,env(safe-area-inset-bottom));}
 .capture-overlay.result-ready .capture-actions{grid-template-columns:1fr 1.25fr 1fr;gap:10px;padding:12px 14px max(16px,env(safe-area-inset-bottom));}
 .capture-overlay.result-ready #captureRetakeBtn{grid-column:1;display:block!important;}

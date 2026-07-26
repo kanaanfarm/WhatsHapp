@@ -1,0 +1,6 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6766
+Focused VIDEO SEND repair.
+Upload the contents of 01_RENDER_SERVER_WEBSITE to the Render/GitHub web service repository.
+After deploy verify /health returns build 6766.
+Then test 5-second video laptop -> mobile and mobile -> laptop.
+If it fails, the UI now shows the exact server rejection after "Video send failed:".
