@@ -2,6 +2,7 @@ let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
 let voiceHoldActive=false,cameraPointerHeld=false,cameraLongPressTriggered=false,cameraHoldTimer=null;
 let videoRecorder=null,videoChunks=[],videoStream=null,videoRecording=false,recordingLimitTimer=null;
+let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let currentUserFilter="all";
 let currentWorkspaceSection="chats";
@@ -22,6 +23,8 @@ const groupPeers=new Map(),groupPendingIce=new Map();
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const NOTIFICATIONS_KEY="connectchat-message-notifications";
+const PHONE_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg>';
+const VIDEO_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>';
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
 const $=id=>document.getElementById(id);
 
@@ -151,7 +154,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6749"}
+    data:{url:"/?v=6751"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1182,6 +1185,60 @@ function updateComposer(){
   resizeMessageInput();
 }
 
+function formatMediaSize(bytes){
+  if(bytes<1024)return `${bytes} B`;
+  if(bytes<1024*1024)return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/(1024*1024)).toFixed(1)} MB`;
+}
+function closeMediaConfirmation(confirmed=false){
+  const pending=pendingMediaConfirmation;
+  pendingMediaConfirmation=null;
+  $("mediaConfirmOverlay").classList.add("hidden");
+  $("mediaConfirmPreview").replaceChildren();
+  if(pendingMediaObjectUrl)URL.revokeObjectURL(pendingMediaObjectUrl);
+  pendingMediaObjectUrl=null;
+  if(pending)pending.resolve(Boolean(confirmed));
+}
+function confirmMediaUpload(file,kind){
+  if(!["image","voice","video"].includes(kind))return Promise.resolve(true);
+  if(pendingMediaConfirmation)closeMediaConfirmation(false);
+  return new Promise(resolve=>{
+    pendingMediaConfirmation={resolve};
+    pendingMediaObjectUrl=URL.createObjectURL(file);
+    const preview=$("mediaConfirmPreview");
+    preview.replaceChildren();
+    let media;
+    if(kind==="image"){
+      media=document.createElement("img");
+      media.alt="Photo preview";
+      $("mediaConfirmTitle").textContent="Send this photo?";
+    }else if(kind==="video"){
+      media=document.createElement("video");
+      media.controls=true;media.playsInline=true;
+      $("mediaConfirmTitle").textContent="Send this video?";
+    }else{
+      media=document.createElement("audio");
+      media.controls=true;
+      $("mediaConfirmTitle").textContent="Send this voice recording?";
+    }
+    media.src=pendingMediaObjectUrl;
+    preview.appendChild(media);
+    $("mediaConfirmName").textContent=file.name||({image:"Photo",video:"Video",voice:"Voice recording"}[kind]);
+    $("mediaConfirmSize").textContent=formatMediaSize(file.size);
+    $("mediaConfirmOverlay").classList.remove("hidden");
+  });
+}
+async function previewAndUploadMedia(file,kind){
+  const receiverId=Number(activeUser?.id);
+  if(!await confirmMediaUpload(file,kind))return false;
+  if(!activeUser||Number(activeUser.id)!==receiverId){toast("The conversation changed. Media was not sent.");return false}
+  return uploadFile(file,kind);
+}
+$("closeMediaConfirmBtn").onclick=()=>closeMediaConfirmation(false);
+$("cancelMediaConfirmBtn").onclick=()=>closeMediaConfirmation(false);
+$("sendMediaConfirmBtn").onclick=()=>closeMediaConfirmation(true);
+$("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverlay"))closeMediaConfirmation(false)};
+
 async function uploadFile(file,kind){
   if(!activeUser){toast("Select a user first.");return false}
   if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
@@ -1200,7 +1257,11 @@ function attachmentKind(file){return file.type.startsWith("image/")?"image":file
 async function uploadFiles(fileList){
   const files=[...fileList].slice(0,10);
   if(!files.length)return;
-  for(const file of files)await uploadFile(file,attachmentKind(file));
+  for(const file of files){
+    const kind=attachmentKind(file);
+    if(["image","voice","video"].includes(kind))await previewAndUploadMedia(file,kind);
+    else await uploadFile(file,kind);
+  }
   if(fileList.length>10)toast("A maximum of 10 files can be added at one time.");
 }
 $("attachBtn").onclick=()=>{
@@ -1211,7 +1272,7 @@ $("attachBtn").onclick=()=>{
 $("fileInput").onchange=e=>{
   uploadFiles(e.target.files);e.target.value="";
 };
-$("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)uploadFile(f,"image");e.target.value=""};
+$("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"image");e.target.value=""};
 
 const chatDropTarget=$("chatPanel");
 ["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
@@ -1236,7 +1297,7 @@ $("messageInput").addEventListener("paste",e=>{
   if(imageItem){
     e.preventDefault();
     const file=imageItem.getAsFile();
-    if(file)uploadFile(file,"image");
+    if(file)previewAndUploadMedia(file,"image");
   }
 });
 
@@ -1272,7 +1333,7 @@ async function startVoiceHoldRecording(){
       const file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type});
       isRecording=false;$("recordBtn").classList.remove("recording");
       clearRecordingFeedback();
-      if(blob.size>500)uploadFile(file,"voice");
+      if(blob.size>500)previewAndUploadMedia(file,"voice");
     };
     mediaRecorder.start(250);isRecording=true;$("recordBtn").classList.add("recording");
     recordingFeedback("Recording voice… release to send");
@@ -1308,7 +1369,7 @@ async function startVideoHoldRecording(){
       videoRecording=false;videoStream=null;
       $("cameraBtn").classList.remove("recording","camera-recording");
       clearRecordingFeedback();
-      if(blob.size>1000)uploadFile(file,"video");
+      if(blob.size>1000)previewAndUploadMedia(file,"video");
     };
     videoRecorder.start(250);
     videoRecording=true;
@@ -1764,8 +1825,8 @@ async function openGroupConversation(groupId,group){
           <div><h2>${sectionEscape(group?.name||"Group")}</h2><p>${sectionEscape(group?.description||"Private group conversation")}</p></div>
           <div class="group-call-actions">
             ${["owner","admin"].includes(group?.role)?'<button id="groupManageMembersBtn" type="button" title="Manage members">👤＋</button>':""}
-            <button id="groupAudioCallBtn" type="button" title="Start group voice call">☎</button>
-            <button id="groupVideoCallBtn" type="button" title="Start group video call">▣</button>
+            <button id="groupAudioCallBtn" class="call-symbol" type="button" title="Start group voice call" aria-label="Start group voice call">${PHONE_ICON_SVG}</button>
+            <button id="groupVideoCallBtn" class="call-symbol" type="button" title="Start group video call" aria-label="Start group video call">${VIDEO_ICON_SVG}</button>
           </div>
         </header>
         <section id="groupMemberPanel" class="group-member-panel hidden"></section>

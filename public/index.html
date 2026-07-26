@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6749">
+  <link rel="stylesheet" href="style.css?v=6751">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -108,8 +108,12 @@
         <div class="chat-identity"><h2 id="chatName">Select a user</h2><span id="chatStatus">Start a private conversation</span></div>
         <div class="call-actions">
           <button id="searchChatBtn" class="header-btn" title="Search conversation">⌕</button>
-          <button id="audioCallBtn" class="header-btn" title="Audio call" aria-label="Audio call" disabled>📞</button>
-          <button id="videoCallBtn" class="header-btn" title="Video call" aria-label="Video call" disabled>🎥</button>
+          <button id="audioCallBtn" class="header-btn call-symbol" title="Audio call" aria-label="Audio call" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg>
+          </button>
+          <button id="videoCallBtn" class="header-btn call-symbol" title="Video call" aria-label="Video call" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>
+          </button>
           <button id="chatAiBtn" class="header-btn" title="AI tools for this conversation" disabled>✦</button>
           <button id="moreChatBtn" class="header-btn" title="More">⋮</button>
         </div>
@@ -324,6 +328,20 @@
     </div>
   </section>
 
+  <section id="mediaConfirmOverlay" class="dialog-overlay media-confirm-overlay hidden" role="dialog" aria-modal="true" aria-label="Confirm media before sending">
+    <div class="dialog-card media-confirm-dialog">
+      <button id="closeMediaConfirmBtn" class="dialog-close" type="button" aria-label="Cancel media">×</button>
+      <h2 id="mediaConfirmTitle">Preview</h2>
+      <p class="dialog-intro">Check this media before uploading it to the chat.</p>
+      <div id="mediaConfirmPreview" class="media-confirm-preview"></div>
+      <div class="media-confirm-details"><b id="mediaConfirmName">Media</b><small id="mediaConfirmSize"></small></div>
+      <div class="media-confirm-actions">
+        <button id="cancelMediaConfirmBtn" class="secondary-btn" type="button">Cancel</button>
+        <button id="sendMediaConfirmBtn" class="primary" type="button">Send</button>
+      </div>
+    </div>
+  </section>
+
   <section id="profilePhotoViewer" class="profile-photo-viewer hidden" aria-label="Profile photo viewer" aria-modal="true" role="dialog">
     <header class="profile-photo-viewer-head">
       <div><small>PROFILE PHOTO</small><h2 id="profilePhotoViewerName">User</h2></div>
@@ -340,6 +358,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6749"></script>
+  <script src="app.js?v=6751"></script>
 </body>
 </html>
