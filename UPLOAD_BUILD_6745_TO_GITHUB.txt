@@ -1,0 +1,26 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6745
+
+UPLOAD ONLY THE CONTENTS OF:
+01_RENDER_SERVER_WEBSITE
+
+GitHub:
+1. Open the ConnectChat repository.
+2. Upload the 11 files from 01_RENDER_SERVER_WEBSITE.
+3. Commit the changes.
+4. Enter: Deploy ConnectChat build 6745
+
+Render:
+Wait for the deployment to finish, then verify:
+
+https://connectchat-pro-kanaan.onrender.com/api/health
+
+It must show:
+"build":"6745"
+
+Then open:
+https://connectchat-pro-kanaan.onrender.com/?v=6745
+
+This build improves the desktop Settings presentation and removes the
+duplicate Profile & privacy action.
+
+No new Supabase SQL migration is required for build 6745.

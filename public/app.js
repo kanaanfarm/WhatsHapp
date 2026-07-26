@@ -1971,11 +1971,10 @@ function renderSettingsWorkspace(){
         </button>
       </section>
       <section class="settings-mobile-card">
-        <button id="settingsStatusBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Status</b><small>Set or view your current status</small></span><i>›</i></button>
-        <button id="settingsPrivacyBtn" type="button" class="settings-mobile-row"><span>🔒</span><span><b>Profile & privacy</b><small>Photo and account information</small></span><i>›</i></button>
-        <button id="settingsSignInBtn" type="button" class="settings-mobile-row"><span>📱</span><span><b>Email or phone sign-in</b><small>Optional now; username remains the default</small></span><i>›</i></button>
-        <button id="settingsRecoveryBtn" type="button" class="settings-mobile-row"><span>🔑</span><span><b>Account recovery</b><small>View your recovery code</small></span><i>›</i></button>
-        <button id="settingsAppearanceBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Chats & appearance</b><small>Text, icons and message controls</small></span><i>›</i></button>
+        <button id="settingsStatusBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Status</b><small>View or post an update</small></span><i>›</i></button>
+        <button id="settingsSignInBtn" type="button" class="settings-mobile-row"><span>📱</span><span><b>Sign-in options</b><small>Add an email address or phone number</small></span><i>›</i></button>
+        <button id="settingsRecoveryBtn" type="button" class="settings-mobile-row"><span>🔑</span><span><b>Account recovery</b><small>Show your recovery code</small></span><i>›</i></button>
+        <button id="settingsAppearanceBtn" type="button" class="settings-mobile-row"><span>🎨</span><span><b>Appearance</b><small>Layout, text, icons and message controls</small></span><i>›</i></button>
       </section>
       <section id="settingsSignInPanel" class="settings-signin-panel hidden">
         <h2>Email or phone sign-in</h2>
@@ -1998,7 +1997,7 @@ function renderSettingsWorkspace(){
         <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
       </section>
       <section class="settings-mobile-card settings-account-card">
-        <button id="settingsSwitchBtn" type="button" class="settings-mobile-row"><span>💻</span><span><b>Switch account</b><small>Sign in using another account</small></span><i>›</i></button>
+        <button id="settingsSwitchBtn" type="button" class="settings-mobile-row"><span>💻</span><span><b>Switch account</b><small>Use a different account</small></span><i>›</i></button>
         ${me.isAdmin?`<button id="settingsAdminBtn" type="button" class="settings-mobile-row"><span>👥</span><span><b>Administration</b><small>Approve and manage users</small></span><i>›</i></button>`:""}
         <button id="settingsDeleteAccountBtn" type="button" class="settings-mobile-row settings-logout-row"><span>🗑</span><span><b>Delete my account</b><small>Permanently remove this account and its data</small></span><i>›</i></button>
         <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of ConnectChat</small></span><i>›</i></button>
@@ -2014,7 +2013,6 @@ function renderSettingsWorkspace(){
       </section>
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
-  $("settingsPrivacyBtn").onclick=()=>openProfilePage(me);
   $("settingsSignInBtn").onclick=()=>{
     $("settingsSignInPanel").classList.toggle("hidden");
     if(!$("settingsSignInPanel").classList.contains("hidden"))$("settingsSignInPanel").scrollIntoView({block:"center"});

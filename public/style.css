@@ -1173,3 +1173,142 @@ html[data-composer="essential"] .workspace-chat #cameraBtn{
   }
   .workspace-chat .message-entry{min-width:64px;padding:0 3px}
 }
+
+/* v6.7.3 build 6745: polished desktop Settings presentation.
+   The phone layout already defines these components inside its mobile media
+   query; desktop previously fell back to unstyled browser buttons. */
+@media(min-width:801px){
+  .settings-workspace-grid.settings-whatsapp{
+    grid-template-columns:minmax(300px,.82fr) minmax(430px,1.18fr);
+    align-items:start;
+    gap:18px;
+  }
+  .settings-whatsapp>section{
+    min-width:0;
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--panel);
+    box-shadow:0 8px 24px rgba(31,43,68,.06);
+  }
+  .settings-whatsapp .settings-mobile-identity,
+  .settings-whatsapp .settings-mobile-card{
+    padding:0!important;
+  }
+  .settings-identity-button{
+    width:100%;
+    min-height:112px;
+    display:grid;
+    grid-template-columns:68px minmax(0,1fr) auto;
+    align-items:center;
+    gap:15px;
+    padding:20px;
+    border:0;
+    background:transparent;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  .settings-identity-button:hover{background:var(--soft)}
+  .settings-profile-avatar{
+    width:68px;
+    height:68px;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    border-radius:50%;
+    background:linear-gradient(135deg,#536dfe,#8b5cf6);
+    color:#fff;
+    font-size:24px;
+    font-weight:900;
+  }
+  .settings-profile-avatar img{width:100%;height:100%;object-fit:cover}
+  .settings-identity-button>span:nth-child(2){
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .settings-identity-button b{
+    overflow:hidden;
+    font-size:18px;
+    line-height:1.2;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-identity-button small{
+    overflow:hidden;
+    color:var(--muted);
+    font-size:12px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-identity-button em{
+    width:max-content;
+    padding:4px 8px;
+    border-radius:999px;
+    background:var(--soft);
+    color:var(--muted);
+    font-size:10px;
+    font-style:normal;
+    font-weight:800;
+  }
+  .settings-identity-button>i,
+  .settings-mobile-row>i{
+    color:var(--muted);
+    font-size:24px;
+    font-style:normal;
+  }
+  .settings-mobile-row{
+    width:100%;
+    min-height:72px;
+    display:grid;
+    grid-template-columns:44px minmax(0,1fr) auto;
+    align-items:center;
+    gap:13px;
+    padding:13px 16px;
+    border:0;
+    border-bottom:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  .settings-mobile-row:last-child{border-bottom:0}
+  .settings-mobile-row:hover{background:var(--soft)}
+  .settings-mobile-row>span:first-child{
+    width:44px;
+    height:44px;
+    display:grid;
+    place-items:center;
+    border-radius:13px;
+    background:var(--soft);
+    font-size:20px;
+  }
+  .settings-mobile-row>span:nth-child(2){
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .settings-mobile-row b{font-size:14px;line-height:1.2}
+  .settings-mobile-row small{
+    overflow:hidden;
+    color:var(--muted);
+    font-size:11px;
+    line-height:1.35;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-logout-row b{color:#c9364f}
+  .settings-whatsapp .appearance-settings{
+    grid-column:1 / -1;
+    padding:22px!important;
+  }
+  .settings-whatsapp .settings-signin-panel{grid-column:1 / -1}
+  .settings-whatsapp .license-information-card{padding:20px!important}
+}
+
+@media(min-width:801px) and (max-width:1050px){
+  .settings-workspace-grid.settings-whatsapp{grid-template-columns:1fr}
+  .settings-whatsapp .appearance-settings,
+  .settings-whatsapp .settings-signin-panel{grid-column:auto}
+}
