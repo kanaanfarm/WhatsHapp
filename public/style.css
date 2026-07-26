@@ -1094,6 +1094,10 @@ body{position:fixed;inset:0;overflow:hidden}
     left:0;
     width:100%;
     height:auto;
+    /* Workspace pages must sit above the conversation list. Previously the
+       list used z-index:20 while this page inherited z-index:5, so Settings
+       appeared only after selecting a conversation hid the list. */
+    z-index:30;
   }
 }
 

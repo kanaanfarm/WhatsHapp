@@ -523,6 +523,10 @@ function renderUsers(){
   if(currentWorkspaceSection!=="chats")return;
   const q=$("userSearch").value.toLowerCase();
   const filtered=users.filter(u=>{
+    // ConnectChat AI has its own primary navigation destination. Keeping a
+    // second AI row among private conversations is confusing, especially on
+    // phones where the AI tab is always visible in the bottom navigation.
+    if(u.isAI)return false;
     const matches=(u.displayName||u.username).toLowerCase().includes(q)||u.username.toLowerCase().includes(q);
     if(!matches)return false;
     const archived=archivedUserIds.has(Number(u.id));
@@ -549,7 +553,7 @@ function renderUsers(){
     const aiTool=d.querySelector(".user-ai-tool");
     if(aiTool)aiTool.onclick=async event=>{event.stopPropagation();await selectUser(u);toggleSmartPopup(true)};
     const listAvatar=d.querySelector(".avatar");
-    if(listAvatar&&!u.isAI){
+    if(listAvatar&&!u.isAI&&!u.isSelf){
       listAvatar.title=`View ${name} profile`;
       listAvatar.onclick=event=>{event.stopPropagation();openProfilePage(u)};
     }
