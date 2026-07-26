@@ -1,0 +1,9 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6756
+
+Upload the CONTENTS of this 01_RENDER_SERVER_WEBSITE folder to the same GitHub repository/root used by Render.
+
+After Render finishes deploying, check /health.
+Expected response:
+{"ok":true,"version":"6.7.3","build":"6756"}
+
+Then open the app with ?v=6756 and refresh once so the old service-worker cache is replaced.
