@@ -15,6 +15,7 @@ button,input{font:inherit}.hidden{display:none!important}
 .tabs button{border:0;background:transparent;padding:10px;border-radius:10px;cursor:pointer}.tabs button.active{background:var(--panel);font-weight:700;box-shadow:0 4px 12px rgba(24,32,51,.07)}
 .auth-card input,.search-box input,.composer input{width:100%;border:1px solid var(--border);background:var(--soft);padding:13px 14px;border-radius:13px;outline:none}
 .auth-card input{margin-bottom:12px}.auth-card input:focus,.search-box input:focus,.composer input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.1)}
+.trial-license-mark{margin-top:18px;padding-top:14px;border-top:1px solid var(--border);display:grid;gap:3px;text-align:center;color:var(--muted)}.trial-license-mark b{color:var(--accent);font-size:13px;letter-spacing:.06em;text-transform:uppercase}.trial-license-mark span{font-weight:800;color:var(--text);font-size:12px}.trial-license-mark small{font-size:10px}
 .auth-label{display:block;font-size:12px;font-weight:700;margin:0 0 6px;color:#4a5568}.password-field{position:relative}.password-field input{padding-right:65px}.password-field button{position:absolute;right:7px;top:7px;border:0;background:transparent;color:var(--accent);font-weight:700;font-size:12px;padding:7px;cursor:pointer}
 .primary,.send-btn{border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:13px;padding:13px 18px;cursor:pointer}
 .primary{width:100%;margin-top:4px}.primary:disabled{opacity:.65;cursor:wait}.error{color:var(--danger);font-size:13px;min-height:20px;margin-top:10px;text-align:center}
@@ -243,6 +244,7 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 .workspace-empty h2{margin:0 0 8px}.workspace-empty p{margin:0;color:var(--muted,#74809a)}
 .workspace-loading{padding:50px;text-align:center;color:var(--muted,#74809a)}
 .settings-workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.license-information-card{padding:18px!important}.license-information-head{display:flex;align-items:center;gap:12px}.license-information-head>span{font-size:28px}.license-information-head h2{margin:0;font-size:18px}.license-information-head p{margin:3px 0 0!important}.license-information-card dl{margin:15px 0 10px}.license-information-card dl>div{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}.license-information-card dt{color:var(--muted);font-size:12px}.license-information-card dd{margin:0;font-weight:800;font-size:12px;text-align:right}.license-information-card .license-active{color:#008069}.license-information-card>small{color:var(--muted);font-size:10px}
 .settings-workspace-grid section h2{margin-top:0}
 .settings-workspace-grid section p{color:var(--muted,#74809a)}
 .settings-button-row{display:flex;flex-wrap:wrap;gap:8px}

@@ -2003,6 +2003,15 @@ function renderSettingsWorkspace(){
         <button id="settingsDeleteAccountBtn" type="button" class="settings-mobile-row settings-logout-row"><span>🗑</span><span><b>Delete my account</b><small>Permanently remove this account and its data</small></span><i>›</i></button>
         <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of ConnectChat</small></span><i>›</i></button>
       </section>
+      <section class="license-information-card">
+        <div class="license-information-head"><span>🛡️</span><div><h2>Licence information</h2><p>ConnectChat Pro v6.7.3</p></div></div>
+        <dl>
+          <div><dt>Edition</dt><dd>Trial Version</dd></div>
+          <div><dt>Licensor</dt><dd>Aboassad</dd></div>
+          <div><dt>Status</dt><dd class="license-active">Active for evaluation</dd></div>
+        </dl>
+        <small>All Rights Reserved © 2026</small>
+      </section>
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
   $("settingsPrivacyBtn").onclick=()=>openProfilePage(me);

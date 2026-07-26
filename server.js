@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6742";
+const APP_BUILD = "6744";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -605,6 +605,7 @@ app.post("/api/register", async (req, res) => {
       if (error.code === "23505") return res.status(409).json({ error: "Username already exists." });
       throw error;
     }
+    io.emit("users:changed", { reason: "registration", userId: Number(data.id), status: "pending" });
     res.status(201).json({
       ...safeUser(data),
       recoveryCode,
