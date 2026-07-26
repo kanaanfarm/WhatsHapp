@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6751">
+  <link rel="stylesheet" href="style.css?v=6752">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -108,11 +108,8 @@
         <div class="chat-identity"><h2 id="chatName">Select a user</h2><span id="chatStatus">Start a private conversation</span></div>
         <div class="call-actions">
           <button id="searchChatBtn" class="header-btn" title="Search conversation">⌕</button>
-          <button id="audioCallBtn" class="header-btn call-symbol" title="Audio call" aria-label="Audio call" disabled>
+          <button id="callMenuBtn" class="header-btn call-symbol" title="Call options" aria-label="Choose voice or video call" disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg>
-          </button>
-          <button id="videoCallBtn" class="header-btn call-symbol" title="Video call" aria-label="Video call" disabled>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>
           </button>
           <button id="chatAiBtn" class="header-btn" title="AI tools for this conversation" disabled>✦</button>
           <button id="moreChatBtn" class="header-btn" title="More">⋮</button>
@@ -199,8 +196,7 @@
           </div>
           <div id="profileViewerActions" class="profile-photo-actions hidden">
             <button id="profileMessageBtn" type="button" class="primary">Message</button>
-            <button id="profileVoiceBtn" type="button" class="secondary-btn">Voice call</button>
-            <button id="profileVideoBtn" type="button" class="secondary-btn">Video call</button>
+            <button id="profileCallBtn" type="button" class="secondary-btn">Call</button>
           </div>
           <small id="profilePhotoHelp">JPG, PNG, WEBP or GIF. Maximum 12 MB. Square photos look best.</small>
           <div id="profilePhotoResult" class="dialog-result"></div>
@@ -239,6 +235,19 @@
         <button id="shareScreenBtn" class="call-control hidden">🖥 Share screen</button>
         <button id="endCallBtn" class="end-call hidden">End call</button>
       </div>
+    </div>
+  </section>
+
+  <section id="callChoiceOverlay" class="dialog-overlay call-choice-overlay hidden" role="dialog" aria-modal="true" aria-label="Choose call type">
+    <div class="dialog-card call-choice-dialog">
+      <button id="closeCallChoiceBtn" class="dialog-close" type="button" aria-label="Close call options">×</button>
+      <h2>Start a call</h2>
+      <p id="callChoiceContact" class="dialog-intro">Choose how you want to call this user.</p>
+      <div class="call-choice-actions">
+        <button id="chooseVoiceCallBtn" type="button"><span class="call-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg></span><b>Voice call</b><small>Use microphone only</small></button>
+        <button id="chooseVideoCallBtn" type="button"><span class="call-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg></span><b>Video call</b><small>Use camera and microphone</small></button>
+      </div>
+      <small id="callChoiceOfflineNote" class="call-choice-offline hidden">This user is offline. ConnectChat will save a missed-call notification.</small>
     </div>
   </section>
 
@@ -358,6 +367,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6751"></script>
+  <script src="app.js?v=6752"></script>
 </body>
 </html>

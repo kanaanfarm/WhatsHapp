@@ -1,6 +1,7 @@
 let authMode="login", me=null, users=[], activeUser=null, socket=null, statuses=[];
 let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], isRecording=false;
-let voiceHoldActive=false,cameraPointerHeld=false,cameraLongPressTriggered=false,cameraHoldTimer=null;
+let voiceHoldActive=false,cameraPointerHeld=false,cameraLongPressTriggered=false,cameraHoldTimer=null,voiceHoldTimer=null;
+let voicePointerId=null,cameraPointerId=null;
 let videoRecorder=null,videoChunks=[],videoStream=null,videoRecording=false,recordingLimitTimer=null;
 let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
@@ -154,7 +155,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6751"}
+    data:{url:"/?v=6752"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -519,7 +520,10 @@ function connectSocket(){
   socket.on("group-call:full",payload=>{
     if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
-  socket.on("call:incoming",showIncomingCall);
+  socket.on("call:incoming",data=>{
+    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`);
+    showIncomingCall(data);
+  });
   socket.on("call:answered",async p=>{
     if(!peer||p.userId!==callPeerId)return;
     await peer.setRemoteDescription(p.answer);
@@ -534,6 +538,15 @@ function connectSocket(){
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
+  socket.on("call:queued",payload=>{
+    toast(`${payload?.receiverName||"This user"} is offline. A missed-call notification was saved.`);
+  });
+  socket.on("call:missed",payload=>{
+    const mode=payload?.mode==="video"?"video":"voice";
+    toast(`Missed ${mode} call from ${payload?.callerName||"a ConnectChat user"}.`);
+    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`);
+    if(currentWorkspaceSection==="calls")renderCallsWorkspace();
+  });
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
 function refreshUsers(force=false){
@@ -577,7 +590,7 @@ document.addEventListener("visibilitychange",()=>{if(me&&document.visibilityStat
 function resetConversation(){
   $("chatName").textContent="Select a user";$("chatStatus").textContent="Start a private conversation";$("activeAvatar").textContent="?";
   $("messages").className="messages empty-state";$("messages").innerHTML="<div><h3>Your messages</h3><p>Select a user to start chatting.</p></div>";
-  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("audioCallBtn").disabled=true;$("videoCallBtn").disabled=true;
+  $("messageInput").disabled=true;$("sendBtn").disabled=true;$("callMenuBtn").disabled=true;
   $("attachBtn").disabled=true;
   if($("chatAiBtn"))$("chatAiBtn").disabled=true;
   $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
@@ -730,7 +743,7 @@ async function selectUser(u){
   $("smartStrip")?.classList.add("hidden");$("conversationMenu")?.classList.add("hidden");
   if($("aiProviderControl"))$("aiProviderControl").classList.toggle("hidden",!u.isAI);
   $("messageInput").disabled=false;$("sendBtn").disabled=false;
-  $("audioCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;$("videoCallBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
+  $("callMenuBtn").disabled=!callsEnabled||u.isSelf||u.isAI;
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   // Reveal the selected conversation immediately on phones. Message history
   // may continue loading, but the header and composer should never wait for it.
@@ -811,7 +824,10 @@ function showCallUi(name,status,mode,incoming=false){
 
 async function startCall(mode){
   if(!callsEnabled||!activeUser||peer)return;
-  if(!activeUser.online)return toast("This user is offline.");
+  if(!activeUser.online){
+    socket.emit("call:notify",{receiverId:activeUser.id,mode});
+    return;
+  }
   try{
     callPeerId=activeUser.id;callMode=mode;
     showCallUi(activeUser.username,"Calling…",mode);
@@ -889,8 +905,20 @@ function finishCall(message="Call ended",notify=true){
   setTimeout(()=>$("callOverlay").classList.add("hidden"),500);
 }
 
-$("videoCallBtn").onclick=()=>startCall("video");
-$("audioCallBtn").onclick=()=>startCall("audio");
+function closeCallChoice(){
+  $("callChoiceOverlay").classList.add("hidden");
+}
+function openCallChoice(){
+  if(!callsEnabled||!activeUser||activeUser.isSelf||activeUser.isAI)return;
+  $("callChoiceContact").textContent=`Call ${activeUser.displayName||activeUser.username}`;
+  $("callChoiceOfflineNote").classList.toggle("hidden",Boolean(activeUser.online));
+  $("callChoiceOverlay").classList.remove("hidden");
+}
+$("callMenuBtn").onclick=openCallChoice;
+$("closeCallChoiceBtn").onclick=closeCallChoice;
+$("callChoiceOverlay").onclick=event=>{if(event.target===$("callChoiceOverlay"))closeCallChoice()};
+$("chooseVoiceCallBtn").onclick=()=>{closeCallChoice();startCall("audio")};
+$("chooseVideoCallBtn").onclick=()=>{closeCallChoice();startCall("video")};
 $("acceptCallBtn").onclick=acceptIncomingCall;
 $("declineCallBtn").onclick=()=>{if(callPeerId)socket.emit("call:reject",{receiverId:callPeerId});finishCall("Call declined",false)};
 $("endCallBtn").onclick=()=>finishCall();
@@ -935,8 +963,7 @@ function updateHeader(){
   $("chatName").textContent=activeUser.displayName||activeUser.username;
   $("chatStatus").textContent=activeUser.isAI?"AI assistant · Arabic & English":(activeUser.isSelf?"Private space for your messages and files":(activeUser.online?"Online":lastSeenText(activeUser.lastSeenAt)));
   $("activeAvatar").innerHTML=activeUser.isAI?"AI":avatarHtml(activeUser,activeUser.isSelf?"★":initials(activeUser.username));
-  $("audioCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
-  $("videoCallBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
+  $("callMenuBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("moreChatBtn").classList.remove("hidden");
   if($("chatAiBtn"))$("chatAiBtn").disabled=false;
   $("attachBtn").disabled=Boolean(activeUser.isAI);
@@ -1393,39 +1420,57 @@ function stopVideoHoldRecording(){
 
 const recordButton=$("recordBtn");
 recordButton.addEventListener("pointerdown",event=>{
+  if(event.button!==undefined&&event.button!==0)return;
   event.preventDefault();
+  if(voicePointerId!==null||isRecording||videoRecording)return;
+  voicePointerId=event.pointerId;
   voiceHoldActive=true;
-  recordButton.setPointerCapture?.(event.pointerId);
-  startVoiceHoldRecording();
+  clearTimeout(voiceHoldTimer);
+  voiceHoldTimer=setTimeout(()=>{if(voiceHoldActive)startVoiceHoldRecording()},180);
 });
-["pointerup","pointercancel","lostpointercapture"].forEach(type=>recordButton.addEventListener(type,event=>{
-  event.preventDefault();
+function releaseVoicePointer(event){
+  if(voicePointerId===null||(event.pointerId!==undefined&&event.pointerId!==voicePointerId))return;
+  clearTimeout(voiceHoldTimer);
   stopVoiceHoldRecording();
-}));
+  voicePointerId=null;
+}
+document.addEventListener("pointerup",releaseVoicePointer);
+document.addEventListener("pointercancel",releaseVoicePointer);
 recordButton.addEventListener("contextmenu",event=>event.preventDefault());
 
 const cameraButton=$("cameraBtn");
 cameraButton.addEventListener("pointerdown",event=>{
+  if(event.button!==undefined&&event.button!==0)return;
   event.preventDefault();
   if(!activeUser)return toast("Select a user first.");
+  if(cameraPointerId!==null||videoRecording||isRecording)return;
+  cameraPointerId=event.pointerId;
   cameraPointerHeld=true;
   cameraLongPressTriggered=false;
-  cameraButton.setPointerCapture?.(event.pointerId);
   clearTimeout(cameraHoldTimer);
   cameraHoldTimer=setTimeout(()=>{
-    cameraLongPressTriggered=true;
-    startVideoHoldRecording();
+    if(cameraPointerHeld){
+      cameraLongPressTriggered=true;
+      startVideoHoldRecording();
+    }
   },350);
 });
-["pointerup","pointercancel","lostpointercapture"].forEach(type=>cameraButton.addEventListener(type,event=>{
-  event.preventDefault();
+function releaseCameraPointer(event){
+  if(cameraPointerId===null||(event.pointerId!==undefined&&event.pointerId!==cameraPointerId))return;
   clearTimeout(cameraHoldTimer);
-  const takePhoto=type==="pointerup"&&!cameraLongPressTriggered&&cameraPointerHeld;
+  const takePhoto=event.type==="pointerup"&&!cameraLongPressTriggered&&cameraPointerHeld;
   if(cameraLongPressTriggered)stopVideoHoldRecording();
   cameraPointerHeld=false;
+  cameraPointerId=null;
   if(takePhoto)$("cameraInput").click();
-}));
+}
+document.addEventListener("pointerup",releaseCameraPointer);
+document.addEventListener("pointercancel",releaseCameraPointer);
 cameraButton.addEventListener("contextmenu",event=>event.preventDefault());
+window.addEventListener("blur",()=>{
+  if(voicePointerId!==null)releaseVoicePointer({});
+  if(cameraPointerId!==null)releaseCameraPointer({type:"pointercancel"});
+});
 
 $("backBtn").onclick=()=>{
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
@@ -1475,8 +1520,7 @@ if($("profileBtn"))$("profileBtn").onclick=()=>openProfilePage(me);
 if(document.querySelector(".rail-profile"))document.querySelector(".rail-profile").onclick=()=>openProfilePage(me);
 $("closeProfilePageBtn").onclick=()=>{$("profilePage").classList.add("hidden");profileTarget=null};
 $("profileMessageBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user)selectUser(user)};
-$("profileVoiceBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("audioCallBtn").click())}};
-$("profileVideoBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(()=>$("videoCallBtn").click())}};
+$("profileCallBtn").onclick=()=>{const user=profileTarget;$("profilePage").classList.add("hidden");if(user){selectUser(user).then(openCallChoice)}};
 function updateProfilePhotoViewerZoom(){
   const image=$("profilePhotoViewerImage");
   if(!image)return;
@@ -1752,6 +1796,7 @@ function bindWorkspaceUserActions(){
     if(!user)return;
     const action=btn.dataset.workAction;
     if(action==="message"){openChatsWorkspace();selectUser(user)}
+    if(action==="call"){openChatsWorkspace();selectUser(user);setTimeout(openCallChoice,80)}
     if(action==="voice"){openChatsWorkspace();selectUser(user);setTimeout(()=>startCall("audio"),80)}
     if(action==="video"){openChatsWorkspace();selectUser(user);setTimeout(()=>startCall("video"),80)}
     if(action==="profile")openProfilePage(user);
@@ -2233,7 +2278,7 @@ async function renderCallsWorkspace(){
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading call history…</div>`;
   try{
     const calls=await api("/api/calls");
-    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div>${calls.length?'<button id="clearCallHistoryBtn" type="button" class="danger-link">🗑 Clear call history</button>':""}</div>${renderPeopleCards("Voice call","voice")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon">${c.mode==="video"?"🎥":"📞"}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty("📞","No calls yet","Voice and video calls will appear here.")}`;
+    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div>${calls.length?'<button id="clearCallHistoryBtn" type="button" class="danger-link">🗑 Clear call history</button>':""}</div>${renderPeopleCards("Call","call")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon call-symbol">${c.mode==="video"?VIDEO_ICON_SVG:PHONE_ICON_SVG}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty(PHONE_ICON_SVG,"No calls yet","Voice and video calls will appear here.")}`;
     bindWorkspaceUserActions();
     if($("clearCallHistoryBtn"))$("clearCallHistoryBtn").onclick=async()=>{
       if(!confirm("Clear your complete call history? This cannot be undone."))return;

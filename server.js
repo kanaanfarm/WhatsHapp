@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6751";
+const APP_BUILD = "6752";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2500,6 +2500,36 @@ io.on("connection", async socket => {
   io.emit("presence", { userId, online: true });
   socket.emit("presence:snapshot", { userIds: [...onlineUsers.keys()] });
   markPendingMessagesDelivered(userId).catch(error => console.error("Could not mark pending messages delivered:", error));
+  try {
+    const { data: missedCalls, error: missedError } = await supabase.from("call_logs")
+      .select("id,caller_id,mode,started_at")
+      .eq("receiver_id", userId).eq("status", "missed").is("ended_at", null)
+      .order("started_at", { ascending: true }).limit(20);
+    if (missedError) throw missedError;
+    const callerIds = [...new Set((missedCalls || []).map(call => Number(call.caller_id)))];
+    const { data: callers, error: callerError } = callerIds.length
+      ? await supabase.from("users").select("id,username").in("id", callerIds)
+      : { data: [], error: null };
+    if (callerError) throw callerError;
+    const callerNames = new Map((callers || []).map(caller => [Number(caller.id), caller.username]));
+    const callIds = (missedCalls || []).map(call => Number(call.id));
+    if (callIds.length) {
+      const { error: markError } = await supabase.from("call_logs")
+        .update({ ended_at: new Date().toISOString() }).in("id", callIds);
+      if (markError) throw markError;
+      for (const call of missedCalls) {
+        socket.emit("call:missed", {
+          callId: Number(call.id),
+          callerId: Number(call.caller_id),
+          callerName: callerNames.get(Number(call.caller_id)) || "ConnectChat user",
+          mode: call.mode === "video" ? "video" : "audio",
+          startedAt: call.started_at
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Could not deliver missed-call notifications:", error.message);
+  }
 
   socket.on("privateMessage", async payload => {
     try {
@@ -2567,13 +2597,28 @@ io.on("connection", async socket => {
     }
   });
 
-  socket.on("call:start", payload => {
+  socket.on("call:start", async payload => {
     if (!CALLS_ENABLED || !eventAllowed(socket, "call", 10, 60 * 1000) || !payload || typeof payload !== "object") {
       return socket.emit("call:unavailable", {});
     }
     const receiverId = Number(payload.receiverId);
-    if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || receiverId === userId || !onlineUsers.has(receiverId)
+    if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || receiverId === userId
       || !validDescription(payload.offer, "offer")) return socket.emit("call:unavailable", { receiverId });
+    if (!onlineUsers.has(receiverId)) {
+      try {
+        const receiver = await getUserById(receiverId, "id,username,status");
+        if (!receiver || receiver.status !== "approved") return socket.emit("call:unavailable", { receiverId });
+        const mode = payload.mode === "audio" ? "audio" : "video";
+        const { error } = await supabase.from("call_logs").insert({
+          caller_id: userId, receiver_id: receiverId, mode, status: "missed"
+        });
+        if (error) throw error;
+        return socket.emit("call:queued", { receiverId, receiverName: receiver.username, mode, deliveredNow: false });
+      } catch (error) {
+        console.error("Could not save missed call:", error);
+        return socket.emit("call:unavailable", { receiverId });
+      }
+    }
     openCallPair(userId, receiverId);
     supabase.from("call_logs").insert({
       caller_id: userId, receiver_id: receiverId,
@@ -2585,6 +2630,49 @@ io.on("connection", async socket => {
       mode: payload.mode === "audio" ? "audio" : "video",
       offer: payload.offer
     });
+  });
+
+  socket.on("call:notify", async payload => {
+    try {
+      if (!CALLS_ENABLED || !eventAllowed(socket, "call-notify", 6, 60 * 1000) || !payload || typeof payload !== "object") {
+        return socket.emit("call:unavailable", {});
+      }
+      const receiverId = Number(payload.receiverId);
+      if (!Number.isSafeInteger(receiverId) || receiverId <= 0 || receiverId === userId) {
+        return socket.emit("call:unavailable", {});
+      }
+      const receiver = await getUserById(receiverId, "id,username,status");
+      if (!receiver || receiver.status !== "approved") return socket.emit("call:unavailable", {});
+      const mode = payload.mode === "video" ? "video" : "audio";
+      const online = onlineUsers.has(receiverId);
+      const notificationTime = online ? new Date().toISOString() : null;
+      const { data: callLog, error } = await supabase.from("call_logs").insert({
+        caller_id: userId,
+        receiver_id: receiverId,
+        mode,
+        status: "missed",
+        ended_at: notificationTime
+      }).select("id,started_at").single();
+      if (error) throw error;
+      if (online) {
+        io.to(`user:${receiverId}`).emit("call:missed", {
+          callId: Number(callLog.id),
+          callerId: userId,
+          callerName: username,
+          mode,
+          startedAt: callLog.started_at
+        });
+      }
+      socket.emit("call:queued", {
+        receiverId,
+        receiverName: receiver.username,
+        mode,
+        deliveredNow: online
+      });
+    } catch (error) {
+      console.error("Could not save offline call notification:", error);
+      socket.emit("call:unavailable", {});
+    }
   });
 
   socket.on("call:answer", payload => {
