@@ -2000,6 +2000,7 @@ function renderSettingsWorkspace(){
       <section class="settings-mobile-card settings-account-card">
         <button id="settingsSwitchBtn" type="button" class="settings-mobile-row"><span>💻</span><span><b>Switch account</b><small>Sign in using another account</small></span><i>›</i></button>
         ${me.isAdmin?`<button id="settingsAdminBtn" type="button" class="settings-mobile-row"><span>👥</span><span><b>Administration</b><small>Approve and manage users</small></span><i>›</i></button>`:""}
+        <button id="settingsDeleteAccountBtn" type="button" class="settings-mobile-row settings-logout-row"><span>🗑</span><span><b>Delete my account</b><small>Permanently remove this account and its data</small></span><i>›</i></button>
         <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of ConnectChat</small></span><i>›</i></button>
       </section>
     </div>`;
@@ -2032,6 +2033,20 @@ function renderSettingsWorkspace(){
   $("settingsStatusBtn").onclick=()=>$("statusBtn").click();
   $("settingsRecoveryBtn").onclick=()=>$("recoveryBtn").click();
   $("settingsSwitchBtn").onclick=logoutAndReturn;
+  $("settingsDeleteAccountBtn").onclick=async()=>{
+    const password=prompt("Enter your password to delete your ConnectChat account:");
+    if(password===null)return;
+    if(!password)return toast("Your password is required.");
+    if(!confirm("Permanently delete your ConnectChat account, messages and stored files? This cannot be undone."))return;
+    try{
+      $("settingsDeleteAccountBtn").disabled=true;
+      await api("/api/account",{method:"DELETE",body:JSON.stringify({password,confirm:"DELETE MY ACCOUNT"})});
+      alert("Your ConnectChat account was deleted.");
+      location.reload();
+    }catch(error){
+      $("settingsDeleteAccountBtn").disabled=false;toast(error.message);
+    }
+  };
   $("settingsLogoutBtn").onclick=logoutAndReturn;
   if($("settingsAdminBtn"))$("settingsAdminBtn").onclick=()=>$("adminBtn").click();
 }

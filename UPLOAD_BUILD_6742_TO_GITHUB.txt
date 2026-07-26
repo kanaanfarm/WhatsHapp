@@ -1,0 +1,24 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6742
+GITHUB / RENDER PACKAGE
+
+1. Extract this ZIP file.
+2. Open your ConnectChat repository on GitHub.
+3. Select Add file > Upload files.
+4. Drag ALL extracted files and folders into GitHub.
+5. Enter: Deploy ConnectChat build 6742
+6. Select Commit changes.
+7. Wait for Render to redeploy.
+
+Verify:
+https://connectchat-pro-kanaan.onrender.com/api/health
+
+The response must include:
+"build":"6742"
+
+Then open:
+https://connectchat-pro-kanaan.onrender.com/?v=6742
+
+IMPORTANT
+- Do not upload a .env file.
+- Keep all secret keys in Render Environment settings only.
+- No new Supabase SQL migration is required for build 6742.

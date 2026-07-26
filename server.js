@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6741";
+const APP_BUILD = "6742";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -935,6 +935,55 @@ app.delete("/api/admin/users/:userId", auth, adminOnly, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not delete user." });
+  }
+});
+
+app.delete("/api/account", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const password = String(req.body?.password || "");
+    if (req.body?.confirm !== "DELETE MY ACCOUNT") {
+      return res.status(400).json({ error: "Account deletion was not confirmed." });
+    }
+    const account = await getUserById(userId, "id,password_hash,avatar,is_admin");
+    if (!account || !(await bcrypt.compare(password, account.password_hash || dummyPasswordHash))) {
+      return res.status(401).json({ error: "Your password is incorrect." });
+    }
+    if (account.is_admin) {
+      const { count, error: countError } = await supabase.from("users")
+        .select("id", { head: true, count: "exact" }).eq("is_admin", true).neq("id", userId);
+      if (countError) throw countError;
+      if (!count) return res.status(409).json({ error: "Create or promote another administrator before deleting the last administrator account." });
+    }
+
+    const [messageFilesResult, statusFilesResult] = await Promise.all([
+      supabase.from("messages").select("file_url")
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`).not("file_url", "is", null),
+      supabase.from("user_statuses").select("file_url").eq("user_id", userId).not("file_url", "is", null)
+    ]);
+    if (messageFilesResult.error) throw messageFilesResult.error;
+    if (statusFilesResult.error) throw statusFilesResult.error;
+    const storagePaths = [...new Set([
+      account.avatar,
+      ...(messageFilesResult.data || []).map(row => row.file_url),
+      ...(statusFilesResult.data || []).map(row => row.file_url)
+    ].filter(Boolean))];
+    for (let i = 0; i < storagePaths.length; i += 100) {
+      const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(storagePaths.slice(i, i + 100));
+      if (error) console.error("Could not remove self-deleted account files:", error.message);
+    }
+
+    await destroyUserSessions(userId);
+    const { error } = await supabase.from("users").delete().eq("id", userId);
+    if (error) throw error;
+    onlineUsers.delete(userId);
+    io.in(`user:${userId}`).disconnectSockets(true);
+    io.emit("presence", { userId, online: false });
+    io.emit("users:changed");
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Self-delete account failed:", error);
+    res.status(500).json({ error: "Your account could not be deleted." });
   }
 });
 
