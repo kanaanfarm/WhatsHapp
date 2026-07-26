@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6766"}
+    data:{url:"/?v=6767"}
   };
   try{
     if("serviceWorker" in navigator){

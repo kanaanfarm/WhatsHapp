@@ -1,4 +1,4 @@
-CONNECTCHAT PRO v6.7.3 — BUILD 6766
+CONNECTCHAT PRO v6.7.3 — BUILD 6767
 
 VIDEO SEND FIX
 - Photo and voice behavior from 6764 retained.
@@ -8,4 +8,4 @@ VIDEO SEND FIX
 - Client and server upload limits aligned at 30 MB.
 - Duplicate-send protection retained.
 
-After deploy verify /health returns build 6766.
+After deploy verify /health returns build 6767.

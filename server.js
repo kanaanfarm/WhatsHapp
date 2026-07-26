@@ -22,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6766";
+const APP_BUILD = "6767";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1665,6 +1665,7 @@ app.post("/api/groups/:groupId/upload", auth, upload.single("file"), async (req,
       "Text files must use UTF-8 encoding.",
       "The recorded media type could not be verified.",
       "The recorded video could not be verified.",
+      "The recorded video format is not supported.",
       "The video recording is empty."
     ]);
     res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Group file upload failed. Run v6.5.1-group-attachments-migration.sql." });
@@ -2562,7 +2563,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
 
     const requestedKind = ["image", "voice", "video", "file"].includes(req.body.kind) ? req.body.kind : "file";
 
-    // Build 6766: do not transcode every video before it can be sent.
+    // Build 6767: do not transcode every video before it can be sent.
     // The browser preview already proves that most recordings are valid media.
     // For video we first verify and store the original bytes immediately. This
     // avoids slow ffmpeg transcoding on Render blocking even a short recording.
@@ -2571,11 +2572,27 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     // because it has been reliable and gives consistent M4A playback.
     let stored = null;
     if (requestedKind === "video") {
-      // Build 6766: keep the exact Blob that already played in the local Preview.
-      // Validate the browser recording without transcoding it. This avoids a
-      // second media-processing failure between Preview and Send on Render.
-      const verified = await verifyRecordedVideo(req.file);
-      stored = { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: "video" };
+      // Build 6767: the same Blob that plays in Preview must be the Blob sent.
+      // Do not reject browser MediaRecorder output just because a signature
+      // library cannot classify it. Safari/Chrome can produce fragmented MP4
+      // or WebM variants that are valid/playable but not detected reliably.
+      if (!req.file?.buffer || req.file.buffer.length < 1024) throw new Error("The video recording is empty.");
+      const declaredMime = String(req.file.mimetype || "").split(";")[0].trim().toLowerCase();
+      const declaredVideoTypes = {
+        "video/webm": { mime: "video/webm", ext: "webm" },
+        "video/mp4": { mime: "video/mp4", ext: "mp4" },
+        "video/quicktime": { mime: "video/quicktime", ext: "mov" }
+      };
+      let videoType = declaredVideoTypes[declaredMime] || basicRecordedVideoSignature(req.file.buffer);
+      if (!videoType) {
+        // Last fallback: try normal detection, but do not transcode.
+        try {
+          const verified = await verifyUpload(req.file);
+          if (verified.kind === "video") videoType = verified;
+        } catch {}
+      }
+      if (!videoType) throw new Error("The recorded video format is not supported.");
+      stored = { buffer: req.file.buffer, mime: videoType.mime, ext: videoType.ext, kind: "video" };
     } else if (requestedKind === "voice") {
       stored = await normalizeRecordedMedia(req.file, "voice");
       if (!stored) {
@@ -2624,6 +2641,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
       "Text files must use UTF-8 encoding.",
       "The recorded media type could not be verified.",
       "The recorded video could not be verified.",
+      "The recorded video format is not supported.",
       "The video recording is empty."
     ]);
     res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Upload failed." });
