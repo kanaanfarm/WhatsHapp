@@ -155,7 +155,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6756"}
+    data:{url:"/?v=6757"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -989,7 +989,7 @@ function messageContent(msg){
   const fileUrl=escapeHtml(safeFileUrl(msg.file_url));
   if(msg.kind==="image"&&fileUrl)return `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer"><img class="chat-image" src="${fileUrl}" alt="Shared image"></a>${caption}`;
   if(msg.kind==="voice"&&fileUrl)return `<audio class="voice-note" controls preload="metadata" src="${fileUrl}"></audio>${caption}`;
-  if(String(msg.mime_type||"").startsWith("video/")&&fileUrl)return `<video class="chat-video" controls playsinline preload="metadata" src="${fileUrl}"></video>${caption}`;
+  if(String(msg.mime_type||"").startsWith("video/")&&fileUrl)return `<video class="chat-video" controls playsinline preload="metadata" src="${fileUrl}" onerror="this.classList.add('media-playback-error');this.nextElementSibling?.classList.remove('hidden')"></video><a class="file-link hidden" href="${fileUrl}" target="_blank" rel="noopener noreferrer">Open video file</a>${caption}`;
   if(msg.kind==="file"&&fileUrl)return `<a class="file-link" href="${fileUrl}" target="_blank" rel="noopener noreferrer">📎 ${escapeHtml(msg.file_name||"Download file")}</a>${caption}`;
   if(msg.kind!=="text")return `<span>Attachment unavailable</span>${caption}`;
   return escapeHtml(msg.body||"");
@@ -1008,6 +1008,16 @@ function updateMessageReceipt(payload){
   const info=receiptInfo(payload);receipt.textContent=info.text;receipt.className=info.className;
 }
 function addMessage(msg){
+  // A message can arrive from the upload response/history refresh and Socket.IO nearly at the same time.
+  // Render each persisted message ID only once on this client.
+  if(msg?.id!=null){
+    const existing=[...$("messages").querySelectorAll(".msg")].find(item=>String(item.dataset.messageId)===String(msg.id));
+    if(existing){
+      const index=activeConversation.findIndex(item=>String(item.id)===String(msg.id));
+      if(index>=0)activeConversation[index]={...activeConversation[index],...msg};
+      return existing;
+    }
+  }
   if(!activeUser?.isAI&&msg?.id&&!activeConversation.some(item=>Number(item.id)===Number(msg.id))){
     activeConversation.push(msg);
     if(currentInsightTab!=="overview")renderWorkspaceInsightTab(currentInsightTab);
@@ -1424,7 +1434,19 @@ function stopVideoHoldRecording(){
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment";
+function isAppleSafariRecorder(){
+  const ua=navigator.userAgent||"";
+  return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
+}
 function captureMime(types){return types.find(t=>MediaRecorder.isTypeSupported?.(t))||""}
+function captureRecorderMime(mode){
+  if(mode==="video")return isAppleSafariRecorder()
+    ? captureMime(["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/mp4"])
+    : captureMime(["video/webm;codecs=vp8,opus","video/webm","video/mp4"]);
+  return isAppleSafariRecorder()
+    ? captureMime(["audio/mp4","audio/aac","audio/webm;codecs=opus","audio/webm"])
+    : captureMime(["audio/webm;codecs=opus","audio/webm","audio/mp4"]);
+}
 function stopCaptureStream(){captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;$("captureVideo").srcObject=null}
 function resetCaptureResult(){captureBlob=null;$("captureRetakeBtn").classList.add("hidden");$("captureSendBtn").classList.add("hidden");$("captureMainBtn").classList.remove("hidden");$("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");$("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");}
 function stopCaptureClock(){clearInterval(captureClock);captureClock=null;$("captureTimer").textContent="00:00"}
@@ -1444,7 +1466,7 @@ async function captureMain(){
    const v=$("captureVideo"),c=$("captureCanvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));showCaptureResult();return;
  }
  if(captureRecorder?.state==="recording"){captureRecorder.stop();return}
- captureChunks=[];const types=captureMode==="video"?["video/mp4","video/webm;codecs=vp8,opus","video/webm"]:["audio/mp4","audio/webm;codecs=opus","audio/webm"];const mime=captureMime(types);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{captureBlob=new Blob(captureChunks,{type:captureRecorder.mimeType||(captureMode==="video"?"video/webm":"audio/webm")});$("captureOverlay").classList.remove("recording");showCaptureResult()};captureRecorder.start(200);$("captureOverlay").classList.add("recording");startCaptureClock();
+ captureChunks=[];const mime=captureRecorderMime(captureMode);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{const actualType=captureRecorder.mimeType||mime||(captureMode==="video"?(isAppleSafariRecorder()?"video/mp4":"video/webm"):(isAppleSafariRecorder()?"audio/mp4":"audio/webm"));captureBlob=new Blob(captureChunks,{type:actualType});$("captureOverlay").classList.remove("recording");if(captureBlob.size<512){toast("The recording was empty. Please record again.");prepareCapture(captureMode);return}showCaptureResult()};captureRecorder.start(250);$("captureOverlay").classList.add("recording");startCaptureClock();
 }
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
