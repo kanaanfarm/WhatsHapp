@@ -22,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6764";
+const APP_BUILD = "6765";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2533,21 +2533,33 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
 
     const requestedKind = ["image", "voice", "video", "file"].includes(req.body.kind) ? req.body.kind : "file";
 
-    // Recorded media from iPhone/Safari can be a valid fragmented MP4/M4A that
-    // generic magic-byte detection does not always classify correctly. For
-    // voice/video, let ffmpeg validate + normalize the upload first. If that
-    // is unavailable or fails, fall back to the normal strict verifier.
+    // Build 6765: do not transcode every video before it can be sent.
+    // The browser preview already proves that most recordings are valid media.
+    // For video we first verify and store the original bytes immediately. This
+    // avoids slow ffmpeg transcoding on Render blocking even a short recording.
+    // ffmpeg is now only a fallback for Safari/iPhone fragmented MP4 that the
+    // strict file signature detector cannot identify. Voice keeps normalization
+    // because it has been reliable and gives consistent M4A playback.
     let stored = null;
-    if (["voice", "video"].includes(requestedKind)) {
-      stored = await normalizeRecordedMedia(req.file, requestedKind);
-    }
-    if (!stored) {
-      const verified = await verifyUpload(req.file);
-      const kindMatches = verified.kind === requestedKind ||
-        (requestedKind === "voice" && verified.kind === "video" && req.file.mimetype === "audio/webm");
-      if (["voice", "video"].includes(requestedKind) && !kindMatches) {
-        throw new Error("The recorded media type could not be verified.");
+    if (requestedKind === "video") {
+      try {
+        const verified = await verifyUpload(req.file);
+        if (verified.kind !== "video") throw new Error("The recorded media type could not be verified.");
+        stored = { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: "video" };
+      } catch (verifyError) {
+        stored = await normalizeRecordedMedia(req.file, "video");
+        if (!stored) throw verifyError;
       }
+    } else if (requestedKind === "voice") {
+      stored = await normalizeRecordedMedia(req.file, "voice");
+      if (!stored) {
+        const verified = await verifyUpload(req.file);
+        const kindMatches = verified.kind === "voice" || (verified.kind === "video" && req.file.mimetype === "audio/webm");
+        if (!kindMatches) throw new Error("The recorded media type could not be verified.");
+        stored = { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: "voice" };
+      }
+    } else {
+      const verified = await verifyUpload(req.file);
       stored = { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: requestedKind === "file" ? verified.kind : requestedKind };
     }
     const extension = stored.ext ? `.${stored.ext}` : "";

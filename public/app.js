@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6764"}
+    data:{url:"/?v=6765"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1285,7 +1285,7 @@ async function uploadFile(file,kind){
   if(mediaUploadInFlight){toast("Please wait for the current upload to finish.");return false}
   if(!activeUser){toast("Select a user first.");return false}
   if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
-  if(file.size>12*1024*1024){toast(`${file.name} is larger than 12 MB.`);return false}
+  if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
   const caption=$("messageInput").value.trim();
   const receiverId=Number(activeUser.id);
   const uploadId=`${kind}:${receiverId}:${file.name}:${file.size}:${file.lastModified||0}`;
@@ -2148,7 +2148,7 @@ function appendGroupMessage(message){
 
 async function uploadGroupFile(file){
   if(!currentGroupId)return false;
-  if(file.size>12*1024*1024){toast(`${file.name} is larger than 12 MB.`);return false}
+  if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
   const caption=$("workspaceChatInput")?.value.trim()||"";
   const form=new FormData();form.append("file",file);form.append("caption",caption);
   const input=$("workspaceChatInput"),attach=$("groupAttachBtn");

@@ -1,0 +1,11 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6765
+
+VIDEO SEND FIX
+- Photo and voice behavior from 6764 retained.
+- Video Record -> Stop -> Preview or Send retained.
+- Video upload no longer waits for ffmpeg transcoding when the original recording is already valid.
+- Safari/iPhone fragmented MP4 uses ffmpeg only as a verification/normalization fallback.
+- Client and server upload limits aligned at 30 MB.
+- Duplicate-send protection retained.
+
+After deploy verify /health returns build 6765.

@@ -1,5 +1,5 @@
-const CACHE="connectchat-v6764";
-const ASSETS=["/","/index.html","/style.css?v=6764","/app.js?v=6764","/manifest.json","/logo.svg"];
+const CACHE="connectchat-v6765";
+const ASSETS=["/","/index.html","/style.css?v=6765","/app.js?v=6765","/manifest.json","/logo.svg"];
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener("activate",e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener("fetch",e=>{
@@ -9,7 +9,7 @@ self.addEventListener("fetch",e=>{
 });
 self.addEventListener("notificationclick",event=>{
   event.notification.close();
-  const target=event.notification.data?.url||"/?v=6764";
+  const target=event.notification.data?.url||"/?v=6765";
   event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(windows=>{
     const existing=windows[0];
     if(existing){existing.navigate(target);return existing.focus()}
