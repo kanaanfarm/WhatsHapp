@@ -155,7 +155,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6752"}
+    data:{url:"/?v=6753"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -191,14 +191,14 @@ async function measureNetworkQuality(){
     const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
     const effective=connection?.effectiveType||"";
     const downlink=Number(connection?.downlink||0);
-    let level="excellent",label="Excellent";
-    if(latency>1200||effective==="slow-2g"){level="poor";label="Poor"}
+    let level="good",label="Good";
+    if(latency>1200||effective==="slow-2g"){level="poor";label="Bad"}
     else if(latency>650||effective==="2g"){level="fair";label="Fair"}
-    else if(latency>280||effective==="3g"){level="good";label="Good"}
+    else if(effective==="3g"){level="fair";label="Fair"}
     const speed=downlink?` · ${downlink.toFixed(1)} Mbps`:"";
     setNetworkQuality(level,label,`${latency} ms${speed}`);
   }catch{
-    setNetworkQuality("poor","Poor","The server is responding slowly or cannot be reached");
+    setNetworkQuality("poor","Bad","The server is responding slowly or cannot be reached");
   }finally{
     clearTimeout(timeout);
   }
@@ -417,7 +417,7 @@ function connectSocket(){
   if(socket)socket.disconnect();
   socket=io();
   socket.on("connect",()=>{refreshUsers();measureNetworkQuality()});
-  socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Poor","Disconnected from the ConnectChat server")});
+  socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Bad","Disconnected from the ConnectChat server")});
   socket.on("privateMessage",msg=>{
     const incoming=Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)!==Number(me.id);
     const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
