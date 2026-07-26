@@ -1,0 +1,12 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6762
+
+MEDIA RECORDING TEST BUILD
+- Voice/video recording is fully finalized before the send arrow appears.
+- Send arrow appears only after Stop and a complete preview Blob exists.
+- Safari/iPhone recording uses a single final MediaRecorder Blob (no timeslice chunk concatenation).
+- Photo capture shows preview, then Retake or send arrow.
+- Voice/video preview remains playable before sending.
+- Fixed HTTP suffix byte-range handling used by desktop browsers to load media duration/metadata.
+- Normalized stored media filenames now match the actual MP4/M4A/WebM type.
+- Existing duplicate-upload lock retained.
+- Photos continue to render directly inside chat.

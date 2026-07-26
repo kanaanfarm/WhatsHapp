@@ -1,0 +1,9 @@
+ConnectChat Pro v6.7.3 Build 6761
+
+Fixes:
+- Photos render directly inside chat instead of showing only Shared image/file links.
+- Voice/video/photo media uses an authenticated same-origin streaming endpoint for reliable desktop/mobile playback.
+- HTTP byte-range support added for audio/video playback and metadata duration.
+- FFmpeg normalization has a timeout so uploads cannot remain stuck indefinitely.
+- Empty recordings are blocked before upload.
+- Build/cache version updated to 6761.

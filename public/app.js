@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6760"}
+    data:{url:"/?v=6762"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -987,10 +987,12 @@ function safeFileUrl(value){
 }
 function messageContent(msg){
   const caption=msg.body?`<div class="caption">${escapeHtml(msg.body)}</div>`:"";
-  const fileUrl=escapeHtml(safeFileUrl(msg.file_url));
-  if(msg.kind==="image"&&fileUrl)return `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer"><img class="chat-image" src="${fileUrl}" alt="Shared image"></a>${caption}`;
+  const signedUrl=safeFileUrl(msg.file_url);
+  const mediaUrl=msg?.id?`/api/message-media/${encodeURIComponent(msg.id)}`:signedUrl;
+  const fileUrl=escapeHtml(mediaUrl);
+  if(msg.kind==="image"&&fileUrl)return `<img class="chat-image" src="${fileUrl}" alt="Photo" loading="lazy" onclick="window.open(this.src,'_blank')">${caption}`;
   if(msg.kind==="voice"&&fileUrl)return `<audio class="voice-note" controls preload="metadata" src="${fileUrl}"></audio>${caption}`;
-  if(String(msg.mime_type||"").startsWith("video/")&&fileUrl)return `<video class="chat-video" controls playsinline preload="metadata" src="${fileUrl}" onerror="this.classList.add('media-playback-error');this.nextElementSibling?.classList.remove('hidden')"></video><a class="file-link hidden" href="${fileUrl}" target="_blank" rel="noopener noreferrer">Open video file</a>${caption}`;
+  if(String(msg.mime_type||"").startsWith("video/")&&fileUrl)return `<video class="chat-video" controls playsinline preload="metadata" src="${fileUrl}" onerror="this.classList.add('media-playback-error');this.nextElementSibling?.classList.remove('hidden')"></video><a class="file-link hidden" href="${fileUrl}" target="_blank" rel="noopener noreferrer">Open video</a>${caption}`;
   if(msg.kind==="file"&&fileUrl)return `<a class="file-link" href="${fileUrl}" target="_blank" rel="noopener noreferrer">📎 ${escapeHtml(msg.file_name||"Download file")}</a>${caption}`;
   if(msg.kind!=="text")return `<span>Attachment unavailable</span>${caption}`;
   return escapeHtml(msg.body||"");
@@ -1438,7 +1440,7 @@ function stopVideoHoldRecording(){
 
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment";
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -1452,49 +1454,111 @@ function captureRecorderMime(mode){
     ? captureMime(["audio/mp4","audio/aac","audio/webm;codecs=opus","audio/webm"])
     : captureMime(["audio/webm;codecs=opus","audio/webm","audio/mp4"]);
 }
-function stopCaptureStream(){captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;const v=$("captureVideo");v.srcObject=null;if(v.src&&v.src.startsWith("blob:")){URL.revokeObjectURL(v.src);v.removeAttribute("src")}v.controls=false;v.muted=true}
-function resetCaptureResult(){captureBlob=null;$("captureRetakeBtn").classList.add("hidden");$("captureSendBtn").classList.add("hidden");$("captureMainBtn").classList.remove("hidden");$("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");$("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");}
-function stopCaptureClock(){clearInterval(captureClock);captureClock=null;$("captureTimer").textContent="00:00"}
+function clearCapturePreviewUrl(){
+  if(capturePreviewUrl){URL.revokeObjectURL(capturePreviewUrl);capturePreviewUrl=null;}
+}
+function stopCaptureStream(){
+  captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;
+  const v=$("captureVideo");v.srcObject=null;
+  if(v.src&&v.src.startsWith("blob:")){URL.revokeObjectURL(v.src);v.removeAttribute("src")}
+  v.controls=false;v.muted=true;
+}
+function setCaptureSendReady(ready){
+  const send=$("captureSendBtn");
+  send.disabled=!ready;
+  send.classList.toggle("hidden",!ready);
+  send.textContent="➤";
+  send.title="Send";send.setAttribute("aria-label","Send recording");
+}
+function resetCaptureResult(){
+  clearCapturePreviewUrl();captureBlob=null;captureStopping=false;
+  $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);
+  $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
+  $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
+  $("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");
+  $("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");
+}
+function stopCaptureClock(reset=true){clearInterval(captureClock);captureClock=null;if(reset)$("captureTimer").textContent="00:00"}
 function startCaptureClock(){captureStartedAt=Date.now();captureClock=setInterval(()=>{const s=Math.floor((Date.now()-captureStartedAt)/1000);$("captureTimer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`},250)}
 async function prepareCapture(mode){
-  captureMode=mode; stopCaptureStream(); stopCaptureClock(); resetCaptureResult();
+  captureMode=mode;
+  if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
+  captureRecorder=null;captureChunks=[];
+  stopCaptureStream();stopCaptureClock();resetCaptureResult();
   $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
-  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1); document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
-  try{captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});if(mode!=="voice"){$("captureVideo").srcObject=captureStream;await $("captureVideo").play().catch(()=>{})}}
-  catch(e){toast(mode==="voice"?"Microphone permission is required.":mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");closeCapture()}
+  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+  try{
+    captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});
+    if(mode!=="voice"){$("captureVideo").srcObject=captureStream;await $("captureVideo").play().catch(()=>{})}
+  }catch(e){toast(mode==="voice"?"Microphone permission is required.":mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");closeCapture()}
 }
-function openCapture(mode){if(!activeUser)return toast("Select a user first.");if(activeUser.isAI)return toast("Media recording is available in human chats.");if(!navigator.mediaDevices?.getUserMedia)return toast("Camera/microphone recording is not supported by this browser.");$("captureOverlay").classList.remove("hidden");prepareCapture(mode)}
-function closeCapture(){if(captureRecorder?.state==="recording")captureRecorder.stop();stopCaptureStream();stopCaptureClock();captureBlob=null;$("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording")}
+function openCapture(mode){
+  if(!activeUser)return toast("Select a user first.");
+  if(activeUser.isAI)return toast("Media recording is available in human chats.");
+  if(!navigator.mediaDevices?.getUserMedia)return toast("Camera/microphone recording is not supported by this browser.");
+  $("captureOverlay").classList.remove("hidden");prepareCapture(mode);
+}
+function closeCapture(){
+  if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
+  captureRecorder=null;captureChunks=[];captureStopping=false;clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;
+  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording");
+}
 function showCaptureResult(){
-  stopCaptureClock();
-  $("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSendBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden");
+  stopCaptureClock(false);
+  $("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden");
   if(captureBlob&&captureMode!=="photo"){
-    stopCaptureStream();
-    const v=$("captureVideo");
-    v.srcObject=null;v.src=URL.createObjectURL(captureBlob);v.controls=true;v.muted=false;v.loop=false;v.classList.remove("hidden");
+    stopCaptureStream();clearCapturePreviewUrl();
+    const v=$("captureVideo");capturePreviewUrl=URL.createObjectURL(captureBlob);v.srcObject=null;v.src=capturePreviewUrl;v.controls=true;v.muted=false;v.loop=false;v.classList.remove("hidden");
+    v.load();
   }
+  setCaptureSendReady(Boolean(captureBlob&&captureBlob.size>=1024));
+}
+async function finalizeCaptureRecording(recorder,mime){
+  // MediaRecorder's final dataavailable event is delivered before stop. Building
+  // the Blob only here guarantees the recording is complete before Send appears.
+  const actualType=recorder.mimeType||mime||(captureMode==="video"?(isAppleSafariRecorder()?"video/mp4":"video/webm"):(isAppleSafariRecorder()?"audio/mp4":"audio/webm"));
+  captureBlob=new Blob(captureChunks,{type:actualType});captureStopping=false;$("captureOverlay").classList.remove("recording");
+  if(captureBlob.size<1024){toast("The recording was empty. Please record again.");await prepareCapture(captureMode);return}
+  showCaptureResult();
 }
 async function captureMain(){
- if(captureMode==="photo"){
-   const v=$("captureVideo"),c=$("captureCanvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));showCaptureResult();return;
- }
- if(captureRecorder?.state==="recording"){try{captureRecorder.requestData()}catch{}captureRecorder.stop();return}
- captureChunks=[];const mime=captureRecorderMime(captureMode);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{const actualType=captureRecorder.mimeType||mime||(captureMode==="video"?(isAppleSafariRecorder()?"video/mp4":"video/webm"):(isAppleSafariRecorder()?"audio/mp4":"audio/webm"));captureBlob=new Blob(captureChunks,{type:actualType});$("captureOverlay").classList.remove("recording");if(captureBlob.size<512){toast("The recording was empty. Please record again.");prepareCapture(captureMode);return}showCaptureResult()};captureRecorder.start(1000);$("captureOverlay").classList.add("recording");startCaptureClock();
+  if(captureMode==="photo"){
+    const v=$("captureVideo"),c=$("captureCanvas");
+    if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
+    c.width=v.videoWidth;c.height=v.videoHeight;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");
+    captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));
+    if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
+    showCaptureResult();return;
+  }
+  if(captureRecorder?.state==="recording"){
+    if(captureStopping)return;captureStopping=true;$("captureMainBtn").disabled=true;$("captureMainBtn").setAttribute("aria-label","Finishing recording");
+    try{captureRecorder.requestData()}catch{}
+    captureRecorder.stop();return;
+  }
+  if(!captureStream?.active)return toast(captureMode==="voice"?"Microphone is not ready.":"Camera is not ready.");
+  captureChunks=[];captureBlob=null;captureStopping=false;
+  const mime=captureRecorderMime(captureMode);const recorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder=recorder;
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size)captureChunks.push(e.data)};
+  recorder.onerror=()=>{captureStopping=false;$("captureOverlay").classList.remove("recording");toast("Recording failed. Please try again.");prepareCapture(captureMode)};
+  recorder.onstop=()=>finalizeCaptureRecording(recorder,mime);
+  // Do not use a timeslice. Safari/iPhone MP4/AAC recordings can become invalid
+  // when chunks are concatenated. One final Blob on stop is much more reliable.
+  recorder.start();$("captureOverlay").classList.add("recording");$("captureMainBtn").setAttribute("aria-label","Stop recording");startCaptureClock();
 }
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
 $("captureSendBtn").onclick=async()=>{
-  if(!captureBlob||captureSendInFlight)return;
-  captureSendInFlight=true;$("captureSendBtn").disabled=true;
+  if(!captureBlob||captureBlob.size<1024||captureSendInFlight||captureStopping)return;
+  captureSendInFlight=true;setCaptureSendReady(false);
   try{
     const type=captureBlob.type||({photo:"image/jpeg",video:"video/webm",voice:"audio/webm"}[captureMode]);
-    const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):"webm";
+    const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):type.includes("ogg")?"ogg":"webm";
     const kind=captureMode==="photo"?"image":captureMode;
-    const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type});
+    const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
     const sent=await uploadFile(file,kind);
-    if(sent)closeCapture();
-  }finally{captureSendInFlight=false;if($("captureSendBtn"))$("captureSendBtn").disabled=false}
+    if(sent)closeCapture();else setCaptureSendReady(true);
+  }finally{captureSendInFlight=false;if(captureBlob&&!$("captureOverlay").classList.contains("hidden"))setCaptureSendReady(true)}
 };
 $("captureSwitchBtn").onclick=async()=>{captureFacing=captureFacing==="environment"?"user":"environment";await prepareCapture(captureMode)};
 document.querySelectorAll(".capture-tabs button").forEach(b=>b.onclick=()=>prepareCapture(b.dataset.mode));

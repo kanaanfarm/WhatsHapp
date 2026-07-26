@@ -22,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6760";
+const APP_BUILD = "6762";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -585,9 +585,11 @@ async function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
     const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args], { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) { settled = true; child.kill("SIGKILL"); reject(new Error("Media conversion timed out.")); } }, 25000);
     child.stderr.on("data", chunk => { stderr += chunk.toString().slice(0, 8192); });
-    child.on("error", reject);
-    child.on("close", code => code === 0 ? resolve() : reject(new Error(stderr || `ffmpeg exited with ${code}`)));
+    child.on("error", error => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
+    child.on("close", code => { if (!settled) { settled = true; clearTimeout(timer); code === 0 ? resolve() : reject(new Error(stderr || `ffmpeg exited with ${code}`)); } });
   });
 }
 
@@ -2220,6 +2222,57 @@ app.delete("/api/conversations/:otherId", auth, async (req, res) => {
   }
 });
 
+app.get("/api/message-media/:messageId", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const messageId = Number(req.params.messageId);
+    if (!Number.isSafeInteger(messageId) || messageId <= 0) return res.status(400).end();
+    const { data: message, error } = await supabase.from("messages")
+      .select("id,sender_id,receiver_id,file_url,file_name,mime_type")
+      .eq("id", messageId).maybeSingle();
+    if (error) throw error;
+    if (!message || (Number(message.sender_id) !== userId && Number(message.receiver_id) !== userId)) return res.status(404).end();
+    if (!message.file_url) return res.status(404).end();
+    const { data, error: downloadError } = await supabase.storage.from(STORAGE_BUCKET).download(message.file_url);
+    if (downloadError || !data) throw downloadError || new Error("Media download failed.");
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const total = buffer.length;
+    const mime = message.mime_type || "application/octet-stream";
+    const safeName = cleanFileName(message.file_name || `media-${message.id}`);
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Disposition", `inline; filename=\"${safeName.replace(/\"/g, "")}\"`);
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader("Accept-Ranges", "bytes");
+    const range = req.headers.range;
+    if (range && /^bytes=\d*-\d*$/.test(range)) {
+      const [a,b] = range.slice(6).split("-");
+      let start, end;
+      if (!a && b) {
+        // Suffix-byte range (for example bytes=-500) is commonly used by
+        // browsers to read media metadata from the end of a file.
+        const suffix = Number(b);
+        if (!Number.isFinite(suffix) || suffix <= 0 || total === 0) return res.status(416).end();
+        start = Math.max(0, total - suffix);
+        end = total - 1;
+      } else {
+        start = Number(a || 0);
+        end = b ? Number(b) : total - 1;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= total || start > end || total === 0) return res.status(416).end();
+        end = Math.min(end, total - 1);
+      }
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+      res.setHeader("Content-Length", end-start+1);
+      return res.end(buffer.subarray(start,end+1));
+    }
+    res.setHeader("Content-Length", total);
+    res.end(buffer);
+  } catch (error) {
+    console.error("Message media proxy failed:", error?.message || error);
+    res.status(404).end();
+  }
+});
+
 app.get("/api/messages/:userId", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
@@ -2514,7 +2567,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
       kind: stored.kind,
       body: cleanText(req.body.caption, 500),
       file_url: storagePath,
-      file_name: cleanFileName(req.file.originalname),
+      file_name: cleanFileName(`${path.parse(req.file.originalname || "media").name}.${stored.ext || path.extname(req.file.originalname || "").replace(/^\./, "") || "bin"}`),
       mime_type: stored.mime,
       delivered_at: deliveredAt,
       read_at: readAt
