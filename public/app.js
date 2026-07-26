@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6762"}
+    data:{url:"/?v=6763"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1440,7 +1440,7 @@ function stopVideoHoldRecording(){
 
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -1470,9 +1470,17 @@ function setCaptureSendReady(ready){
   send.textContent="➤";
   send.title="Send";send.setAttribute("aria-label","Send recording");
 }
+function setCapturePreviewReady(ready){
+  const preview=$("capturePreviewBtn");
+  const show=Boolean(ready&&captureMode!=="photo");
+  preview.disabled=!show;
+  preview.classList.toggle("hidden",!show);
+  preview.textContent="▶ Preview";
+  capturePreviewPlaying=false;
+}
 function resetCaptureResult(){
-  clearCapturePreviewUrl();captureBlob=null;captureStopping=false;
-  $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);
+  clearCapturePreviewUrl();captureBlob=null;captureStopping=false;capturePreviewPlaying=false;
+  $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);setCapturePreviewReady(false);
   $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
   $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
   $("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");
@@ -1489,7 +1497,7 @@ async function prepareCapture(mode){
   $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
   try{
     captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});
-    if(mode!=="voice"){$("captureVideo").srcObject=captureStream;await $("captureVideo").play().catch(()=>{})}
+    if(mode!=="voice"){const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;await live.play().catch(()=>{})}
   }catch(e){toast(mode==="voice"?"Microphone permission is required.":mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");closeCapture()}
 }
 function openCapture(mode){
@@ -1508,10 +1516,11 @@ function showCaptureResult(){
   $("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden");
   if(captureBlob&&captureMode!=="photo"){
     stopCaptureStream();clearCapturePreviewUrl();
-    const v=$("captureVideo");capturePreviewUrl=URL.createObjectURL(captureBlob);v.srcObject=null;v.src=capturePreviewUrl;v.controls=true;v.muted=false;v.loop=false;v.classList.remove("hidden");
-    v.load();
+    const v=$("captureVideo");capturePreviewUrl=URL.createObjectURL(captureBlob);v.srcObject=null;v.src=capturePreviewUrl;v.autoplay=false;v.controls=false;v.muted=false;v.loop=false;v.classList.remove("hidden");
+    v.load();try{v.pause();v.currentTime=0}catch{}
   }
-  setCaptureSendReady(Boolean(captureBlob&&captureBlob.size>=1024));
+  const ready=Boolean(captureBlob&&captureBlob.size>=1024);
+  setCapturePreviewReady(ready);setCaptureSendReady(ready);
 }
 async function finalizeCaptureRecording(recorder,mime){
   // MediaRecorder's final dataavailable event is delivered before stop. Building
@@ -1548,6 +1557,16 @@ async function captureMain(){
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
+$("capturePreviewBtn").onclick=async()=>{
+  if(!captureBlob||captureBlob.size<1024||captureMode==="photo")return;
+  const v=$("captureVideo"),btn=$("capturePreviewBtn");
+  try{
+    if(capturePreviewPlaying&&!v.paused){v.pause();capturePreviewPlaying=false;btn.textContent="▶ Preview";return}
+    v.currentTime=0;await v.play();capturePreviewPlaying=true;btn.textContent="⏸ Pause";
+    v.onended=()=>{capturePreviewPlaying=false;btn.textContent="▶ Preview";try{v.currentTime=0}catch{}};
+    v.onpause=()=>{if(!v.ended){capturePreviewPlaying=false;btn.textContent="▶ Preview"}};
+  }catch(e){capturePreviewPlaying=false;btn.textContent="▶ Preview";toast("Preview could not play on this device.")}
+};
 $("captureSendBtn").onclick=async()=>{
   if(!captureBlob||captureBlob.size<1024||captureSendInFlight||captureStopping)return;
   captureSendInFlight=true;setCaptureSendReady(false);

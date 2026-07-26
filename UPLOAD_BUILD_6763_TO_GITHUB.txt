@@ -1,0 +1,12 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6763
+
+Recorder UX update:
+- Voice and video: Record -> Stop -> Preview + Send appear together.
+- No automatic playback after Stop.
+- Preview starts only when the user presses Preview.
+- Send remains available without previewing.
+- Retake remains available before send.
+- Same behavior on mobile and desktop.
+
+Deploy this folder contents to the existing Render/GitHub service.
+Verify /health returns build 6763 before testing.
