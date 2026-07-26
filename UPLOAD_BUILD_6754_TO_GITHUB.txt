@@ -1,0 +1,20 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6754
+
+UPLOAD ONLY THE CONTENTS OF:
+01_RENDER_SERVER_WEBSITE
+
+GitHub:
+1. Upload all 11 files from 01_RENDER_SERVER_WEBSITE.
+2. Replace the existing repository files.
+3. Commit: Deploy ConnectChat build 6754
+
+Verify:
+https://connectchat-pro-kanaan.onrender.com/api/health
+
+It must show:
+"build":"6754"
+
+Then open:
+https://connectchat-pro-kanaan.onrender.com/?v=6754
+
+No new Supabase SQL migration is required.

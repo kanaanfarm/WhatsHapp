@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6753">
+  <link rel="stylesheet" href="style.css?v=6754">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -126,6 +126,7 @@
       <footer class="composer">
         <input id="fileInput" type="file" accept="image/*,audio/*,video/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+        <input id="videoCameraInput" type="file" accept="video/*" capture="environment" hidden>
         <button id="emojiBtn" class="circle-btn" type="button" title="Emoji">😊</button>
         <button id="attachBtn" class="circle-btn attach-btn" type="button" title="Add photos or documents" aria-label="Add photos or documents" disabled>📎</button>
         <button id="cameraBtn" class="circle-btn apple-control-icon" type="button" title="Tap for photo · Hold for video" aria-label="Tap for photo or hold to record video">
@@ -367,6 +368,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6753"></script>
+  <script src="app.js?v=6754"></script>
 </body>
 </html>

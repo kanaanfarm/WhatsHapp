@@ -1424,7 +1424,9 @@ html[data-composer="essential"] .workspace-chat #cameraBtn{
 }
 
 /* Calls must always be the front-most application surface on every device. */
-.call-overlay{z-index:10000!important}
+.call-overlay{z-index:2147483647!important;position:fixed!important;inset:0!important;isolation:isolate}
+body.call-active{overflow:hidden!important;touch-action:none}
+body.call-active #callOverlay{display:flex!important;visibility:visible!important;opacity:1!important}
 
 .media-confirm-dialog{width:min(520px,100%)}
 .media-confirm-preview{

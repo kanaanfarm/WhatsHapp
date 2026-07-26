@@ -155,7 +155,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6753"}
+    data:{url:"/?v=6754"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -807,6 +807,8 @@ async function flushPendingIce(){
 }
 
 function showCallUi(name,status,mode,incoming=false){
+  document.body.appendChild($("callOverlay"));
+  document.body.classList.add("call-active");
   $("callName").textContent=name;$("callStatus").textContent=status;
   $("callOverlay").classList.remove("hidden");
   $("videoStage").classList.toggle("audio-only",mode==="audio");
@@ -902,7 +904,7 @@ function finishCall(message="Call ended",notify=true){
   $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
-  setTimeout(()=>$("callOverlay").classList.add("hidden"),500);
+  setTimeout(()=>{$("callOverlay").classList.add("hidden");document.body.classList.remove("call-active")},500);
 }
 
 function closeCallChoice(){
@@ -1300,6 +1302,7 @@ $("fileInput").onchange=e=>{
   uploadFiles(e.target.files);e.target.value="";
 };
 $("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"image");e.target.value=""};
+$("videoCameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"video");e.target.value=""};
 
 const chatDropTarget=$("chatPanel");
 ["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
@@ -1439,6 +1442,9 @@ document.addEventListener("pointercancel",releaseVoicePointer);
 recordButton.addEventListener("contextmenu",event=>event.preventDefault());
 
 const cameraButton=$("cameraBtn");
+function useNativeMobileVideoCapture(){
+  return window.matchMedia?.("(pointer: coarse)")?.matches||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
 cameraButton.addEventListener("pointerdown",event=>{
   if(event.button!==undefined&&event.button!==0)return;
   event.preventDefault();
@@ -1451,7 +1457,7 @@ cameraButton.addEventListener("pointerdown",event=>{
   cameraHoldTimer=setTimeout(()=>{
     if(cameraPointerHeld){
       cameraLongPressTriggered=true;
-      startVideoHoldRecording();
+      if(!useNativeMobileVideoCapture())startVideoHoldRecording();
     }
   },350);
 });
@@ -1459,10 +1465,12 @@ function releaseCameraPointer(event){
   if(cameraPointerId===null||(event.pointerId!==undefined&&event.pointerId!==cameraPointerId))return;
   clearTimeout(cameraHoldTimer);
   const takePhoto=event.type==="pointerup"&&!cameraLongPressTriggered&&cameraPointerHeld;
-  if(cameraLongPressTriggered)stopVideoHoldRecording();
+  const takeNativeVideo=event.type==="pointerup"&&cameraLongPressTriggered&&cameraPointerHeld&&useNativeMobileVideoCapture();
+  if(cameraLongPressTriggered&&!takeNativeVideo)stopVideoHoldRecording();
   cameraPointerHeld=false;
   cameraPointerId=null;
   if(takePhoto)$("cameraInput").click();
+  if(takeNativeVideo)$("videoCameraInput").click();
 }
 document.addEventListener("pointerup",releaseCameraPointer);
 document.addEventListener("pointercancel",releaseCameraPointer);
