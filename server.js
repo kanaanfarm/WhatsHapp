@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6739";
+const APP_BUILD = "6740";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1685,10 +1685,14 @@ app.get("/api/calls", auth, async (req, res) => {
     if (error) throw error;
     const userIds = [...new Set((data || []).flatMap(x => [Number(x.caller_id), Number(x.receiver_id)]))];
     const { data: people, error: peopleError } = userIds.length
-      ? await supabase.from("users").select("id,username,avatar_url").in("id", userIds)
+      ? await supabase.from("users").select("id,username,avatar").in("id", userIds)
       : { data: [], error: null };
     if (peopleError) throw peopleError;
-    const peopleMap = new Map((people || []).map(x => [Number(x.id), x]));
+    const peopleMap = new Map((people || []).map(x => [Number(x.id), {
+      id: x.id,
+      username: x.username,
+      avatar: avatarProxyUrl(x.id, x.avatar)
+    }]));
     res.json((data || []).map(x => ({ ...x, caller: peopleMap.get(Number(x.caller_id)), receiver: peopleMap.get(Number(x.receiver_id)) })));
   } catch (error) {
     console.error("Call history failed:", error);
