@@ -1,0 +1,9 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6760
+
+Fixes:
+- Keep server-side duplicate prevention from 6759.
+- Restore reliable voice/video sending from mobile and desktop.
+- Validate and normalize recorded voice/video with ffmpeg before strict file-type detection.
+- Better support Safari/iPhone fragmented MP4/M4A recordings.
+
+After deploy verify /health returns build 6760.

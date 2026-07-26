@@ -22,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6759";
+const APP_BUILD = "6760";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1633,7 +1633,8 @@ app.post("/api/groups/:groupId/upload", auth, upload.single("file"), async (req,
     const safeMessages = new Set([
       "The file content does not match an allowed type.",
       "This file type is not allowed.",
-      "Text files must use UTF-8 encoding."
+      "Text files must use UTF-8 encoding.",
+      "The recorded media type could not be verified."
     ]);
     res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Group file upload failed. Run v6.5.1-group-attachments-migration.sql." });
   }
@@ -2478,9 +2479,24 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     if (uploadKey && recentMediaUploads.has(uploadKey)) return res.json(recentMediaUploads.get(uploadKey).message);
 
     const requestedKind = ["image", "voice", "video", "file"].includes(req.body.kind) ? req.body.kind : "file";
-    const verified = await verifyUpload(req.file);
-    const normalized = (verified.kind === requestedKind && ["voice", "video"].includes(requestedKind)) ? await normalizeRecordedMedia(req.file, requestedKind) : null;
-    const stored = normalized || { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: verified.kind };
+
+    // Recorded media from iPhone/Safari can be a valid fragmented MP4/M4A that
+    // generic magic-byte detection does not always classify correctly. For
+    // voice/video, let ffmpeg validate + normalize the upload first. If that
+    // is unavailable or fails, fall back to the normal strict verifier.
+    let stored = null;
+    if (["voice", "video"].includes(requestedKind)) {
+      stored = await normalizeRecordedMedia(req.file, requestedKind);
+    }
+    if (!stored) {
+      const verified = await verifyUpload(req.file);
+      const kindMatches = verified.kind === requestedKind ||
+        (requestedKind === "voice" && verified.kind === "video" && req.file.mimetype === "audio/webm");
+      if (["voice", "video"].includes(requestedKind) && !kindMatches) {
+        throw new Error("The recorded media type could not be verified.");
+      }
+      stored = { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: requestedKind === "file" ? verified.kind : requestedKind };
+    }
     const extension = stored.ext ? `.${stored.ext}` : "";
     storagePath = `${req.session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
     const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, stored.buffer, {
@@ -2514,7 +2530,8 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     const safeMessages = new Set([
       "The file content does not match an allowed type.",
       "This file type is not allowed.",
-      "Text files must use UTF-8 encoding."
+      "Text files must use UTF-8 encoding.",
+      "The recorded media type could not be verified."
     ]);
     res.status(400).json({ error: safeMessages.has(error.message) ? error.message : "Upload failed." });
   }
