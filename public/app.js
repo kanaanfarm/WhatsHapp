@@ -3,6 +3,7 @@ let typingTimer=null, deferredPrompt=null, mediaRecorder=null, audioChunks=[], i
 let voiceHoldActive=false,cameraPointerHeld=false,cameraLongPressTriggered=false,cameraHoldTimer=null,voiceHoldTimer=null;
 let voicePointerId=null,cameraPointerId=null;
 let videoRecorder=null,videoChunks=[],videoStream=null,videoRecording=false,recordingLimitTimer=null;
+let mediaUploadInFlight=false,captureSendInFlight=false;
 let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let currentUserFilter="all";
@@ -155,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6757"}
+    data:{url:"/?v=6759"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1279,18 +1280,22 @@ $("sendMediaConfirmBtn").onclick=()=>closeMediaConfirmation(true);
 $("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverlay"))closeMediaConfirmation(false)};
 
 async function uploadFile(file,kind){
+  if(mediaUploadInFlight){toast("Please wait for the current upload to finish.");return false}
   if(!activeUser){toast("Select a user first.");return false}
   if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
   if(file.size>12*1024*1024){toast(`${file.name} is larger than 12 MB.`);return false}
   const caption=$("messageInput").value.trim();
-  const fd=new FormData();fd.append("file",file);fd.append("receiverId",activeUser.id);fd.append("kind",kind);fd.append("caption",caption);
+  const receiverId=Number(activeUser.id);
+  const uploadId=`${kind}:${receiverId}:${file.name}:${file.size}:${file.lastModified||0}`;
+  const fd=new FormData();fd.append("file",file);fd.append("receiverId",receiverId);fd.append("kind",kind);fd.append("caption",caption);fd.append("uploadId",uploadId);
+  mediaUploadInFlight=true;
   $("uploadStatus").textContent=`Uploading ${file.name}…`;$("uploadStatus").classList.remove("hidden");$("attachBtn").disabled=true;
   try{
     await api("/api/upload",{method:"POST",body:fd});
-    if(caption){$("messageInput").value="";updateComposer()}
+    if(caption&&activeUser&&Number(activeUser.id)===receiverId){$("messageInput").value="";updateComposer()}
     toast(kind==="voice"?"Voice sent":kind==="image"?"Photo sent":kind==="video"?"Video sent":"Document sent");return true
   }catch(e){toast(e.message);return false}
-  finally{$("uploadStatus").classList.add("hidden");$("uploadStatus").textContent="Uploading…";$("attachBtn").disabled=false}
+  finally{mediaUploadInFlight=false;$("uploadStatus").classList.add("hidden");$("uploadStatus").textContent="Uploading…";$("attachBtn").disabled=false}
 }
 function attachmentKind(file){return file.type.startsWith("image/")?"image":file.type.startsWith("audio/")?"voice":file.type.startsWith("video/")?"video":"file"}
 async function uploadFiles(fileList){
@@ -1447,7 +1452,7 @@ function captureRecorderMime(mode){
     ? captureMime(["audio/mp4","audio/aac","audio/webm;codecs=opus","audio/webm"])
     : captureMime(["audio/webm;codecs=opus","audio/webm","audio/mp4"]);
 }
-function stopCaptureStream(){captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;$("captureVideo").srcObject=null}
+function stopCaptureStream(){captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;const v=$("captureVideo");v.srcObject=null;if(v.src&&v.src.startsWith("blob:")){URL.revokeObjectURL(v.src);v.removeAttribute("src")}v.controls=false;v.muted=true}
 function resetCaptureResult(){captureBlob=null;$("captureRetakeBtn").classList.add("hidden");$("captureSendBtn").classList.add("hidden");$("captureMainBtn").classList.remove("hidden");$("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");$("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");}
 function stopCaptureClock(){clearInterval(captureClock);captureClock=null;$("captureTimer").textContent="00:00"}
 function startCaptureClock(){captureStartedAt=Date.now();captureClock=setInterval(()=>{const s=Math.floor((Date.now()-captureStartedAt)/1000);$("captureTimer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`},250)}
@@ -1460,18 +1465,37 @@ async function prepareCapture(mode){
 }
 function openCapture(mode){if(!activeUser)return toast("Select a user first.");if(activeUser.isAI)return toast("Media recording is available in human chats.");if(!navigator.mediaDevices?.getUserMedia)return toast("Camera/microphone recording is not supported by this browser.");$("captureOverlay").classList.remove("hidden");prepareCapture(mode)}
 function closeCapture(){if(captureRecorder?.state==="recording")captureRecorder.stop();stopCaptureStream();stopCaptureClock();captureBlob=null;$("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording")}
-function showCaptureResult(){stopCaptureClock();$("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSendBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden")}
+function showCaptureResult(){
+  stopCaptureClock();
+  $("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSendBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden");
+  if(captureBlob&&captureMode!=="photo"){
+    stopCaptureStream();
+    const v=$("captureVideo");
+    v.srcObject=null;v.src=URL.createObjectURL(captureBlob);v.controls=true;v.muted=false;v.loop=false;v.classList.remove("hidden");
+  }
+}
 async function captureMain(){
  if(captureMode==="photo"){
    const v=$("captureVideo"),c=$("captureCanvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));showCaptureResult();return;
  }
- if(captureRecorder?.state==="recording"){captureRecorder.stop();return}
- captureChunks=[];const mime=captureRecorderMime(captureMode);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{const actualType=captureRecorder.mimeType||mime||(captureMode==="video"?(isAppleSafariRecorder()?"video/mp4":"video/webm"):(isAppleSafariRecorder()?"audio/mp4":"audio/webm"));captureBlob=new Blob(captureChunks,{type:actualType});$("captureOverlay").classList.remove("recording");if(captureBlob.size<512){toast("The recording was empty. Please record again.");prepareCapture(captureMode);return}showCaptureResult()};captureRecorder.start(250);$("captureOverlay").classList.add("recording");startCaptureClock();
+ if(captureRecorder?.state==="recording"){try{captureRecorder.requestData()}catch{}captureRecorder.stop();return}
+ captureChunks=[];const mime=captureRecorderMime(captureMode);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{const actualType=captureRecorder.mimeType||mime||(captureMode==="video"?(isAppleSafariRecorder()?"video/mp4":"video/webm"):(isAppleSafariRecorder()?"audio/mp4":"audio/webm"));captureBlob=new Blob(captureChunks,{type:actualType});$("captureOverlay").classList.remove("recording");if(captureBlob.size<512){toast("The recording was empty. Please record again.");prepareCapture(captureMode);return}showCaptureResult()};captureRecorder.start(1000);$("captureOverlay").classList.add("recording");startCaptureClock();
 }
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
-$("captureSendBtn").onclick=async()=>{if(!captureBlob)return;const type=captureBlob.type||({photo:"image/jpeg",video:"video/webm",voice:"audio/webm"}[captureMode]);const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):"webm";const kind=captureMode==="photo"?"image":captureMode;const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type});closeCapture();await previewAndUploadMedia(file,kind)};
+$("captureSendBtn").onclick=async()=>{
+  if(!captureBlob||captureSendInFlight)return;
+  captureSendInFlight=true;$("captureSendBtn").disabled=true;
+  try{
+    const type=captureBlob.type||({photo:"image/jpeg",video:"video/webm",voice:"audio/webm"}[captureMode]);
+    const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):"webm";
+    const kind=captureMode==="photo"?"image":captureMode;
+    const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type});
+    const sent=await uploadFile(file,kind);
+    if(sent)closeCapture();
+  }finally{captureSendInFlight=false;if($("captureSendBtn"))$("captureSendBtn").disabled=false}
+};
 $("captureSwitchBtn").onclick=async()=>{captureFacing=captureFacing==="environment"?"user":"environment";await prepareCapture(captureMode)};
 document.querySelectorAll(".capture-tabs button").forEach(b=>b.onclick=()=>prepareCapture(b.dataset.mode));
 recordButton.onclick=()=>openCapture("voice");cameraButton.onclick=()=>openCapture("photo");

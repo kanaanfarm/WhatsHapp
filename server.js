@@ -3,6 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const os = require("os");
+const fs = require("fs/promises");
+const { spawn } = require("child_process");
 const crypto = require("crypto");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
@@ -19,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6757";
+const APP_BUILD = "6759";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -575,6 +578,38 @@ async function verifyUpload(file) {
   if (!allowedMimeTypes.includes(mime)) throw new Error("This file type is not allowed.");
   const kind = mime.startsWith("image/") ? "image" : (mime.startsWith("audio/") ? "voice" : (mime.startsWith("video/") ? "video" : "file"));
   return { mime, ext: detected.ext.replace(/[^a-z0-9]/gi, "").slice(0, 10), kind };
+}
+
+
+async function runFfmpeg(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args], { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", chunk => { stderr += chunk.toString().slice(0, 8192); });
+    child.on("error", reject);
+    child.on("close", code => code === 0 ? resolve() : reject(new Error(stderr || `ffmpeg exited with ${code}`)));
+  });
+}
+
+async function normalizeRecordedMedia(file, requestedKind) {
+  if (!file?.buffer || !["voice", "video"].includes(requestedKind)) return null;
+  const token = crypto.randomUUID();
+  const inputPath = path.join(os.tmpdir(), `connectchat-in-${token}`);
+  const outputPath = path.join(os.tmpdir(), `connectchat-out-${token}.${requestedKind === "video" ? "mp4" : "m4a"}`);
+  try {
+    await fs.writeFile(inputPath, file.buffer);
+    if (requestedKind === "video") {
+      await runFfmpeg(["-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.1", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", outputPath]);
+      return { buffer: await fs.readFile(outputPath), mime: "video/mp4", ext: "mp4", kind: "video" };
+    }
+    await runFfmpeg(["-i", inputPath, "-vn", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", outputPath]);
+    return { buffer: await fs.readFile(outputPath), mime: "audio/mp4", ext: "m4a", kind: "voice" };
+  } catch (error) {
+    console.error("Media normalization failed; using original upload:", error.message);
+    return null;
+  } finally {
+    await Promise.allSettled([fs.unlink(inputPath), fs.unlink(outputPath)]);
+  }
 }
 
 function validPassword(password) {
@@ -2424,6 +2459,12 @@ app.delete("/api/statuses/:statusId", auth, async (req, res) => {
   }
 });
 
+const recentMediaUploads = new Map();
+function cleanupRecentMediaUploads() {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [key, value] of recentMediaUploads) if (value.createdAt < cutoff) recentMediaUploads.delete(key);
+}
+
 app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
   let storagePath;
   try {
@@ -2431,11 +2472,19 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     if (!req.file || !receiverId) return res.status(400).json({ error: "Missing file or receiver." });
     const receiver = await getUserById(receiverId, "id,status");
     if (!receiver || receiver.status !== "approved") return res.status(404).json({ error: "Approved receiver not found." });
+    cleanupRecentMediaUploads();
+    const uploadId = cleanText(req.body.uploadId, 100);
+    const uploadKey = uploadId ? `${Number(req.session.userId)}:${receiverId}:${uploadId}` : null;
+    if (uploadKey && recentMediaUploads.has(uploadKey)) return res.json(recentMediaUploads.get(uploadKey).message);
+
+    const requestedKind = ["image", "voice", "video", "file"].includes(req.body.kind) ? req.body.kind : "file";
     const verified = await verifyUpload(req.file);
-    const extension = verified.ext ? `.${verified.ext}` : "";
+    const normalized = (verified.kind === requestedKind && ["voice", "video"].includes(requestedKind)) ? await normalizeRecordedMedia(req.file, requestedKind) : null;
+    const stored = normalized || { buffer: req.file.buffer, mime: verified.mime, ext: verified.ext, kind: verified.kind };
+    const extension = stored.ext ? `.${stored.ext}` : "";
     storagePath = `${req.session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
-    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, req.file.buffer, {
-      contentType: verified.mime,
+    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, stored.buffer, {
+      contentType: stored.mime,
       cacheControl: "900",
       upsert: false
     });
@@ -2446,16 +2495,17 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     const { data: message, error } = await supabase.from("messages").insert({
       sender_id: req.session.userId,
       receiver_id: receiverId,
-      kind: verified.kind,
+      kind: stored.kind,
       body: cleanText(req.body.caption, 500),
       file_url: storagePath,
       file_name: cleanFileName(req.file.originalname),
-      mime_type: verified.mime,
+      mime_type: stored.mime,
       delivered_at: deliveredAt,
       read_at: readAt
     }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,delivered_at,read_at,created_at").single();
     if (error) throw error;
     const outgoing = await signedMessage({ ...message, sender_name: req.session.username });
+    if (uploadKey) recentMediaUploads.set(uploadKey, { createdAt: Date.now(), message: outgoing });
     io.to(`user:${req.session.userId}`).to(`user:${receiverId}`).emit("privateMessage", outgoing);
     res.json(outgoing);
   } catch (error) {

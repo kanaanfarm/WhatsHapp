@@ -1,0 +1,9 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6759
+
+Fixes:
+- Server-side idempotency for media uploads to prevent duplicate voice/video/photo messages.
+- Normalizes voice recordings to AAC/M4A for cross-device playback.
+- Normalizes video recordings to H.264/AAC MP4 with fast-start for Windows/desktop playback.
+- Keeps recorder confirmation flow and visible controls.
+
+After deploy verify /health returns build 6759.
