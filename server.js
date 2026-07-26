@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6740";
+const APP_BUILD = "6741";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1697,6 +1697,21 @@ app.get("/api/calls", auth, async (req, res) => {
   } catch (error) {
     console.error("Call history failed:", error);
     res.status(500).json({ error: "Call history could not be loaded. Run enterprise-v5-migration.sql." });
+  }
+});
+
+app.delete("/api/calls", auth, async (req, res) => {
+  try {
+    const userId = Number(req.session.userId);
+    const { data, error } = await supabase.from("call_logs")
+      .delete()
+      .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
+      .select("id");
+    if (error) throw error;
+    res.json({ ok: true, deleted: (data || []).length });
+  } catch (error) {
+    console.error("Clear call history failed:", error);
+    res.status(500).json({ error: "Call history could not be cleared." });
   }
 });
 

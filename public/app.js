@@ -1942,8 +1942,20 @@ async function renderCallsWorkspace(){
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading call history…</div>`;
   try{
     const calls=await api("/api/calls");
-    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div></div>${renderPeopleCards("Voice call","voice")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon">${c.mode==="video"?"🎥":"📞"}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty("📞","No calls yet","Voice and video calls will appear here.")}`;
+    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div>${calls.length?'<button id="clearCallHistoryBtn" type="button" class="danger-link">🗑 Clear call history</button>':""}</div>${renderPeopleCards("Voice call","voice")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon">${c.mode==="video"?"🎥":"📞"}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty("📞","No calls yet","Voice and video calls will appear here.")}`;
     bindWorkspaceUserActions();
+    if($("clearCallHistoryBtn"))$("clearCallHistoryBtn").onclick=async()=>{
+      if(!confirm("Clear your complete call history? This cannot be undone."))return;
+      const button=$("clearCallHistoryBtn");
+      try{
+        button.disabled=true;button.textContent="Clearing…";
+        const result=await api("/api/calls",{method:"DELETE"});
+        toast(`${Number(result.deleted||0)} call record${Number(result.deleted||0)===1?"":"s"} cleared.`);
+        await renderCallsWorkspace();
+      }catch(error){
+        button.disabled=false;button.textContent="🗑 Clear call history";toast(error.message);
+      }
+    };
   }catch(error){$("sectionContent").innerHTML=workspaceEmpty("⚠️","Calls unavailable",error.message)}
 }
 
