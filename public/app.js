@@ -146,16 +146,16 @@ async function requestMessageNotifications(){
   }
 }
 
-async function showMessageNotification(title,body,tag,force=false){
+async function showMessageNotification(title,body,tag){
   if(!notificationsEnabled())return;
-  if(!force&&document.visibilityState==="visible"&&document.hasFocus())return;
+  if(document.visibilityState==="visible"&&document.hasFocus())return;
   const options={
     body:String(body||"New message").slice(0,160),
     icon:"/logo.svg",
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6755"}
+    data:{url:"/?v=6754"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -521,8 +521,7 @@ function connectSocket(){
     if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
   socket.on("call:incoming",data=>{
-    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`,true);
-    try{navigator.vibrate?.([250,120,250,120,500])}catch{}
+    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`);
     showIncomingCall(data);
   });
   socket.on("call:answered",async p=>{
@@ -545,7 +544,7 @@ function connectSocket(){
   socket.on("call:missed",payload=>{
     const mode=payload?.mode==="video"?"video":"voice";
     toast(`Missed ${mode} call from ${payload?.callerName||"a ConnectChat user"}.`);
-    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`,true);
+    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`);
     if(currentWorkspaceSection==="calls")renderCallsWorkspace();
   });
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
@@ -1423,59 +1422,38 @@ function stopVideoHoldRecording(){
 }
 
 const recordButton=$("recordBtn");
-let voiceClickRecording=false;
-recordButton.title="Tap to start/stop voice recording";
-recordButton.setAttribute("aria-label","Tap to start or stop voice recording");
-recordButton.addEventListener("click",async event=>{
-  event.preventDefault();
-  if(!activeUser)return toast("Select a user first.");
-  if(videoRecording)return toast("Finish the video recording first.");
-  if(isRecording){
-    voiceClickRecording=false;
-    stopVoiceHoldRecording();
-    return;
-  }
-  voiceHoldActive=true;
-  voiceClickRecording=true;
-  await startVoiceHoldRecording();
-  if(!isRecording)voiceClickRecording=false;
-});
-recordButton.addEventListener("contextmenu",event=>event.preventDefault());
-
 const cameraButton=$("cameraBtn");
-function useNativeMobileVideoCapture(){
-  return window.matchMedia?.("(pointer: coarse)")?.matches||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment";
+function captureMime(types){return types.find(t=>MediaRecorder.isTypeSupported?.(t))||""}
+function stopCaptureStream(){captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;$("captureVideo").srcObject=null}
+function resetCaptureResult(){captureBlob=null;$("captureRetakeBtn").classList.add("hidden");$("captureSendBtn").classList.add("hidden");$("captureMainBtn").classList.remove("hidden");$("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");$("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");}
+function stopCaptureClock(){clearInterval(captureClock);captureClock=null;$("captureTimer").textContent="00:00"}
+function startCaptureClock(){captureStartedAt=Date.now();captureClock=setInterval(()=>{const s=Math.floor((Date.now()-captureStartedAt)/1000);$("captureTimer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`},250)}
+async function prepareCapture(mode){
+  captureMode=mode; stopCaptureStream(); stopCaptureClock(); resetCaptureResult();
+  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
+  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1); document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+  try{captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});if(mode!=="voice"){$("captureVideo").srcObject=captureStream;await $("captureVideo").play().catch(()=>{})}}
+  catch(e){toast(mode==="voice"?"Microphone permission is required.":mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");closeCapture()}
 }
-function openCameraChoice(){
-  if(!activeUser)return toast("Select a user first.");
-  $("cameraChoiceOverlay").classList.remove("hidden");
+function openCapture(mode){if(!activeUser)return toast("Select a user first.");if(activeUser.isAI)return toast("Media recording is available in human chats.");if(!navigator.mediaDevices?.getUserMedia)return toast("Camera/microphone recording is not supported by this browser.");$("captureOverlay").classList.remove("hidden");prepareCapture(mode)}
+function closeCapture(){if(captureRecorder?.state==="recording")captureRecorder.stop();stopCaptureStream();stopCaptureClock();captureBlob=null;$("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording")}
+function showCaptureResult(){stopCaptureClock();$("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSendBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden")}
+async function captureMain(){
+ if(captureMode==="photo"){
+   const v=$("captureVideo"),c=$("captureCanvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));showCaptureResult();return;
+ }
+ if(captureRecorder?.state==="recording"){captureRecorder.stop();return}
+ captureChunks=[];const types=captureMode==="video"?["video/mp4","video/webm;codecs=vp8,opus","video/webm"]:["audio/mp4","audio/webm;codecs=opus","audio/webm"];const mime=captureMime(types);captureRecorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder.ondataavailable=e=>{if(e.data.size)captureChunks.push(e.data)};captureRecorder.onstop=()=>{captureBlob=new Blob(captureChunks,{type:captureRecorder.mimeType||(captureMode==="video"?"video/webm":"audio/webm")});$("captureOverlay").classList.remove("recording");showCaptureResult()};captureRecorder.start(200);$("captureOverlay").classList.add("recording");startCaptureClock();
 }
-function closeCameraChoice(){$("cameraChoiceOverlay").classList.add("hidden")}
-cameraButton.title="Photo or video";
-cameraButton.setAttribute("aria-label","Take a photo or record a video");
-cameraButton.addEventListener("click",event=>{
-  event.preventDefault();
-  if(videoRecording){stopVideoHoldRecording();return}
-  if(isRecording)return toast("Finish the voice recording first.");
-  openCameraChoice();
-});
-$("closeCameraChoiceBtn").onclick=closeCameraChoice;
-$("cameraChoiceOverlay").onclick=event=>{if(event.target===$("cameraChoiceOverlay"))closeCameraChoice()};
-$("choosePhotoBtn").onclick=()=>{closeCameraChoice();$("cameraInput").click()};
-$("chooseVideoBtn").onclick=async()=>{
-  closeCameraChoice();
-  if(useNativeMobileVideoCapture()){
-    $("videoCameraInput").click();
-    return;
-  }
-  cameraPointerHeld=true;
-  cameraLongPressTriggered=true;
-  await startVideoHoldRecording();
-  if(videoRecording)toast("Video recording started. Tap the camera button again to stop.");
-};
-window.addEventListener("blur",()=>{
-  if(isRecording&&voiceClickRecording){/* keep recording while permission/browser UI changes focus */}
-});
+$("captureMainBtn").onclick=captureMain;
+$("captureCloseBtn").onclick=closeCapture;
+$("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
+$("captureSendBtn").onclick=async()=>{if(!captureBlob)return;const type=captureBlob.type||({photo:"image/jpeg",video:"video/webm",voice:"audio/webm"}[captureMode]);const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):"webm";const kind=captureMode==="photo"?"image":captureMode;const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type});closeCapture();await previewAndUploadMedia(file,kind)};
+$("captureSwitchBtn").onclick=async()=>{captureFacing=captureFacing==="environment"?"user":"environment";await prepareCapture(captureMode)};
+document.querySelectorAll(".capture-tabs button").forEach(b=>b.onclick=()=>prepareCapture(b.dataset.mode));
+recordButton.onclick=()=>openCapture("voice");cameraButton.onclick=()=>openCapture("photo");
+recordButton.title="Record voice";recordButton.setAttribute("aria-label","Record voice");cameraButton.title="Photo or video";cameraButton.setAttribute("aria-label","Open photo or video recorder");
 
 $("backBtn").onclick=()=>{
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
