@@ -1,0 +1,12 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6764
+
+Mobile recorder focus:
+- Voice/video: Record -> Stop -> Preview + Send visible together.
+- No automatic playback or automatic send.
+- iPhone/Safari does not force requestData before stop.
+- Voice preview uses a dedicated audio player.
+- Mobile post-stop action bar is pinned above the safe area.
+- Recording bitrate is limited for reliable mobile uploads.
+- Upload limit increased to 30 MB.
+
+After deploy verify /health returns build 6764.

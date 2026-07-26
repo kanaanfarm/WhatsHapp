@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6763"}
+    data:{url:"/?v=6764"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1440,7 +1440,7 @@ function stopVideoHoldRecording(){
 
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -1467,8 +1467,9 @@ function setCaptureSendReady(ready){
   const send=$("captureSendBtn");
   send.disabled=!ready;
   send.classList.toggle("hidden",!ready);
-  send.textContent="➤";
+  send.textContent="➤ Send";
   send.title="Send";send.setAttribute("aria-label","Send recording");
+  $("captureOverlay").classList.toggle("result-ready",Boolean(ready));
 }
 function setCapturePreviewReady(ready){
   const preview=$("capturePreviewBtn");
@@ -1485,8 +1486,9 @@ function resetCaptureResult(){
   $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
   $("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");
   $("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");
+  const a=$("captureAudio");if(a){a.pause();a.removeAttribute("src");a.load();a.classList.add("hidden")}
 }
-function stopCaptureClock(reset=true){clearInterval(captureClock);captureClock=null;if(reset)$("captureTimer").textContent="00:00"}
+function stopCaptureClock(reset=true){clearInterval(captureClock);captureClock=null;clearTimeout(captureAutoStopTimer);captureAutoStopTimer=null;if(reset)$("captureTimer").textContent="00:00"}
 function startCaptureClock(){captureStartedAt=Date.now();captureClock=setInterval(()=>{const s=Math.floor((Date.now()-captureStartedAt)/1000);$("captureTimer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`},250)}
 async function prepareCapture(mode){
   captureMode=mode;
@@ -1515,9 +1517,16 @@ function showCaptureResult(){
   stopCaptureClock(false);
   $("captureMainBtn").classList.add("hidden");$("captureRetakeBtn").classList.remove("hidden");$("captureSwitchBtn").classList.add("hidden");
   if(captureBlob&&captureMode!=="photo"){
-    stopCaptureStream();clearCapturePreviewUrl();
-    const v=$("captureVideo");capturePreviewUrl=URL.createObjectURL(captureBlob);v.srcObject=null;v.src=capturePreviewUrl;v.autoplay=false;v.controls=false;v.muted=false;v.loop=false;v.classList.remove("hidden");
-    v.load();try{v.pause();v.currentTime=0}catch{}
+    stopCaptureStream();clearCapturePreviewUrl();capturePreviewUrl=URL.createObjectURL(captureBlob);
+    const v=$("captureVideo"),a=$("captureAudio");
+    if(captureMode==="voice"&&a){
+      v.pause();v.removeAttribute("src");v.classList.add("hidden");$("voiceWave").classList.remove("hidden");
+      a.src=capturePreviewUrl;a.autoplay=false;a.controls=false;a.preload="metadata";a.classList.add("hidden");a.load();try{a.pause();a.currentTime=0}catch{}
+    }else{
+      if(a){a.pause();a.removeAttribute("src");a.classList.add("hidden")}
+      v.srcObject=null;v.src=capturePreviewUrl;v.autoplay=false;v.controls=false;v.muted=false;v.loop=false;v.classList.remove("hidden");v.preload="metadata";
+      v.load();try{v.pause();v.currentTime=0}catch{}
+    }
   }
   const ready=Boolean(captureBlob&&captureBlob.size>=1024);
   setCapturePreviewReady(ready);setCaptureSendReady(ready);
@@ -1541,30 +1550,36 @@ async function captureMain(){
   }
   if(captureRecorder?.state==="recording"){
     if(captureStopping)return;captureStopping=true;$("captureMainBtn").disabled=true;$("captureMainBtn").setAttribute("aria-label","Finishing recording");
-    try{captureRecorder.requestData()}catch{}
+    // iPhone/Safari MP4 can be corrupted when requestData() is forced just before stop.
+    if(!isAppleSafariRecorder()){try{captureRecorder.requestData()}catch{}}
     captureRecorder.stop();return;
   }
   if(!captureStream?.active)return toast(captureMode==="voice"?"Microphone is not ready.":"Camera is not ready.");
   captureChunks=[];captureBlob=null;captureStopping=false;
-  const mime=captureRecorderMime(captureMode);const recorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined);captureRecorder=recorder;
+  const mime=captureRecorderMime(captureMode);
+  const options=mime?{mimeType:mime}:{};
+  if(captureMode==="video"){options.videoBitsPerSecond=1200000;options.audioBitsPerSecond=64000}else options.audioBitsPerSecond=64000;
+  let recorder;try{recorder=new MediaRecorder(captureStream,options)}catch{recorder=new MediaRecorder(captureStream,mime?{mimeType:mime}:undefined)}captureRecorder=recorder;
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)captureChunks.push(e.data)};
   recorder.onerror=()=>{captureStopping=false;$("captureOverlay").classList.remove("recording");toast("Recording failed. Please try again.");prepareCapture(captureMode)};
-  recorder.onstop=()=>finalizeCaptureRecording(recorder,mime);
+  recorder.onstop=()=>setTimeout(()=>finalizeCaptureRecording(recorder,mime),120);
   // Do not use a timeslice. Safari/iPhone MP4/AAC recordings can become invalid
   // when chunks are concatenated. One final Blob on stop is much more reliable.
   recorder.start();$("captureOverlay").classList.add("recording");$("captureMainBtn").setAttribute("aria-label","Stop recording");startCaptureClock();
+  captureAutoStopTimer=setTimeout(()=>{if(captureRecorder?.state==="recording")captureMain()},60000);
 }
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
 $("capturePreviewBtn").onclick=async()=>{
   if(!captureBlob||captureBlob.size<1024||captureMode==="photo")return;
-  const v=$("captureVideo"),btn=$("capturePreviewBtn");
+  const player=captureMode==="voice"?$("captureAudio"):$("captureVideo"),btn=$("capturePreviewBtn");
+  if(!player)return toast("Preview is unavailable on this device.");
   try{
-    if(capturePreviewPlaying&&!v.paused){v.pause();capturePreviewPlaying=false;btn.textContent="▶ Preview";return}
-    v.currentTime=0;await v.play();capturePreviewPlaying=true;btn.textContent="⏸ Pause";
-    v.onended=()=>{capturePreviewPlaying=false;btn.textContent="▶ Preview";try{v.currentTime=0}catch{}};
-    v.onpause=()=>{if(!v.ended){capturePreviewPlaying=false;btn.textContent="▶ Preview"}};
+    if(capturePreviewPlaying&&!player.paused){player.pause();capturePreviewPlaying=false;btn.textContent="▶ Preview";return}
+    player.currentTime=0;await player.play();capturePreviewPlaying=true;btn.textContent="⏸ Pause";
+    player.onended=()=>{capturePreviewPlaying=false;btn.textContent="▶ Preview";try{player.currentTime=0}catch{}};
+    player.onpause=()=>{if(!player.ended){capturePreviewPlaying=false;btn.textContent="▶ Preview"}};
   }catch(e){capturePreviewPlaying=false;btn.textContent="▶ Preview";toast("Preview could not play on this device.")}
 };
 $("captureSendBtn").onclick=async()=>{
