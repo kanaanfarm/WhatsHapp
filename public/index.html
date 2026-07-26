@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6745">
+  <link rel="stylesheet" href="style.css?v=6746">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -42,6 +42,9 @@
   </section>
 
   <section id="appView" class="app app-v4 hidden">
+    <div id="networkQuality" class="network-quality checking" role="status" aria-live="polite" title="Checking connection quality">
+      <i></i><span>Checking…</span>
+    </div>
     <button id="themeBtn" class="hidden" type="button" aria-hidden="true"></button>
     <button id="accentBtn" class="hidden" type="button" aria-hidden="true"></button>
     <nav class="rail" aria-label="Primary navigation">
@@ -327,6 +330,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6745"></script>
+  <script src="app.js?v=6746"></script>
 </body>
 </html>

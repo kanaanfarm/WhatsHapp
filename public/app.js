@@ -15,6 +15,7 @@ let avatarCropImage=null,avatarCropObjectUrl=null,avatarCropBaseScale=1,avatarCr
 let profilePhotoViewerScale=1;
 let currentGroupId=null,currentGroup=null,groupCallMode=null,groupCallStream=null;
 let refreshUsersPromise=null,refreshUsersTimer=null,lastUsersRefreshAt=0,usersRenderFrame=0;
+let networkQualityTimer=null;
 const groupPeers=new Map(),groupPendingIce=new Map();
 const AI_HISTORY_KEY="connectchat-ai-history-v1";
 const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
@@ -98,6 +99,101 @@ function toast(text){
   $("toast").textContent=text;$("toast").classList.remove("hidden");
   setTimeout(()=>$("toast").classList.add("hidden"),2200);
 }
+
+function notificationPermissionText(){
+  if(!("Notification" in window))return "Not supported on this device";
+  if(Notification.permission==="granted")return "On";
+  if(Notification.permission==="denied")return "Blocked in browser settings";
+  return "Tap to enable";
+}
+
+async function requestMessageNotifications(){
+  if(!("Notification" in window)){
+    toast("Notifications are not supported by this browser.");
+    return;
+  }
+  if(Notification.permission==="denied"){
+    toast("Notifications are blocked. Enable them in your browser or phone settings.");
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    toast(permission==="granted"?"Message notifications enabled.":"Notifications were not enabled.");
+    const status=$("settingsNotificationStatus");
+    if(status)status.textContent=notificationPermissionText();
+  }catch{
+    toast("Notification permission could not be requested.");
+  }
+}
+
+async function showMessageNotification(title,body,tag){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  if(document.visibilityState==="visible"&&document.hasFocus())return;
+  const options={
+    body:String(body||"New message").slice(0,160),
+    icon:"/logo.svg",
+    badge:"/logo.svg",
+    tag,
+    renotify:true,
+    data:{url:"/?v=6746"}
+  };
+  try{
+    if("serviceWorker" in navigator){
+      const registration=await navigator.serviceWorker.ready;
+      await registration.showNotification(title,options);
+    }else{
+      new Notification(title,options);
+    }
+  }catch(error){
+    console.warn("Notification failed:",error);
+  }
+}
+
+function setNetworkQuality(level,label,detail=""){
+  const indicator=$("networkQuality");
+  if(!indicator)return;
+  indicator.className=`network-quality ${level}`;
+  indicator.querySelector("span").textContent=label;
+  indicator.title=detail||`Internet quality: ${label}`;
+}
+
+async function measureNetworkQuality(){
+  if(!navigator.onLine){
+    setNetworkQuality("offline","Offline","No internet connection");
+    return;
+  }
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),6000);
+  const started=performance.now();
+  try{
+    await fetch(`/api/health?network=${Date.now()}`,{cache:"no-store",signal:controller.signal});
+    const latency=Math.round(performance.now()-started);
+    const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+    const effective=connection?.effectiveType||"";
+    const downlink=Number(connection?.downlink||0);
+    let level="excellent",label="Excellent";
+    if(latency>1200||effective==="slow-2g"){level="poor";label="Poor"}
+    else if(latency>650||effective==="2g"){level="fair";label="Fair"}
+    else if(latency>280||effective==="3g"){level="good";label="Good"}
+    const speed=downlink?` · ${downlink.toFixed(1)} Mbps`:"";
+    setNetworkQuality(level,label,`${latency} ms${speed}`);
+  }catch{
+    setNetworkQuality("poor","Poor","The server is responding slowly or cannot be reached");
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+function startNetworkQualityMonitor(){
+  clearInterval(networkQualityTimer);
+  measureNetworkQuality();
+  networkQualityTimer=setInterval(measureNetworkQuality,15000);
+}
+
+window.addEventListener("online",measureNetworkQuality);
+window.addEventListener("offline",measureNetworkQuality);
+const browserConnection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+browserConnection?.addEventListener?.("change",measureNetworkQuality);
 function setMode(mode){
   authMode=mode;
   $("loginTab").classList.toggle("active",mode==="login");
@@ -293,18 +389,27 @@ async function startApp(){
   synchronizeCurrentAccount();
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
+  startNetworkQualityMonitor();
   if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
 }
 
 function connectSocket(){
   if(socket)socket.disconnect();
   socket=io();
-  socket.on("connect",refreshUsers);
+  socket.on("connect",()=>{refreshUsers();measureNetworkQuality()});
+  socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Poor","Disconnected from the ConnectChat server")});
   socket.on("privateMessage",msg=>{
+    const incoming=Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)!==Number(me.id);
     const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
     if(relevant){
       addMessage(msg);
       if(Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)===Number(activeUser.id))socket.emit("message:read",{messageIds:[msg.id]});
+    }
+    if(incoming){
+      const sender=users.find(user=>Number(user.id)===Number(msg.sender_id));
+      const senderName=msg.sender_name||sender?.displayName||sender?.username||"New message";
+      const preview=msg.kind==="text"?msg.body:(msg.kind==="image"?"Sent a photo":msg.kind==="voice"||msg.kind==="audio"?"Sent a voice message":"Sent an attachment");
+      showMessageNotification(senderName,preview,`private-${msg.sender_id}`);
     }
     refreshUsers();
   });
@@ -357,8 +462,12 @@ function connectSocket(){
     if(activeUser&&p.userId===activeUser.id)$("typingText").textContent=p.isTyping?`${p.username} is typing...`:"";
   });
   socket.on("group:message",msg=>{
-    if(Number(msg?.group_id)!==Number(currentGroupId))return;
-    appendGroupMessage(msg);
+    const isCurrent=Number(msg?.group_id)===Number(currentGroupId);
+    if(isCurrent)appendGroupMessage(msg);
+    if(Number(msg?.sender_id)!==Number(me.id)){
+      const title=currentGroup&&Number(currentGroup.id)===Number(msg.group_id)?currentGroup.name:"New group message";
+      showMessageNotification(title,`${msg.sender_name||"Member"}: ${msg.body||"Sent an attachment"}`,`group-${msg.group_id}`);
+    }
   });
   socket.on("group-call:invite",async payload=>{
     if(groupCallStream||Number(payload?.callerId)===Number(me.id))return;
@@ -1972,6 +2081,7 @@ function renderSettingsWorkspace(){
       </section>
       <section class="settings-mobile-card">
         <button id="settingsStatusBtn" type="button" class="settings-mobile-row"><span>💬</span><span><b>Status</b><small>View or post an update</small></span><i>›</i></button>
+        <button id="settingsNotificationsBtn" type="button" class="settings-mobile-row"><span>🔔</span><span><b>Message notifications</b><small id="settingsNotificationStatus">${sectionEscape(notificationPermissionText())}</small></span><i>›</i></button>
         <button id="settingsSignInBtn" type="button" class="settings-mobile-row"><span>📱</span><span><b>Sign-in options</b><small>Add an email address or phone number</small></span><i>›</i></button>
         <button id="settingsRecoveryBtn" type="button" class="settings-mobile-row"><span>🔑</span><span><b>Account recovery</b><small>Show your recovery code</small></span><i>›</i></button>
         <button id="settingsAppearanceBtn" type="button" class="settings-mobile-row"><span>🎨</span><span><b>Appearance</b><small>Layout, text, icons and message controls</small></span><i>›</i></button>
@@ -2013,6 +2123,7 @@ function renderSettingsWorkspace(){
       </section>
     </div>`;
   $("settingsProfileBtn").onclick=()=>openProfilePage(me);
+  $("settingsNotificationsBtn").onclick=requestMessageNotifications;
   $("settingsSignInBtn").onclick=()=>{
     $("settingsSignInPanel").classList.toggle("hidden");
     if(!$("settingsSignInPanel").classList.contains("hidden"))$("settingsSignInPanel").scrollIntoView({block:"center"});

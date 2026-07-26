@@ -1312,3 +1312,53 @@ html[data-composer="essential"] .workspace-chat #cameraBtn{
   .settings-whatsapp .appearance-settings,
   .settings-whatsapp .settings-signin-panel{grid-column:auto}
 }
+
+/* v6.7.3 build 6746: live server/internet quality indicator. */
+.network-quality{
+  position:fixed;
+  top:10px;
+  right:12px;
+  z-index:180;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:30px;
+  padding:6px 10px;
+  border:1px solid rgba(102,113,125,.2);
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  color:#53606b;
+  box-shadow:0 5px 18px rgba(24,33,50,.12);
+  font-size:11px;
+  font-weight:800;
+  backdrop-filter:blur(12px);
+  pointer-events:none;
+}
+.network-quality i{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#98a2aa;
+  box-shadow:0 0 0 4px rgba(152,162,170,.15);
+}
+.network-quality.excellent i{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.15)}
+.network-quality.good i{background:#65b741;box-shadow:0 0 0 4px rgba(101,183,65,.15)}
+.network-quality.fair i{background:#f4b740;box-shadow:0 0 0 4px rgba(244,183,64,.17)}
+.network-quality.poor i{background:#f07b36;box-shadow:0 0 0 4px rgba(240,123,54,.16)}
+.network-quality.offline i{background:#d6455d;box-shadow:0 0 0 4px rgba(214,69,93,.15)}
+.network-quality.excellent{color:#087a4a}
+.network-quality.good{color:#4c7d2e}
+.network-quality.fair{color:#8a6300}
+.network-quality.poor{color:#a54d1f}
+.network-quality.offline{color:#b22e45}
+
+@media(max-width:800px){
+  .network-quality{
+    top:calc(env(safe-area-inset-top) + 7px);
+    right:9px;
+    min-height:27px;
+    padding:5px 8px;
+    font-size:10px;
+  }
+  .network-quality i{width:8px;height:8px}
+}
