@@ -1456,3 +1456,13 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   .media-confirm-preview{max-height:48vh}
   .media-confirm-preview img,.media-confirm-preview video{max-height:48vh}
 }
+
+
+/* v6.7.3 build 6755: reliable front call layer and explicit media controls. */
+body.call-active #appView{visibility:hidden!important;pointer-events:none!important}
+body.call-active #callOverlay{visibility:visible!important;pointer-events:auto!important}
+.camera-choice-dialog{width:min(460px,100%)}
+.camera-choice-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.camera-choice-actions>button{min-height:118px;display:grid;justify-items:center;align-content:center;gap:6px;border:1px solid var(--line);border-radius:17px;background:var(--soft);color:var(--text);cursor:pointer}
+.camera-choice-actions>button span{font-size:30px}.camera-choice-actions>button b{font-size:15px}.camera-choice-actions>button small{color:var(--muted);font-size:11px}
+@media(max-width:800px){.camera-choice-actions{grid-template-columns:1fr 1fr}.camera-choice-actions>button{min-height:105px}}

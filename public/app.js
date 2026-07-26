@@ -146,16 +146,16 @@ async function requestMessageNotifications(){
   }
 }
 
-async function showMessageNotification(title,body,tag){
+async function showMessageNotification(title,body,tag,force=false){
   if(!notificationsEnabled())return;
-  if(document.visibilityState==="visible"&&document.hasFocus())return;
+  if(!force&&document.visibilityState==="visible"&&document.hasFocus())return;
   const options={
     body:String(body||"New message").slice(0,160),
     icon:"/logo.svg",
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6754"}
+    data:{url:"/?v=6755"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -521,7 +521,8 @@ function connectSocket(){
     if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
   socket.on("call:incoming",data=>{
-    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`);
+    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`,true);
+    try{navigator.vibrate?.([250,120,250,120,500])}catch{}
     showIncomingCall(data);
   });
   socket.on("call:answered",async p=>{
@@ -544,7 +545,7 @@ function connectSocket(){
   socket.on("call:missed",payload=>{
     const mode=payload?.mode==="video"?"video":"voice";
     toast(`Missed ${mode} call from ${payload?.callerName||"a ConnectChat user"}.`);
-    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`);
+    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`,true);
     if(currentWorkspaceSection==="calls")renderCallsWorkspace();
   });
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
@@ -1422,62 +1423,58 @@ function stopVideoHoldRecording(){
 }
 
 const recordButton=$("recordBtn");
-recordButton.addEventListener("pointerdown",event=>{
-  if(event.button!==undefined&&event.button!==0)return;
+let voiceClickRecording=false;
+recordButton.title="Tap to start/stop voice recording";
+recordButton.setAttribute("aria-label","Tap to start or stop voice recording");
+recordButton.addEventListener("click",async event=>{
   event.preventDefault();
-  if(voicePointerId!==null||isRecording||videoRecording)return;
-  voicePointerId=event.pointerId;
+  if(!activeUser)return toast("Select a user first.");
+  if(videoRecording)return toast("Finish the video recording first.");
+  if(isRecording){
+    voiceClickRecording=false;
+    stopVoiceHoldRecording();
+    return;
+  }
   voiceHoldActive=true;
-  clearTimeout(voiceHoldTimer);
-  voiceHoldTimer=setTimeout(()=>{if(voiceHoldActive)startVoiceHoldRecording()},180);
+  voiceClickRecording=true;
+  await startVoiceHoldRecording();
+  if(!isRecording)voiceClickRecording=false;
 });
-function releaseVoicePointer(event){
-  if(voicePointerId===null||(event.pointerId!==undefined&&event.pointerId!==voicePointerId))return;
-  clearTimeout(voiceHoldTimer);
-  stopVoiceHoldRecording();
-  voicePointerId=null;
-}
-document.addEventListener("pointerup",releaseVoicePointer);
-document.addEventListener("pointercancel",releaseVoicePointer);
 recordButton.addEventListener("contextmenu",event=>event.preventDefault());
 
 const cameraButton=$("cameraBtn");
 function useNativeMobileVideoCapture(){
   return window.matchMedia?.("(pointer: coarse)")?.matches||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
-cameraButton.addEventListener("pointerdown",event=>{
-  if(event.button!==undefined&&event.button!==0)return;
-  event.preventDefault();
+function openCameraChoice(){
   if(!activeUser)return toast("Select a user first.");
-  if(cameraPointerId!==null||videoRecording||isRecording)return;
-  cameraPointerId=event.pointerId;
-  cameraPointerHeld=true;
-  cameraLongPressTriggered=false;
-  clearTimeout(cameraHoldTimer);
-  cameraHoldTimer=setTimeout(()=>{
-    if(cameraPointerHeld){
-      cameraLongPressTriggered=true;
-      if(!useNativeMobileVideoCapture())startVideoHoldRecording();
-    }
-  },350);
-});
-function releaseCameraPointer(event){
-  if(cameraPointerId===null||(event.pointerId!==undefined&&event.pointerId!==cameraPointerId))return;
-  clearTimeout(cameraHoldTimer);
-  const takePhoto=event.type==="pointerup"&&!cameraLongPressTriggered&&cameraPointerHeld;
-  const takeNativeVideo=event.type==="pointerup"&&cameraLongPressTriggered&&cameraPointerHeld&&useNativeMobileVideoCapture();
-  if(cameraLongPressTriggered&&!takeNativeVideo)stopVideoHoldRecording();
-  cameraPointerHeld=false;
-  cameraPointerId=null;
-  if(takePhoto)$("cameraInput").click();
-  if(takeNativeVideo)$("videoCameraInput").click();
+  $("cameraChoiceOverlay").classList.remove("hidden");
 }
-document.addEventListener("pointerup",releaseCameraPointer);
-document.addEventListener("pointercancel",releaseCameraPointer);
-cameraButton.addEventListener("contextmenu",event=>event.preventDefault());
+function closeCameraChoice(){$("cameraChoiceOverlay").classList.add("hidden")}
+cameraButton.title="Photo or video";
+cameraButton.setAttribute("aria-label","Take a photo or record a video");
+cameraButton.addEventListener("click",event=>{
+  event.preventDefault();
+  if(videoRecording){stopVideoHoldRecording();return}
+  if(isRecording)return toast("Finish the voice recording first.");
+  openCameraChoice();
+});
+$("closeCameraChoiceBtn").onclick=closeCameraChoice;
+$("cameraChoiceOverlay").onclick=event=>{if(event.target===$("cameraChoiceOverlay"))closeCameraChoice()};
+$("choosePhotoBtn").onclick=()=>{closeCameraChoice();$("cameraInput").click()};
+$("chooseVideoBtn").onclick=async()=>{
+  closeCameraChoice();
+  if(useNativeMobileVideoCapture()){
+    $("videoCameraInput").click();
+    return;
+  }
+  cameraPointerHeld=true;
+  cameraLongPressTriggered=true;
+  await startVideoHoldRecording();
+  if(videoRecording)toast("Video recording started. Tap the camera button again to stop.");
+};
 window.addEventListener("blur",()=>{
-  if(voicePointerId!==null)releaseVoicePointer({});
-  if(cameraPointerId!==null)releaseCameraPointer({type:"pointercancel"});
+  if(isRecording&&voiceClickRecording){/* keep recording while permission/browser UI changes focus */}
 });
 
 $("backBtn").onclick=()=>{
