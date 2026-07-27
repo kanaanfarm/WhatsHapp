@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6778"}
+    data:{url:"/?v=6780"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,12 +826,12 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6778: call video is processed into true left/right orientation.
+  // Build 6780: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
   const capture=$("captureVideo");
-  if(capture)capture.classList.toggle("front-camera-corrected",captureFacing==="user"&&Boolean(captureStream));
+  if(capture)capture.classList.remove("front-camera-corrected");
   applyCameraFilter();
 }
 
@@ -1463,27 +1463,27 @@ async function previewAndUploadMedia(file,kind){
   const receiverId=Number(activeUser?.id);
   if(!await confirmMediaUpload(file,kind))return false;
   if(!activeUser||Number(activeUser.id)!==receiverId){toast("The conversation changed. Media was not sent.");return false}
-  return uploadFile(file,kind);
+  return uploadFile(file,kind,captureReceiverId);
 }
 $("closeMediaConfirmBtn").onclick=()=>closeMediaConfirmation(false);
 $("cancelMediaConfirmBtn").onclick=()=>closeMediaConfirmation(false);
 $("sendMediaConfirmBtn").onclick=()=>closeMediaConfirmation(true);
 $("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverlay"))closeMediaConfirmation(false)};
 
-async function uploadFile(file,kind){
+async function uploadFile(file,kind,forcedReceiverId=null){
   if(mediaUploadInFlight){toast("Please wait for the current upload to finish.");return false}
   if(!activeUser){toast("Select a user first.");return false}
   if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
   if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
   const caption=$("messageInput").value.trim();
-  const receiverId=Number(activeUser.id);
+  const receiverId=Number(forcedReceiverId||activeUser.id);
   const uploadId=`${kind}:${receiverId}:${file.name}:${file.size}:${file.lastModified||0}`;
   const fd=new FormData();fd.append("file",file);fd.append("receiverId",receiverId);fd.append("kind",kind);fd.append("caption",caption);fd.append("uploadId",uploadId);
   mediaUploadInFlight=true;
   $("uploadStatus").textContent=`Uploading ${file.name}…`;$("uploadStatus").classList.remove("hidden");$("attachBtn").disabled=true;
   try{
     const saved=await api("/api/upload",{method:"POST",body:fd});
-    if(!saved?.id)throw new Error(`${kind==="video"?"Video":"Media"} upload did not create a message.`);
+    if(!saved?.id)throw new Error(`${kind==="video"?"Video":"Media"} upload did not create a message.`);if(activeUser&&Number(activeUser.id)===receiverId)addMessage(saved);
     if(caption&&activeUser&&Number(activeUser.id)===receiverId){$("messageInput").value="";updateComposer()}
     toast(kind==="voice"?"Voice sent":kind==="image"?"Photo sent":kind==="video"?"Video sent":"Document sent");return true
   }catch(e){
@@ -1499,7 +1499,7 @@ async function uploadFiles(fileList){
   for(const file of files){
     const kind=attachmentKind(file);
     if(["image","voice","video"].includes(kind))await previewAndUploadMedia(file,kind);
-    else await uploadFile(file,kind);
+    else await uploadFile(file,kind,captureReceiverId);
   }
   if(fileList.length>10)toast("A maximum of 10 files can be added at one time.");
 }
@@ -1633,7 +1633,7 @@ function stopVideoHoldRecording(){
 
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -1678,12 +1678,18 @@ function resetCaptureResult(){
   $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
   $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
   $("captureSwitchBtn").classList.toggle("hidden",captureMode==="voice");
-  $("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");
+  $("captureCanvas").classList.add("hidden");$("captureVideo").classList.toggle("hidden",captureMode==="voice");$("voiceWave").classList.toggle("hidden",captureMode!=="voice");capturePhotoScale=1;const saveBtn=$("captureSaveBtn");if(saveBtn)saveBtn.classList.add("hidden");
   const a=$("captureAudio");if(a){a.pause();a.removeAttribute("src");a.load();a.classList.add("hidden")}
 }
 function stopCaptureClock(reset=true){clearInterval(captureClock);captureClock=null;clearTimeout(captureAutoStopTimer);captureAutoStopTimer=null;if(reset)$("captureTimer").textContent="00:00"}
 function startCaptureClock(){captureStartedAt=Date.now();captureClock=setInterval(()=>{const s=Math.floor((Date.now()-captureStartedAt)/1000);$("captureTimer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`},250)}
-async function prepareCapture(mode){
+async 
+function enforceTrueCaptureOrientation(){
+  const v=$("captureVideo"), cv=$("captureCanvas");
+  if(v){v.style.transform="none";v.style.webkitTransform="none";}
+  if(cv){cv.style.transform=`scale(${capturePhotoScale||1})`;cv.style.webkitTransform=`scale(${capturePhotoScale||1})`;}
+}
+function prepareCapture(mode){
   captureMode=mode;
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
   captureRecorder=null;captureChunks=[];
@@ -1699,12 +1705,12 @@ function openCapture(mode){
   if(!activeUser)return toast("Select a user first.");
   if(activeUser.isAI)return toast("Media recording is available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia)return toast("Camera/microphone recording is not supported by this browser.");
-  $("captureOverlay").classList.remove("hidden");prepareCapture(mode);
+  captureReceiverId=Number(activeUser.id);captureReceiverId=activeUser?Number(activeUser.id):captureReceiverId;$("captureOverlay").classList.remove("hidden");prepareCapture(mode);setTimeout(enforceTrueCaptureOrientation,0);
 }
 function closeCapture(){
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
   captureRecorder=null;captureChunks=[];captureStopping=false;clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;
-  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording");
+  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording");captureReceiverId=null;
 }
 function showCaptureResult(){
   stopCaptureClock(false);
@@ -1721,8 +1727,8 @@ function showCaptureResult(){
       v.load();try{v.pause();v.currentTime=0}catch{}
     }
   }
-  const ready=Boolean(captureBlob&&captureBlob.size>=1024);
-  setCapturePreviewReady(ready);setCaptureSendReady(ready);
+  const ready=Boolean(captureBlob&&captureBlob.size>=1024);const saveBtn=$("captureSaveBtn");if(saveBtn)saveBtn.classList.toggle("hidden",!(ready&&captureMode==="photo"));
+  const sb=$("captureSaveBtn");if(sb)sb.classList.toggle("hidden",!(ready&&captureMode==="photo"));setCapturePreviewReady(ready);setCaptureSendReady(ready);
 }
 async function finalizeCaptureRecording(recorder,mime){
   // MediaRecorder's final dataavailable event is delivered before stop. Building
@@ -1765,7 +1771,7 @@ const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterS
 function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";
   applyCameraFilter();
-  // Build 6778: always mirror the selected call filter to the peer UI as a
+  // Build 6780: always mirror the selected call filter to the peer UI as a
   // signaling fallback. This makes filters visible to the other user even on
   // iPhone/Safari versions that cannot publish a processed canvas/WebCodecs track.
   if(peer&&callPeerId&&callMode==="video"){
@@ -1776,9 +1782,40 @@ if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.va
 if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.onclick=()=>setCameraFilter(btn.dataset.cameraFilter));
 
+
+let capturePinchStart=0,capturePinchScale=1;
+function setCapturePhotoScale(value){
+  capturePhotoScale=Math.max(1,Math.min(4,value));
+  const canvas=$("captureCanvas");
+  if(canvas)canvas.style.transform=`scale(${capturePhotoScale})`;
+}
+$("capturePreview").addEventListener("wheel",e=>{
+  if(captureMode!=="photo"||!captureBlob)return;
+  e.preventDefault();setCapturePhotoScale(capturePhotoScale+(e.deltaY<0?.2:-.2));
+},{passive:false});
+$("capturePreview").addEventListener("touchstart",e=>{
+  if(captureMode!=="photo"||!captureBlob||e.touches.length!==2)return;
+  capturePinchStart=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  capturePinchScale=capturePhotoScale;
+},{passive:true});
+$("capturePreview").addEventListener("touchmove",e=>{
+  if(captureMode!=="photo"||!captureBlob||e.touches.length!==2||!capturePinchStart)return;
+  const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  setCapturePhotoScale(capturePinchScale*(d/capturePinchStart));
+},{passive:true});
+
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
+
+$("captureSaveBtn").onclick=()=>{
+  if(captureMode!=="photo"||!captureBlob)return;
+  const url=URL.createObjectURL(captureBlob);
+  const link=document.createElement("a");
+  link.href=url;link.download=`ConnectChat-photo-${Date.now()}.jpg`;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+};
 $("capturePreviewBtn").onclick=async()=>{
   if(!captureBlob||captureBlob.size<1024||captureMode==="photo")return;
   const player=captureMode==="voice"?$("captureAudio"):$("captureVideo"),btn=$("capturePreviewBtn");
@@ -1798,7 +1835,7 @@ $("captureSendBtn").onclick=async()=>{
     const ext=type.includes("jpeg")?"jpg":type.includes("mp4")?(captureMode==="voice"?"m4a":"mp4"):type.includes("ogg")?"ogg":"webm";
     const kind=captureMode==="photo"?"image":captureMode;
     const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
-    const sent=await uploadFile(file,kind);
+    const sent=await uploadFile(file,kind,captureReceiverId);
     if(sent)closeCapture();else setCaptureSendReady(true);
   }finally{captureSendInFlight=false;if(captureBlob&&!$("captureOverlay").classList.contains("hidden"))setCaptureSendReady(true)}
 };
@@ -2828,3 +2865,24 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
     toast(`AI provider: ${$("aiProviderSelect").selectedOptions[0].textContent}`);
   };
 })();
+
+const cameraFilterSelectEl=$("cameraFilterSelect");
+if(cameraFilterSelectEl){
+  cameraFilterSelectEl.onchange=()=>{
+    const val=cameraFilterSelectEl.value;
+    const map={
+      normal:"none",
+      beauty:"brightness(1.06) contrast(.94) saturate(1.04)",
+      warm:"sepia(.18) saturate(1.12) brightness(1.03)",
+      cool:"saturate(.92) hue-rotate(10deg) brightness(1.02)",
+      bw:"grayscale(1)",
+      bright:"brightness(1.16)",
+      soft:"contrast(.88) brightness(1.05) saturate(.96)"
+    };
+    const f=map[val]||"none";
+    const v=$("captureVideo"),cv=$("captureCanvas");
+    if(v)v.style.filter=f;
+    if(cv)cv.style.filter=f;
+    window.__captureFilterCss=f;
+  };
+}

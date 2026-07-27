@@ -1,0 +1,8 @@
+Build 6780 corrective pass based on user's 6779 test:
+1. Removed recorder mirroring for true left/right orientation.
+2. Changed recorder camera stage to natural portrait framing, not wide/stretch.
+3. Removed Voice tab from Photo/Video recorder.
+4. Removed horizontal filter pills; kept one compact filter selector.
+5. Bound capture send to the chat user who opened the recorder; successful media is sent to that conversation.
+6. Photo preview supports pinch/wheel zoom and includes a local Save button.
+Existing chat voice recorder and confirmed video-call filter/signaling path are not intentionally changed.
