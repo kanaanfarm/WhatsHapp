@@ -18,11 +18,12 @@ const { Document, Packer, Paragraph, HeadingLevel } = require("docx");
 const { rateLimit } = require("express-rate-limit");
 const { createClient } = require("@supabase/supabase-js");
 const { Server } = require("socket.io");
+const webpush = require("web-push");
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6770";
+const APP_BUILD = "6771";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -37,6 +38,15 @@ const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 15 * 60;
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const CALLS_ENABLED = process.env.CALLS_ENABLED !== "false";
+const VAPID_PUBLIC_KEY = String(process.env.VAPID_PUBLIC_KEY || "").trim();
+const VAPID_PRIVATE_KEY = String(process.env.VAPID_PRIVATE_KEY || "").trim();
+const PUSH_SUBJECT = String(process.env.PUSH_SUBJECT || "mailto:admin@connectchat.local").trim();
+const PUSH_ENABLED = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+if (PUSH_ENABLED) {
+  try { webpush.setVapidDetails(PUSH_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY); }
+  catch (error) { console.error("Push notification setup failed:", error.message); }
+}
+
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
@@ -374,6 +384,25 @@ function removeOnlineSocket(userId, socketId) {
   if (sockets.size) return false;
   onlineUsers.delete(userId);
   return true;
+}
+
+async function sendPushToUser(userId, payload) {
+  if (!PUSH_ENABLED) return { sent: 0, disabled: true };
+  const { data, error } = await supabase.from("push_subscriptions")
+    .select("id,endpoint,p256dh,auth").eq("user_id", Number(userId));
+  if (error) { console.error("Push subscriptions query failed:", error.message); return { sent: 0, error: true }; }
+  let sent = 0;
+  for (const row of data || []) {
+    try {
+      await webpush.sendNotification({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }, JSON.stringify(payload), { TTL: 60, urgency: "high" });
+      sent += 1;
+    } catch (error) {
+      const code = Number(error.statusCode || 0);
+      if (code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("id", row.id);
+      else console.error("Push send failed:", code || error.message);
+    }
+  }
+  return { sent };
 }
 
 async function auth(req, res, next) {
@@ -2126,6 +2155,32 @@ app.get("/api/files", auth, async (req, res) => {
 });
 
 
+app.get("/api/push/public-key", auth, (req, res) => {
+  res.json({ enabled: PUSH_ENABLED, publicKey: PUSH_ENABLED ? VAPID_PUBLIC_KEY : "" });
+});
+
+app.post("/api/push/subscribe", auth, async (req, res) => {
+  try {
+    if (!PUSH_ENABLED) return res.status(503).json({ error: "Push notifications are not configured on the server." });
+    const sub = req.body?.subscription || req.body;
+    const endpoint = String(sub?.endpoint || "").slice(0, 2000);
+    const p256dh = String(sub?.keys?.p256dh || "").slice(0, 500);
+    const authKey = String(sub?.keys?.auth || "").slice(0, 500);
+    if (!endpoint || !p256dh || !authKey) return res.status(400).json({ error: "Invalid push subscription." });
+    const { error } = await supabase.from("push_subscriptions").upsert({ user_id: Number(req.currentUser.id), endpoint, p256dh, auth: authKey, updated_at: new Date().toISOString() }, { onConflict: "endpoint" });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) { console.error("Push subscribe failed:", error); res.status(500).json({ error: "Push subscription could not be saved. Run the push migration SQL." }); }
+});
+
+app.post("/api/push/unsubscribe", auth, async (req, res) => {
+  try {
+    const endpoint = String(req.body?.endpoint || "").slice(0, 2000);
+    if (endpoint) await supabase.from("push_subscriptions").delete().eq("user_id", Number(req.currentUser.id)).eq("endpoint", endpoint);
+    res.json({ ok: true });
+  } catch { res.json({ ok: true }); }
+});
+
 app.get("/api/users", auth, async (req, res) => {
   try {
     const userId = Number(req.session.userId);
@@ -2735,6 +2790,7 @@ io.on("connection", async socket => {
       }).select("id,sender_id,receiver_id,kind,body,file_url,file_name,mime_type,delivered_at,read_at,created_at").single();
       if (error) throw error;
       io.to(`user:${userId}`).to(`user:${receiverId}`).emit("privateMessage", { ...message, sender_name: username });
+      if (!onlineUsers.has(receiverId)) sendPushToUser(receiverId, { type: "message", title: username, body: body.slice(0, 160), tag: `private-${userId}`, url: "/?from="+userId }).catch(()=>{});
     } catch (error) {
       console.error("Message failed:", error);
       socket.emit("message:error", { error: "Message could not be sent." });
@@ -2791,7 +2847,8 @@ io.on("connection", async socket => {
           caller_id: userId, receiver_id: receiverId, mode, status: "missed"
         });
         if (error) throw error;
-        return socket.emit("call:queued", { receiverId, receiverName: receiver.username, mode, deliveredNow: false });
+        const pushResult = await sendPushToUser(receiverId, { type: "call", title: `Incoming ${mode === "video" ? "video" : "voice"} call`, body: `${username} is calling you`, tag: `incoming-call-${userId}`, url: "/?callFrom="+userId });
+        return socket.emit("call:queued", { receiverId, receiverName: receiver.username, mode, deliveredNow: Number(pushResult?.sent || 0) > 0 });
       } catch (error) {
         console.error("Could not save missed call:", error);
         return socket.emit("call:unavailable", { receiverId });

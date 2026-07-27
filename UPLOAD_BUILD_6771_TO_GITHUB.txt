@@ -1,0 +1,4 @@
+ConnectChat Pro v6.7.3 Build 6771
+Offline push notifications for private messages and voice/video call attempts.
+Run v6.7.3-push-notifications-migration.sql once in Supabase and configure the VAPID environment variables in Render before testing offline push.
+The working Build 6767 media path was not modified.

@@ -1,0 +1,27 @@
+ConnectChat Pro Build 6771 — Offline Push Notification Setup
+
+1) Supabase
+Open SQL Editor and run once:
+  v6.7.3-push-notifications-migration.sql
+
+2) Generate VAPID keys ONCE (keep the private key secret)
+On a PC with Node.js:
+  npx web-push generate-vapid-keys
+
+3) Render > Environment
+Add these values and redeploy:
+  VAPID_PUBLIC_KEY=<public key from command>
+  VAPID_PRIVATE_KEY=<private key from command>
+  PUSH_SUBJECT=mailto:<your email>
+
+4) Each device/user
+Open ConnectChat > Settings > Message notifications > enable notifications.
+On iPhone/iPad, install ConnectChat to the Home Screen first, then open the installed web app and enable notifications. Browser/PWA push restrictions are controlled by iOS.
+
+5) What Build 6771 does
+- Online users: existing Socket.IO notifications/calls continue unchanged.
+- Offline users: new private text messages can trigger Web Push.
+- Offline call attempts: Web Push alerts the receiver that a voice/video call was attempted; tapping opens ConnectChat. The missed-call history is preserved.
+- Existing photo/voice/video recording and upload code is unchanged.
+
+If VAPID keys or the push_subscriptions table are missing, ConnectChat continues to work normally but offline push is disabled.

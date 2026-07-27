@@ -119,6 +119,25 @@ function notificationPermissionText(){
   return "Tap to enable";
 }
 
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(ch=>ch.charCodeAt(0)));
+}
+async function syncPushSubscription(){
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||Notification.permission!=="granted")return false;
+  try{
+    const cfg=await api("/api/push/public-key");
+    if(!cfg.enabled||!cfg.publicKey)return false;
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.publicKey)});
+    await api("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscription:sub.toJSON()})});
+    return true;
+  }catch(error){console.warn("Push subscription failed:",error);return false}
+}
+
 async function requestMessageNotifications(){
   if(!("Notification" in window)){
     toast("Notifications are not supported by this browser.");
@@ -131,6 +150,7 @@ async function requestMessageNotifications(){
   if(Notification.permission==="granted"){
     const nextEnabled=!notificationsEnabled();
     localStorage.setItem(NOTIFICATIONS_KEY,nextEnabled?"on":"off");
+    if(nextEnabled)await syncPushSubscription();
     toast(nextEnabled?"Message notifications enabled.":"Message notifications disabled.");
     const status=$("settingsNotificationStatus");
     if(status)status.textContent=notificationPermissionText();
@@ -138,7 +158,7 @@ async function requestMessageNotifications(){
   }
   try{
     const permission=await Notification.requestPermission();
-    if(permission==="granted")localStorage.setItem(NOTIFICATIONS_KEY,"on");
+    if(permission==="granted"){localStorage.setItem(NOTIFICATIONS_KEY,"on");await syncPushSubscription();}
     toast(permission==="granted"?"Message notifications enabled.":"Notifications were not enabled.");
     const status=$("settingsNotificationStatus");
     if(status)status.textContent=notificationPermissionText();
@@ -156,7 +176,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6770"}
+    data:{url:"/?v=6771"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -420,7 +440,7 @@ async function startApp(){
 function connectSocket(){
   if(socket)socket.disconnect();
   socket=io();
-  socket.on("connect",()=>{refreshUsers();measureNetworkQuality()});
+  socket.on("connect",()=>{refreshUsers();measureNetworkQuality();if(notificationsEnabled())syncPushSubscription()});
   socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Bad","Disconnected from the ConnectChat server")});
   socket.on("privateMessage",msg=>{
     const incoming=Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)!==Number(me.id);
