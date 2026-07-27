@@ -1,2 +1,2 @@
-ConnectChat Pro v6.7.3 Build 6773
+ConnectChat Pro v6.7.3 Build 6774
 Front-camera left/right orientation correction for live call and capture previews. Working media upload/send path unchanged.

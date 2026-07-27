@@ -1,0 +1,2 @@
+ConnectChat Pro v6.7.3 Build 6774
+Adds camera filter selector for photo/video camera preview and local video-call preview. Photo captures include the selected filter. Existing media upload/recording pipeline is unchanged.

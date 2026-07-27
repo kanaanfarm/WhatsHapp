@@ -1563,7 +1563,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6773: missed-call visibility and in-app call attention */
+/* Build 6774: missed-call visibility and in-app call attention */
 .rail-item[data-section="calls"]{position:relative}
 .calls-missed-badge{position:absolute;top:5px;right:9px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;display:grid;place-items:center;background:#df2b36;color:#fff;font-size:10px;font-weight:900;line-height:1;box-shadow:0 0 0 2px var(--panel)}
 .call-history-item.missed-call-item{border-color:rgba(223,43,54,.32)!important;background:rgba(223,43,54,.065)!important}
@@ -1579,7 +1579,14 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 @media(max-width:800px){.missed-call-alert-overlay{align-items:end;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}.missed-call-alert-card{border-radius:22px 22px 18px 18px}.calls-missed-badge{top:3px;right:4px}}
 
 
-/* Build 6773: front-camera live previews show true left/right orientation.
+/* Build 6774: front-camera live previews show true left/right orientation.
    Rear camera, remote video, saved photo/video, and media playback are unchanged. */
 #localVideo.front-camera-corrected,
 #captureVideo.front-camera-corrected{transform:scaleX(-1)!important;}
+
+/* Build 6774: non-destructive camera filters. Photo captures bake the selected filter; video-call/recorder filters are preview-only to preserve the proven media pipeline. */
+.camera-filter-select,.call-filter-select{border:1px solid rgba(255,255,255,.22);background:#1f1f1f;color:#fff;border-radius:999px;padding:9px 12px;font-weight:700;max-width:130px}
+.capture-tabs .camera-filter-select{margin-left:8px;align-self:center}
+.call-filter-select{min-height:44px}
+.video-stage.audio-only~.call-controls .call-filter-select{display:none}
+@media(max-width:800px){.capture-tabs{flex-wrap:wrap}.capture-tabs .camera-filter-select{flex:0 0 auto;max-width:120px;padding:7px 10px}.call-filter-select{max-width:105px;font-size:12px;padding:8px}}

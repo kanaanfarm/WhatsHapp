@@ -6,6 +6,8 @@ let videoRecorder=null,videoChunks=[],videoStream=null,videoRecording=false,reco
 let mediaUploadInFlight=false,captureSendInFlight=false;
 let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let cameraFilter="normal";
+const CAMERA_FILTERS={normal:"none",beauty:"brightness(1.06) contrast(.96) saturate(1.04)",warm:"sepia(.12) saturate(1.18) hue-rotate(-6deg)",cool:"saturate(.95) hue-rotate(10deg) brightness(1.03)",bw:"grayscale(1) contrast(1.08)",bright:"brightness(1.18) contrast(1.02)",soft:"brightness(1.06) contrast(.9) saturate(.94)"};
 let currentUserFilter="all";
 let currentWorkspaceSection="chats";
 let profileTarget=null;
@@ -176,7 +178,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6773"}
+    data:{url:"/?v=6774"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -805,13 +807,24 @@ async function getMedia(mode){
   return navigator.mediaDevices.getUserMedia({audio:true,video});
 }
 
+function applyCameraFilter(){
+  const css=CAMERA_FILTERS[cameraFilter]||"none";
+  const capture=$("captureVideo"),local=$("localVideo");
+  if(capture)capture.style.filter=css;
+  if(local)local.style.filter=(screenStream?"none":css);
+  const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
+  if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
+  if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
+}
+
 function syncFrontCameraOrientation(){
-  // Build 6773: counter the mirrored front-camera preview so physical left/right
+  // Build 6774: counter the mirrored front-camera preview so physical left/right
   // stays correct. This affects only live local previews, never remote video.
   const local=$("localVideo");
   if(local)local.classList.toggle("front-camera-corrected",currentFacingMode==="user"&&!screenStream);
   const capture=$("captureVideo");
   if(capture)capture.classList.toggle("front-camera-corrected",captureFacing==="user"&&Boolean(captureStream));
+  applyCameraFilter();
 }
 
 async function createPeer(peerId){
@@ -933,7 +946,7 @@ async function toggleScreenShare(){
     if(!sender)throw new Error("Video sender is unavailable");
     cameraVideoTrack=sender.track;
     await sender.replaceTrack(screenTrack);
-    $("localVideo").srcObject=screenStream;$("localVideo").classList.remove("front-camera-corrected");
+    $("localVideo").srcObject=screenStream;$("localVideo").classList.remove("front-camera-corrected");$("localVideo").style.filter="none";
     $("videoStage").classList.add("screen-sharing");
     button.textContent="⏹ Stop sharing";button.classList.add("share-active");
     $("callStatus").textContent="Sharing screen";
@@ -1572,7 +1585,7 @@ async function prepareCapture(mode){
   captureRecorder=null;captureChunks=[];
   stopCaptureStream();stopCaptureClock();resetCaptureResult();
   $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
-  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));if($("cameraFilterSelect"))$("cameraFilterSelect").classList.toggle("hidden",mode==="voice");
   try{
     captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});
     if(mode!=="voice"){const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;syncFrontCameraOrientation();await live.play().catch(()=>{})}
@@ -1619,7 +1632,7 @@ async function captureMain(){
   if(captureMode==="photo"){
     const v=$("captureVideo"),c=$("captureCanvas");
     if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
-    c.width=v.videoWidth;c.height=v.videoHeight;c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.classList.remove("hidden");v.classList.add("hidden");
+    c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext("2d");ctx.save();ctx.filter=CAMERA_FILTERS[cameraFilter]||"none";ctx.drawImage(v,0,0,c.width,c.height);ctx.restore();c.classList.remove("hidden");v.classList.add("hidden");
     captureBlob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));
     if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
     showCaptureResult();return;
@@ -1644,6 +1657,11 @@ async function captureMain(){
   recorder.start();$("captureOverlay").classList.add("recording");$("captureMainBtn").setAttribute("aria-label","Stop recording");startCaptureClock();
   captureAutoStopTimer=setTimeout(()=>{if(captureRecorder?.state==="recording")captureMain()},60000);
 }
+const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
+function setCameraFilter(value){cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();}
+if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
+if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
+
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
