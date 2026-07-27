@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6787"}
+    data:{url:"/?v=6789"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6787: call video is processed into true left/right orientation.
+  // Build 6789: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1554,35 +1554,147 @@ function clearRecordingFeedback(){
 function preferredRecorderType(types){
   return types.find(type=>MediaRecorder.isTypeSupported?.(type))||"";
 }
+
+
+let voiceRecordingStream=null,voiceRecordingMime="",voiceRecordingStopping=false,voicePendingBlob=null,voicePendingFile=null,voicePendingUrl=null,voiceRecordStartedAt=0,voiceRecordTimerHandle=null,voiceRecordReceiverId=null;
+
+function voiceFormatTime(totalSeconds){
+  const sec=Math.max(0,Math.floor(totalSeconds));
+  return `${String(Math.floor(sec/60)).padStart(2,"0")}:${String(sec%60).padStart(2,"0")}`;
+}
+function clearVoiceTimer(){
+  clearInterval(voiceRecordTimerHandle);voiceRecordTimerHandle=null;
+}
+function startVoiceTimer(){
+  clearVoiceTimer();voiceRecordStartedAt=Date.now();
+  $("voiceRecordTimer").textContent="00:00";
+  voiceRecordTimerHandle=setInterval(()=>{
+    $("voiceRecordTimer").textContent=voiceFormatTime((Date.now()-voiceRecordStartedAt)/1000);
+  },250);
+}
+function clearVoicePendingUrl(){
+  if(voicePendingUrl){URL.revokeObjectURL(voicePendingUrl);voicePendingUrl=null}
+}
+function resetVoiceRecorderUi(){
+  clearVoiceTimer();clearVoicePendingUrl();
+  const audio=$("voiceRecordPreview");
+  if(audio){audio.pause();audio.removeAttribute("src");audio.load();audio.classList.add("hidden")}
+  $("voiceRecordPanel").classList.add("hidden");
+  $("voiceRecordStop").classList.remove("hidden");
+  $("voiceRecordSend").classList.add("hidden");
+  $("voiceRecordState").textContent="Recording voice";
+  $("voiceRecordTimer").textContent="00:00";
+  $("recordBtn").classList.remove("recording");
+  voicePendingBlob=null;voicePendingFile=null;voiceRecordReceiverId=null;
+}
+function showVoiceRecordingUi(){
+  $("voiceRecordPanel").classList.remove("hidden");
+  $("voiceRecordStop").classList.remove("hidden");
+  $("voiceRecordSend").classList.add("hidden");
+  $("voiceRecordPreview").classList.add("hidden");
+  $("voiceRecordState").textContent="Recording voice";
+  $("recordBtn").classList.add("recording");
+  startVoiceTimer();
+}
+function showVoicePreview(blob,file){
+  clearVoiceTimer();clearVoicePendingUrl();
+  voicePendingBlob=blob;voicePendingFile=file;
+  voicePendingUrl=URL.createObjectURL(blob);
+  const audio=$("voiceRecordPreview");
+  audio.src=voicePendingUrl;audio.classList.remove("hidden");audio.load();
+  $("voiceRecordPanel").classList.remove("hidden");
+  $("voiceRecordStop").classList.add("hidden");
+  $("voiceRecordSend").classList.remove("hidden");
+  $("voiceRecordState").textContent="Voice ready";
+  $("recordBtn").classList.remove("recording");
+}
 async function startVoiceHoldRecording(){
   if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI)return toast("AI file analysis is not enabled in this version.");
+  if(activeUser.isAI)return toast("Voice messages are available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia||!("MediaRecorder" in window))return toast("Voice recording is not supported by this browser.");
-  if(isRecording||videoRecording)return;
+  if(isRecording||videoRecording||voiceRecordingStopping)return;
+  resetVoiceRecorderUi();
+  voiceRecordReceiverId=Number(activeUser.id);
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    if(!voiceHoldActive){stream.getTracks().forEach(track=>track.stop());return}
-    audioChunks=[];
-    const mimeType=preferredRecorderType(["audio/webm;codecs=opus","audio/mp4","audio/webm"]);
-    mediaRecorder=new MediaRecorder(stream,mimeType?{mimeType,audioBitsPerSecond:64000}:undefined);
-    mediaRecorder.ondataavailable=e=>{if(e.data.size)audioChunks.push(e.data)};
-    mediaRecorder.onstop=()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      const blob=new Blob(audioChunks,{type:mediaRecorder.mimeType||"audio/webm"});
-      const extension=blob.type.includes("mp4")?"m4a":blob.type.includes("ogg")?"ogg":"webm";
-      const file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type});
-      isRecording=false;$("recordBtn").classList.remove("recording");
-      clearRecordingFeedback();
-      if(blob.size>500)previewAndUploadMedia(file,"voice");
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    voiceRecordingStream=stream;audioChunks=[];
+    const apple=/Safari/i.test(navigator.userAgent||"")&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(navigator.userAgent||"");
+    const mimeType=preferredRecorderType(apple
+      ?["audio/mp4;codecs=mp4a.40.2","audio/mp4","audio/webm;codecs=opus","audio/webm"]
+      :["audio/webm;codecs=opus","audio/webm","audio/mp4"]);
+    voiceRecordingMime=mimeType;
+    try{mediaRecorder=new MediaRecorder(stream,mimeType?{mimeType,audioBitsPerSecond:64000}:undefined)}
+    catch{mediaRecorder=new MediaRecorder(stream)}
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)audioChunks.push(e.data)};
+    mediaRecorder.onerror=()=>{
+      voiceRecordingStopping=false;isRecording=false;
+      voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
+      resetVoiceRecorderUi();toast("Voice recording failed. Please try again.");
     };
-    mediaRecorder.start(250);isRecording=true;$("recordBtn").classList.add("recording");
-    recordingFeedback("Recording voice… release to send");
-  }catch(e){toast("Microphone permission is required.")}
+    mediaRecorder.onstop=()=>{
+      setTimeout(()=>{
+        voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
+        const type=mediaRecorder?.mimeType||voiceRecordingMime||(apple?"audio/mp4":"audio/webm");
+        const blob=new Blob(audioChunks,{type});
+        const ext=type.includes("mp4")?"m4a":type.includes("ogg")?"ogg":"webm";
+        const file=new File([blob],`voice-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
+        isRecording=false;voiceRecordingStopping=false;
+        if(blob.size<=500){resetVoiceRecorderUi();toast("Voice recording was empty. Please try again.");return}
+        showVoicePreview(blob,file);
+      },120);
+    };
+    mediaRecorder.start();
+    isRecording=true;showVoiceRecordingUi();
+  }catch{
+    voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
+    isRecording=false;voiceRecordingStopping=false;resetVoiceRecorderUi();
+    toast("Microphone permission is required.");
+  }
 }
 function stopVoiceHoldRecording(){
-  voiceHoldActive=false;
-  if(mediaRecorder?.state==="recording")mediaRecorder.stop();
+  if(!isRecording||voiceRecordingStopping)return;
+  voiceRecordingStopping=true;clearVoiceTimer();
+  $("voiceRecordState").textContent="Finishing…";
+  $("voiceRecordStop").classList.add("hidden");
+  if(mediaRecorder?.state==="recording"){
+    try{mediaRecorder.requestData()}catch{}
+    try{mediaRecorder.stop()}catch{
+      voiceRecordingStopping=false;isRecording=false;
+      voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
+      resetVoiceRecorderUi();
+    }
+  }
 }
+function cancelVoiceRecording(){
+  clearVoiceTimer();
+  if(mediaRecorder?.state==="recording"){
+    mediaRecorder.onstop=null;
+    try{mediaRecorder.stop()}catch{}
+  }
+  voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
+  isRecording=false;voiceRecordingStopping=false;audioChunks=[];
+  resetVoiceRecorderUi();
+}
+$("recordBtn").onclick=async event=>{
+  event.preventDefault();event.stopPropagation();
+  if(isRecording)stopVoiceHoldRecording();
+  else if(voicePendingFile)toast("Send or cancel the current voice recording first.");
+  else await startVoiceHoldRecording();
+};
+$("voiceRecordStop").onclick=stopVoiceHoldRecording;
+$("voiceRecordCancel").onclick=cancelVoiceRecording;
+$("voiceRecordSend").onclick=async()=>{
+  if(!voicePendingFile)return;
+  if(!activeUser||Number(activeUser.id)!==Number(voiceRecordReceiverId)){
+    return toast("Return to the chat where you recorded this voice message before sending.");
+  }
+  const btn=$("voiceRecordSend");btn.disabled=true;
+  try{
+    const sent=await uploadFile(voicePendingFile,"voice");
+    if(sent)resetVoiceRecorderUi();
+  }finally{btn.disabled=false}
+};
+
 
 async function startVideoHoldRecording(){
   if(!activeUser)return toast("Select a user first.");

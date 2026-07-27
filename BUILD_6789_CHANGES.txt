@@ -1,0 +1,10 @@
+Build 6789 — voice recorder UI/preview/send fix only, based on Build 6788.
+
+Flow:
+Mic -> recording panel + timer -> Stop -> audio Preview -> Send arrow or Cancel.
+
+- Does not auto-send after stopping.
+- Same recorded audio file used for preview is sent to chat.
+- Remembers the chat in which recording started.
+- Browser-compatible WebM/Opus and MP4/M4A selection retained.
+- Photo/video filters, orientation, camera recorder, calls, login, notifications and server media handling are unchanged.

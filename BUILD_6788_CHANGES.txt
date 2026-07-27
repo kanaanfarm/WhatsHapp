@@ -1,0 +1,8 @@
+Build 6788 — chat voice recorder fix only, based on confirmed Build 6787.
+
+- Microphone button now uses tap/click to START recording and tap/click again to STOP.
+- Works with mouse/touch without relying on fragile hold/release pointer timing.
+- Uses browser-compatible audio MIME selection, including MP4/M4A preference on Safari/iPhone.
+- Waits for final recorder data before creating the voice file.
+- Stops microphone tracks cleanly after recording.
+- Existing Photo/Video filters, orientation, camera recorder, login, chat, calls, notifications and server media path are unchanged.
