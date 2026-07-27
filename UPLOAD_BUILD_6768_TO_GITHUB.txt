@@ -1,0 +1,3 @@
+ConnectChat Pro v6.7.3 Build 6768
+Mobile call chooser placement fix only.
+Keep working media/Supabase setup unchanged.

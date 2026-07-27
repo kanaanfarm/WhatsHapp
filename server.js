@@ -22,7 +22,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6767";
+const APP_BUILD = "6768";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2563,7 +2563,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
 
     const requestedKind = ["image", "voice", "video", "file"].includes(req.body.kind) ? req.body.kind : "file";
 
-    // Build 6767: do not transcode every video before it can be sent.
+    // Build 6768: do not transcode every video before it can be sent.
     // The browser preview already proves that most recordings are valid media.
     // For video we first verify and store the original bytes immediately. This
     // avoids slow ffmpeg transcoding on Render blocking even a short recording.
@@ -2572,7 +2572,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     // because it has been reliable and gives consistent M4A playback.
     let stored = null;
     if (requestedKind === "video") {
-      // Build 6767: the same Blob that plays in Preview must be the Blob sent.
+      // Build 6768: the same Blob that plays in Preview must be the Blob sent.
       // Do not reject browser MediaRecorder output just because a signature
       // library cannot classify it. Safari/Chrome can produce fragmented MP4
       // or WebM variants that are valid/playable but not detected reliably.

@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6767"}
+    data:{url:"/?v=6768"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -909,13 +909,26 @@ function finishCall(message="Call ended",notify=true){
 }
 
 function closeCallChoice(){
-  $("callChoiceOverlay").classList.add("hidden");
+  const overlay=$("callChoiceOverlay");
+  overlay.classList.add("hidden");
+  // Keep the global DOM clean after closing. On mobile the chooser is mounted
+  // inside the active chat so it can never appear over the conversation list.
+  if(overlay.parentElement!==document.body)document.body.appendChild(overlay);
 }
 function openCallChoice(){
   if(!callsEnabled||!activeUser||activeUser.isSelf||activeUser.isAI)return;
+  const overlay=$("callChoiceOverlay");
+  if(window.innerWidth<=800){
+    // Mobile: the call chooser belongs to the selected conversation.
+    // Mount it inside chatPanel so hiding/leaving that conversation also hides
+    // the chooser, preventing it from appearing on the all-users Messages page.
+    $("chatPanel").appendChild(overlay);
+  }else if(overlay.parentElement!==document.body){
+    document.body.appendChild(overlay);
+  }
   $("callChoiceContact").textContent=`Call ${activeUser.displayName||activeUser.username}`;
   $("callChoiceOfflineNote").classList.toggle("hidden",Boolean(activeUser.online));
-  $("callChoiceOverlay").classList.remove("hidden");
+  overlay.classList.remove("hidden");
 }
 $("callMenuBtn").onclick=openCallChoice;
 $("closeCallChoiceBtn").onclick=closeCallChoice;
