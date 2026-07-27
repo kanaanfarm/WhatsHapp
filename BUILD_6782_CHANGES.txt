@@ -1,0 +1,5 @@
+Build 6782 — video filter recording fix only, based on Build 6781.
+- Video recording now draws live camera frames to an off-screen canvas with the selected camera filter.
+- MediaRecorder records the processed canvas stream and retains microphone audio.
+- Photo filter logic, login, chat, calls, notifications, upload/server path and recorder UI are otherwise unchanged.
+- Falls back to the original camera stream on browsers without canvas.captureStream support.

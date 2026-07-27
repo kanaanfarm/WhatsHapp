@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6781"}
+    data:{url:"/?v=6782"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6781: call video is processed into true left/right orientation.
+  // Build 6782: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1634,7 +1634,7 @@ function stopVideoHoldRecording(){
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -1656,6 +1656,7 @@ function captureVideoConstraints(){
 }
 function clearCapturePreviewUrl(){if(capturePreviewUrl){URL.revokeObjectURL(capturePreviewUrl);capturePreviewUrl=null}}
 function stopCaptureStream(){
+  stopCaptureProcessedStream();
   captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;
   const v=$("captureVideo");
   if(v){
@@ -1744,10 +1745,41 @@ function showCaptureResult(){
 }
 async function finalizeCaptureRecording(recorder,mime){
   const actualType=recorder.mimeType||mime||(isAppleSafariRecorder()?"video/mp4":"video/webm");
-  captureBlob=new Blob(captureChunks,{type:actualType});captureStopping=false;$("captureOverlay").classList.remove("recording");
+  captureBlob=new Blob(captureChunks,{type:actualType});captureStopping=false;stopCaptureProcessedStream();$("captureOverlay").classList.remove("recording");
   if(captureBlob.size<1024){toast("The recording was empty. Please record again.");await prepareCapture("video");return}
   showCaptureResult();
 }
+
+function stopCaptureProcessedStream(){
+  if(captureFilterFrame){cancelAnimationFrame(captureFilterFrame);captureFilterFrame=0}
+  if(captureProcessedStream){captureProcessedStream.getTracks().forEach(t=>t.stop());captureProcessedStream=null}
+  captureFilterCanvas=null;
+}
+function buildFilteredVideoRecordingStream(){
+  const live=$("captureVideo");
+  if(!live||!live.videoWidth||!live.videoHeight||!live.captureStream&&typeof document.createElement("canvas").captureStream!=="function")return null;
+  const canvas=document.createElement("canvas");
+  canvas.width=live.videoWidth;canvas.height=live.videoHeight;
+  const ctx=canvas.getContext("2d",{alpha:false});
+  if(!ctx||typeof canvas.captureStream!=="function")return null;
+  captureFilterCanvas=canvas;
+  const draw=()=>{
+    if(!captureFilterCanvas||!captureStream?.active)return;
+    ctx.save();
+    ctx.filter=captureFilterCss();
+    ctx.drawImage(live,0,0,canvas.width,canvas.height);
+    ctx.restore();
+    captureFilterFrame=requestAnimationFrame(draw);
+  };
+  draw();
+  const fps=30;
+  const processed=canvas.captureStream(fps);
+  const audioTrack=captureStream.getAudioTracks()[0];
+  if(audioTrack)processed.addTrack(audioTrack);
+  captureProcessedStream=processed;
+  return processed;
+}
+
 async function captureMain(){
   if(captureMode==="photo"){
     const v=$("captureVideo"),canvas=$("captureCanvas");
@@ -1768,7 +1800,8 @@ async function captureMain(){
   if(!captureStream?.active)return toast("Camera is not ready.");
   captureChunks=[];captureBlob=null;captureStopping=false;
   const mime=captureRecorderMime(),options=mime?{mimeType:mime,videoBitsPerSecond:1200000,audioBitsPerSecond:64000}:{videoBitsPerSecond:1200000,audioBitsPerSecond:64000};
-  let recorder;try{recorder=new MediaRecorder(captureStream,options)}catch{recorder=new MediaRecorder(captureStream)}
+  const recordingStream=buildFilteredVideoRecordingStream()||captureStream;
+  let recorder;try{recorder=new MediaRecorder(recordingStream,options)}catch{recorder=new MediaRecorder(recordingStream)}
   captureRecorder=recorder;
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)captureChunks.push(e.data)};
   recorder.onerror=()=>{captureStopping=false;$("captureOverlay").classList.remove("recording");toast("Recording failed. Please try again.");prepareCapture("video")};
