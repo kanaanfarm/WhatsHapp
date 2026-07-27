@@ -1,0 +1,7 @@
+Build 6792 — mobile voice recorder fix only.
+
+- Mobile voice recording now uses 250 ms MediaRecorder chunks for reliable iPhone/Android data delivery.
+- Mobile Stop waits longer for the final audio chunk before creating the preview.
+- Mobile Send arrow is explicitly visible and prominent once preview is ready.
+- Desktop voice layout/logic is intentionally unchanged in this build.
+- Photo/video filters, orientation, camera recorder, calls, login, notifications and server upload handling are unchanged.

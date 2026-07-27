@@ -1631,7 +1631,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #captureVideo{transform-origin:center center}
 
 
-/* Build 6791 — dedicated voice recording preview/send panel */
+/* Build 6792 — dedicated voice recording preview/send panel */
 .voice-record-panel{
   margin:6px 12px 0;
   padding:9px 12px;
@@ -1655,7 +1655,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6791 — voice panel visible above composer on desktop/mobile */
+/* Build 6792 — voice panel visible above composer on desktop/mobile */
 .composer{
   flex-wrap:wrap;
   overflow:visible!important;
@@ -1688,7 +1688,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6791 — voice Send arrow + desktop composer visibility */
+/* Build 6792 — voice Send arrow + desktop composer visibility */
 .workspace-chat .composer{
   display:grid!important;
   grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
@@ -1763,4 +1763,38 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   }
   .workspace-chat .composer.has-text > #recordBtn{display:none!important}
   .voice-record-panel audio{order:3;flex:0 0 100%!important;width:100%!important}
+}
+
+
+/* Build 6792 — MOBILE voice flow only */
+@media(max-width:760px){
+  #voiceRecordPanel{
+    display:flex;
+    width:100%;
+    box-sizing:border-box;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  #voiceRecordPanel.hidden{display:none!important}
+  #voiceRecordPreview:not(.hidden){
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    order:3;
+  }
+  #voiceRecordSend:not(.hidden){
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:54px!important;
+    height:54px!important;
+    border-radius:50%!important;
+    background:#00a884!important;
+    color:#fff!important;
+    font-size:26px!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    z-index:50!important;
+  }
 }

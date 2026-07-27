@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6791"}
+    data:{url:"/?v=6792"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6791: call video is processed into true left/right orientation.
+  // Build 6792: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1641,9 +1641,10 @@ async function startVoiceHoldRecording(){
         isRecording=false;voiceRecordingStopping=false;
         if(blob.size<=500){resetVoiceRecorderUi();toast("Voice recording was empty. Please try again.");return}
         showVoicePreview(blob,file);
-      },120);
+      },mobileVoice?350:120);
     };
-    mediaRecorder.start();
+    const mobileVoice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||"")||window.matchMedia?.("(max-width: 760px)")?.matches;
+    mediaRecorder.start(mobileVoice?250:undefined);
     isRecording=true;showVoiceRecordingUi();
   }catch{
     voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
@@ -1657,6 +1658,8 @@ function stopVoiceHoldRecording(){
   $("voiceRecordState").textContent="Finishing…";
   $("voiceRecordStop").classList.add("hidden");
   if(mediaRecorder?.state==="recording"){
+    const mobileVoice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||"")||window.matchMedia?.("(max-width: 760px)")?.matches;
+    if(mobileVoice&&!/Safari/i.test(navigator.userAgent||"")){try{mediaRecorder.requestData()}catch{}}
     try{mediaRecorder.stop()}catch{
       voiceRecordingStopping=false;isRecording=false;
       voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;
