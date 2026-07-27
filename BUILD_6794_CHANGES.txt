@@ -1,0 +1,7 @@
+Build 6794 — desktop microphone enable-state fix only.
+
+- Removes the stale one-time assignment that left the laptop mic button disabled.
+- Mic enabled state is now recalculated from the active human chat.
+- Selecting a real user enables the microphone immediately.
+- Mobile voice flow from Build 6792/6793 is unchanged.
+- Photo/video filters, orientation, camera recorder, calls, login, notifications and upload/server handling are unchanged.

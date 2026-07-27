@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6793"}
+    data:{url:"/?v=6794"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -786,7 +786,7 @@ async function selectUser(u){
     $("sidebar").classList.add("mobile-hidden");
     $("chatPanel").classList.remove("mobile-hidden");
   }
-  updateComposer();
+  updateComposer();syncVoiceMicAvailability();
   if(u.isAI){
     activeConversation=[];
     loadAiHistory().forEach(addMessage);
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6793: call video is processed into true left/right orientation.
+  // Build 6794: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1400,7 +1400,7 @@ document.addEventListener("click",e=>{
 $("sendBtn").onclick=send;
 $("messageInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}};
 $("messageInput").oninput=()=>{
-  updateComposer();
+  updateComposer();syncVoiceMicAvailability();
   if(!activeUser||activeUser.isAI)return;
   socket.emit("typing",{receiverId:activeUser.id,isTyping:true});
   clearTimeout(typingTimer);typingTimer=setTimeout(()=>socket.emit("typing",{receiverId:activeUser.id,isTyping:false}),700);
@@ -1411,9 +1411,20 @@ function resizeMessageInput(){
   input.style.height="auto";
   input.style.height=`${Math.min(input.scrollHeight,120)}px`;
 }
+
+function syncVoiceMicAvailability(){
+  const btn=$("recordBtn");
+  if(!btn)return;
+  const enabled=Boolean(activeUser&&!activeUser.isAI);
+  btn.disabled=!enabled;
+  btn.setAttribute("aria-disabled",String(!enabled));
+  btn.title=enabled?"Record voice":"Select a user to record voice";
+}
+
 function updateComposer(){
   $("messageInput").closest(".composer").classList.toggle("has-text",Boolean($("messageInput").value.trim()));
   resizeMessageInput();
+  syncVoiceMicAvailability();
 }
 
 function formatMediaSize(bytes){
@@ -2080,7 +2091,6 @@ $("captureSendBtn").onclick=async()=>{
 $("captureSwitchBtn").onclick=async()=>{captureFacing=captureFacing==="environment"?"user":"environment";await prepareCapture(captureMode)};
 document.querySelectorAll(".capture-tabs button").forEach(b=>b.onclick=()=>prepareCapture(b.dataset.mode));
 recordButton.title="Record voice";recordButton.setAttribute("aria-label","Record voice");
-recordButton.disabled=!activeUser||!!activeUser.isAI;
 cameraButton.onclick=()=>openCapture("photo");cameraButton.title="Photo or video";cameraButton.setAttribute("aria-label","Open photo or video recorder");
 
 let capturePinchStart=0,capturePinchBase=1;
