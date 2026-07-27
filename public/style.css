@@ -1581,8 +1581,8 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 
 /* Build 6775: front-camera live previews show true left/right orientation.
    Rear camera, remote video, saved photo/video, and media playback are unchanged. */
-#localVideo.front-camera-corrected,
-#captureVideo.front-camera-corrected{transform:none!important;}
+#localVideo.front-camera-corrected{transform:none!important;}
+#captureVideo.front-camera-corrected{transform:scaleX(-1)!important;}
 
 /* Build 6775: non-destructive camera filters. Photo captures bake the selected filter; video-call/recorder filters are preview-only to preserve the proven media pipeline. */
 .camera-filter-select,.call-filter-select{border:1px solid rgba(255,255,255,.22);background:#1f1f1f;color:#fff;border-radius:999px;padding:9px 12px;font-weight:700;max-width:130px}
@@ -1598,3 +1598,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .camera-filter-bar button.active{background:#43ad8c;border-color:#43ad8c;color:#fff}
 .capture-overlay.voice-mode .camera-filter-bar{display:none}
 @media(max-width:800px){.camera-filter-bar{justify-content:flex-start;padding:7px 10px}.camera-filter-bar button{padding:7px 10px;font-size:12px}}
+
+
+/* Build 6776: call local preview already contains the same processed orientation/filter sent to the peer. */
+#localVideo{transform:none!important;}
