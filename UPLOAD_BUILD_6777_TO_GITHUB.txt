@@ -1,0 +1,2 @@
+ConnectChat Pro v6.7.3 Build 6777
+Call camera orientation + transmitted filters fix.

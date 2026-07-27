@@ -7,7 +7,7 @@ let mediaUploadInFlight=false,captureSendInFlight=false;
 let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let cameraFilter="normal";
-let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0;
+let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
 const CAMERA_FILTERS={normal:"none",beauty:"brightness(1.06) contrast(.96) saturate(1.04)",warm:"sepia(.12) saturate(1.18) hue-rotate(-6deg)",cool:"saturate(.95) hue-rotate(10deg) brightness(1.03)",bw:"grayscale(1) contrast(1.08)",bright:"brightness(1.18) contrast(1.02)",soft:"brightness(1.06) contrast(.9) saturate(.94)"};
 let currentUserFilter="all";
 let currentWorkspaceSection="chats";
@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6776"}
+    data:{url:"/?v=6777"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -820,7 +820,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6776: call video is processed into true left/right orientation.
+  // Build 6777: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -830,8 +830,12 @@ function syncFrontCameraOrientation(){
 }
 
 function stopCallVideoProcessor(){
+  callProcessorAbort=true;
   if(callProcessorRaf)cancelAnimationFrame(callProcessorRaf);
   callProcessorRaf=0;
+  try{callTrackReader?.cancel()}catch{}
+  try{callTrackWriter?.close()}catch{}
+  callTrackReader=null;callTrackWriter=null;
   try{callProcessedStream?.getVideoTracks().forEach(t=>t.stop())}catch{}
   try{if(callProcessorVideo){callProcessorVideo.pause();callProcessorVideo.srcObject=null}}catch{}
   callProcessedStream=null;callProcessorVideo=null;callProcessorCanvas=null;
@@ -839,28 +843,77 @@ function stopCallVideoProcessor(){
 
 async function buildCallProcessedStream(rawStream){
   if(!rawStream?.getVideoTracks?.().length||typeof HTMLCanvasElement==="undefined")return rawStream;
+  stopCallVideoProcessor();callProcessorAbort=false;
+  const rawTrack=rawStream.getVideoTracks()[0];
+
+  // Preferred path (desktop/Android and browsers that expose canvas.captureStream).
   const canvas=document.createElement("canvas");
-  if(typeof canvas.captureStream!=="function")return rawStream;
   const source=document.createElement("video");
   source.muted=true;source.playsInline=true;source.autoplay=true;source.srcObject=rawStream;
   await source.play().catch(()=>{});
-  await new Promise(resolve=>{if(source.videoWidth)resolve();else{const done=()=>resolve();source.addEventListener("loadedmetadata",done,{once:true});setTimeout(resolve,600)}});
+  await new Promise(resolve=>{if(source.videoWidth)resolve();else{const done=()=>resolve();source.addEventListener("loadedmetadata",done,{once:true});setTimeout(resolve,700)}});
   canvas.width=source.videoWidth||720;canvas.height=source.videoHeight||1280;
   const ctx=canvas.getContext("2d",{alpha:false});
-  const draw=()=>{
-    if(!ctx||!source.srcObject)return;
-    const w=canvas.width,h=canvas.height;
-    ctx.save();ctx.clearRect(0,0,w,h);ctx.filter=CAMERA_FILTERS[cameraFilter]||"none";
-    if(currentFacingMode==="user"){ctx.translate(w,0);ctx.scale(-1,1)}
-    try{ctx.drawImage(source,0,0,w,h)}catch{}
-    ctx.restore();callProcessorRaf=requestAnimationFrame(draw);
-  };
-  draw();
-  const videoTrack=canvas.captureStream(24).getVideoTracks()[0];
-  if(!videoTrack)return rawStream;
-  callProcessorVideo=source;callProcessorCanvas=canvas;
-  callProcessedStream=new MediaStream([videoTrack,...rawStream.getAudioTracks()]);
-  return callProcessedStream;
+
+  if(typeof canvas.captureStream==="function"){
+    const draw=()=>{
+      if(callProcessorAbort||!ctx||!source.srcObject)return;
+      const w=canvas.width,h=canvas.height;
+      ctx.save();ctx.clearRect(0,0,w,h);ctx.filter=CAMERA_FILTERS[cameraFilter]||"none";
+      if(currentFacingMode==="user"){ctx.translate(w,0);ctx.scale(-1,1)}
+      try{ctx.drawImage(source,0,0,w,h)}catch{}
+      ctx.restore();callProcessorRaf=requestAnimationFrame(draw);
+    };
+    draw();
+    const videoTrack=canvas.captureStream(24).getVideoTracks()[0];
+    if(videoTrack){
+      callProcessorVideo=source;callProcessorCanvas=canvas;
+      callProcessedStream=new MediaStream([videoTrack,...rawStream.getAudioTracks()]);
+      return callProcessedStream;
+    }
+  }
+
+  // iPhone/Safari fallback. CSS filters never affect the WebRTC track, so when
+  // canvas.captureStream is unavailable we process VideoFrames and generate a
+  // real outbound track if the browser exposes the Insertable Streams APIs.
+  const Processor=window.MediaStreamTrackProcessor;
+  const Generator=window.MediaStreamTrackGenerator;
+  if(Processor&&Generator&&window.VideoFrame){
+    try{
+      const processor=new Processor({track:rawTrack});
+      const generator=new Generator({kind:"video"});
+      callTrackReader=processor.readable.getReader();
+      callTrackWriter=generator.writable.getWriter();
+      callProcessorCanvas=canvas;
+      const loop=async()=>{
+        while(!callProcessorAbort){
+          const {value:frame,done}=await callTrackReader.read();
+          if(done||!frame)break;
+          try{
+            const w=frame.displayWidth||frame.codedWidth||canvas.width||720;
+            const h=frame.displayHeight||frame.codedHeight||canvas.height||1280;
+            if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+            const c=canvas.getContext("2d",{alpha:false});
+            c.save();c.clearRect(0,0,w,h);c.filter=CAMERA_FILTERS[cameraFilter]||"none";
+            if(currentFacingMode==="user"){c.translate(w,0);c.scale(-1,1)}
+            c.drawImage(frame,0,0,w,h);c.restore();
+            const out=new VideoFrame(canvas,{timestamp:frame.timestamp||0,duration:frame.duration||undefined});
+            await callTrackWriter.write(out);out.close();
+          }catch(error){console.warn("Mobile call video frame processing failed",error)}
+          finally{try{frame.close()}catch{}}
+        }
+      };
+      loop().catch(error=>console.warn("Mobile call video processor stopped",error));
+      callProcessedStream=new MediaStream([generator,...rawStream.getAudioTracks()]);
+      source.pause();source.srcObject=null;
+      return callProcessedStream;
+    }catch(error){console.warn("Mobile filtered call track unavailable",error)}
+  }
+
+  // Last-resort compatibility fallback: keep the call working. The UI will
+  // explain that filters are local-preview only on this browser.
+  source.pause();source.srcObject=null;
+  return rawStream;
 }
 
 async function createPeer(peerId){
@@ -1012,6 +1065,7 @@ function finishCall(message="Call ended",notify=true){
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
+  stopCallVideoProcessor();
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
   cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off")
   $("localVideo").srcObject=null;$("localVideo").classList.remove("front-camera-corrected");$("remoteVideo").srcObject=null;
@@ -1076,12 +1130,10 @@ $("switchCameraBtn").onclick=async()=>{
     const sender=peer.getSenders().find(item=>item.track?.kind==="video");
     localStream?.getVideoTracks().forEach(track=>{localStream.removeTrack(track);track.stop()});
     localStream.addTrack(newTrack);
-    if(callProcessorVideo){
-      callProcessorVideo.srcObject=localStream;await callProcessorVideo.play().catch(()=>{});
-      $("localVideo").srcObject=callProcessedStream;
-    }else if(sender){
-      await sender.replaceTrack(newTrack);$("localVideo").srcObject=localStream;
-    }
+    const rebuilt=await buildCallProcessedStream(localStream);
+    const processedTrack=rebuilt.getVideoTracks()[0]||newTrack;
+    if(sender)await sender.replaceTrack(processedTrack);
+    $("localVideo").srcObject=rebuilt;
     syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});
     $("videoStage").classList.remove("local-camera-off");
