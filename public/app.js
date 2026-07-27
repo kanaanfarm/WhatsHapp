@@ -176,7 +176,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6772"}
+    data:{url:"/?v=6773"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -805,6 +805,15 @@ async function getMedia(mode){
   return navigator.mediaDevices.getUserMedia({audio:true,video});
 }
 
+function syncFrontCameraOrientation(){
+  // Build 6773: counter the mirrored front-camera preview so physical left/right
+  // stays correct. This affects only live local previews, never remote video.
+  const local=$("localVideo");
+  if(local)local.classList.toggle("front-camera-corrected",currentFacingMode==="user"&&!screenStream);
+  const capture=$("captureVideo");
+  if(capture)capture.classList.toggle("front-camera-corrected",captureFacing==="user"&&Boolean(captureStream));
+}
+
 async function createPeer(peerId){
   const config=await getIceConfig();
   const pc=new RTCPeerConnection({iceServers:config.iceServers});
@@ -859,7 +868,7 @@ async function startCall(mode){
   try{
     callPeerId=activeUser.id;callMode=mode;
     showCallUi(activeUser.username,"Calling…",mode);
-    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;$("localVideo").play().catch(()=>{});
+    localStream=await getMedia(mode);$("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(callPeerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -903,7 +912,7 @@ async function acceptIncomingCall(){
   pendingCall=null;
   try{
     showCallUi(data.callerName,"Connecting…",data.mode);
-    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;$("localVideo").play().catch(()=>{});
+    localStream=await getMedia(data.mode);$("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(data.callerId);
     localStream.getTracks().forEach(track=>peer.addTrack(track,localStream));
     await peer.setRemoteDescription(data.offer);
@@ -924,7 +933,7 @@ async function toggleScreenShare(){
     if(!sender)throw new Error("Video sender is unavailable");
     cameraVideoTrack=sender.track;
     await sender.replaceTrack(screenTrack);
-    $("localVideo").srcObject=screenStream;
+    $("localVideo").srcObject=screenStream;$("localVideo").classList.remove("front-camera-corrected");
     $("videoStage").classList.add("screen-sharing");
     button.textContent="⏹ Stop sharing";button.classList.add("share-active");
     $("callStatus").textContent="Sharing screen";
@@ -940,7 +949,7 @@ async function stopScreenShare(){
   const returnTrack=cameraVideoTrack||localStream?.getVideoTracks()[0];
   try{if(sender&&returnTrack)await sender.replaceTrack(returnTrack)}catch{}
   screenStream.getTracks().forEach(t=>t.stop());screenStream=null;
-  $("localVideo").srcObject=localStream;
+  $("localVideo").srcObject=localStream;syncFrontCameraOrientation();
   $("videoStage").classList.remove("screen-sharing");
   $("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");
   $("callStatus").textContent="Connected";
@@ -952,7 +961,7 @@ function finishCall(message="Call ended",notify=true){
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
   cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off")
-  $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
+  $("localVideo").srcObject=null;$("localVideo").classList.remove("front-camera-corrected");$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
   $("callStatus").textContent=message;
   setTimeout(()=>{$("callOverlay").classList.add("hidden");document.body.classList.remove("call-active")},500);
@@ -1015,7 +1024,7 @@ $("switchCameraBtn").onclick=async()=>{
     await sender.replaceTrack(newTrack);
     localStream?.getVideoTracks().forEach(track=>{localStream.removeTrack(track);track.stop()});
     localStream.addTrack(newTrack);
-    $("localVideo").srcObject=localStream;
+    $("localVideo").srcObject=localStream;syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});
     $("videoStage").classList.remove("local-camera-off");
     $("cameraToggleBtn").textContent="📹 Camera";
@@ -1526,7 +1535,7 @@ function clearCapturePreviewUrl(){
 }
 function stopCaptureStream(){
   captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;
-  const v=$("captureVideo");v.srcObject=null;
+  const v=$("captureVideo");v.srcObject=null;v.classList.remove("front-camera-corrected");
   if(v.src&&v.src.startsWith("blob:")){URL.revokeObjectURL(v.src);v.removeAttribute("src")}
   v.controls=false;v.muted=true;
 }
@@ -1566,7 +1575,7 @@ async function prepareCapture(mode){
   $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
   try{
     captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});
-    if(mode!=="voice"){const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;await live.play().catch(()=>{})}
+    if(mode!=="voice"){const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;syncFrontCameraOrientation();await live.play().catch(()=>{})}
   }catch(e){toast(mode==="voice"?"Microphone permission is required.":mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");closeCapture()}
 }
 function openCapture(mode){
@@ -1591,7 +1600,7 @@ function showCaptureResult(){
       a.src=capturePreviewUrl;a.autoplay=false;a.controls=false;a.preload="metadata";a.classList.add("hidden");a.load();try{a.pause();a.currentTime=0}catch{}
     }else{
       if(a){a.pause();a.removeAttribute("src");a.classList.add("hidden")}
-      v.srcObject=null;v.src=capturePreviewUrl;v.autoplay=false;v.controls=false;v.muted=false;v.loop=false;v.classList.remove("hidden");v.preload="metadata";
+      v.srcObject=null;v.classList.remove("front-camera-corrected");v.src=capturePreviewUrl;v.autoplay=false;v.controls=false;v.muted=false;v.loop=false;v.classList.remove("hidden");v.preload="metadata";
       v.load();try{v.pause();v.currentTime=0}catch{}
     }
   }

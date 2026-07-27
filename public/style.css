@@ -1563,7 +1563,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6772: missed-call visibility and in-app call attention */
+/* Build 6773: missed-call visibility and in-app call attention */
 .rail-item[data-section="calls"]{position:relative}
 .calls-missed-badge{position:absolute;top:5px;right:9px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;display:grid;place-items:center;background:#df2b36;color:#fff;font-size:10px;font-weight:900;line-height:1;box-shadow:0 0 0 2px var(--panel)}
 .call-history-item.missed-call-item{border-color:rgba(223,43,54,.32)!important;background:rgba(223,43,54,.065)!important}
@@ -1577,3 +1577,9 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .missed-call-alert-copy small{color:#d92736;font-weight:900}.missed-call-alert-copy h2{margin:2px 0 2px;font-size:20px}.missed-call-alert-copy p{margin:0;color:var(--muted);font-size:12px}
 .missed-call-alert-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}.missed-call-alert-actions button{min-height:44px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:800}.missed-call-alert-actions button.secondary{background:var(--soft);color:var(--text);border:1px solid var(--line)}
 @media(max-width:800px){.missed-call-alert-overlay{align-items:end;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}.missed-call-alert-card{border-radius:22px 22px 18px 18px}.calls-missed-badge{top:3px;right:4px}}
+
+
+/* Build 6773: front-camera live previews show true left/right orientation.
+   Rear camera, remote video, saved photo/video, and media playback are unchanged. */
+#localVideo.front-camera-corrected,
+#captureVideo.front-camera-corrected{transform:scaleX(-1)!important;}
