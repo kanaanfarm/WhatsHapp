@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6783"}
+    data:{url:"/?v=6784"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6783: call video is processed into true left/right orientation.
+  // Build 6784: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1791,7 +1791,15 @@ async function captureMain(){
     const v=$("captureVideo"),canvas=$("captureCanvas");
     if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
     canvas.width=v.videoWidth;canvas.height=v.videoHeight;
-    const ctx=canvas.getContext("2d");ctx.save();ctx.filter=captureFilterCss();ctx.drawImage(v,0,0,canvas.width,canvas.height);ctx.restore();
+    const ctx=canvas.getContext("2d");
+    ctx.save();
+    ctx.filter=captureFilterCss();
+    if(captureFacing==="user"){
+      ctx.translate(canvas.width,0);
+      ctx.scale(-1,1);
+    }
+    ctx.drawImage(v,0,0,canvas.width,canvas.height);
+    ctx.restore();
     captureBlob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",.92));
     if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
     stopCaptureStream();canvas.classList.remove("hidden");v.classList.add("hidden");canvas.style.transform="scale(1)";

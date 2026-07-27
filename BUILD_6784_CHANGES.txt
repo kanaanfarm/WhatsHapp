@@ -1,0 +1,5 @@
+Build 6784 — front-camera PHOTO orientation fix only.
+
+- Front-camera captured JPEG is mirrored to match the live selfie preview.
+- Rear-camera photo capture is unchanged.
+- Video recording, video filters, login, chat, calls, notifications, upload and server media handling are unchanged.
