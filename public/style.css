@@ -1514,3 +1514,21 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
     overflow:auto;
   }
 }
+
+
+/* Build 6769: live Wi-Fi quality is visible on both voice and video call screens. */
+.call-network-quality{
+  position:absolute!important;
+  top:14px!important;
+  right:16px!important;
+  z-index:20!important;
+  pointer-events:none;
+}
+.call-title{padding-left:72px;padding-right:72px}
+@media(max-width:800px){
+  .call-network-quality{
+    top:max(calc(env(safe-area-inset-top) + 8px),12px)!important;
+    right:10px!important;
+  }
+  .call-title{padding-left:58px;padding-right:58px}
+}

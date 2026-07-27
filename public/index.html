@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6768">
+  <link rel="stylesheet" href="style.css?v=6769">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -226,6 +226,15 @@
   </section>
 
   <section id="callOverlay" class="call-overlay hidden">
+    <div id="callNetworkQuality" class="network-quality checking call-network-quality" role="status" aria-live="polite" title="Checking connection quality">
+      <svg class="network-wifi-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2.5 8.5a14 14 0 0 1 19 0"></path>
+        <path d="M5.5 12a9.5 9.5 0 0 1 13 0"></path>
+        <path d="M8.8 15.5a5 5 0 0 1 6.4 0"></path>
+        <circle cx="12" cy="19" r="1.25"></circle>
+      </svg>
+      <span>Checking</span>
+    </div>
     <div class="call-card">
       <div class="call-title">
         <div>
@@ -378,6 +387,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6768"></script>
+  <script src="app.js?v=6769"></script>
 </body>
 </html>

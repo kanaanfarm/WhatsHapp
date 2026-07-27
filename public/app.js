@@ -156,7 +156,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6768"}
+    data:{url:"/?v=6769"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -171,11 +171,14 @@ async function showMessageNotification(title,body,tag){
 }
 
 function setNetworkQuality(level,label,detail=""){
-  const indicator=$("networkQuality");
-  if(!indicator)return;
-  indicator.className=`network-quality ${level}`;
-  indicator.querySelector("span").textContent=label;
-  indicator.title=detail||`Internet quality: ${label}`;
+  const indicators=[$("networkQuality"),$("callNetworkQuality")].filter(Boolean);
+  for(const indicator of indicators){
+    const extra=indicator.id==="callNetworkQuality"?" call-network-quality":"";
+    indicator.className=`network-quality ${level}${extra}`;
+    const text=indicator.querySelector("span");
+    if(text)text.textContent=label;
+    indicator.title=detail||`Internet quality: ${label}`;
+  }
 }
 
 async function measureNetworkQuality(){

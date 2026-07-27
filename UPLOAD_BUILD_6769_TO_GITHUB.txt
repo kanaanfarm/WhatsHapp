@@ -1,0 +1,9 @@
+ConnectChat Pro v6.7.3 Build 6769
+
+Change in this build:
+- Show the live Wi-Fi quality badge (Good / Fair / Bad / Offline) on both voice-call and video-call screens.
+- Uses the same existing network-quality monitor as the chat screen.
+- Mobile call chooser fix from Build 6768 is retained.
+- Working photo, voice, and video message paths are unchanged.
+
+After deployment, verify /health reports build 6769.
