@@ -1,0 +1,11 @@
+ConnectChat Pro v6.7.3 Build 6779
+
+Photo / Video recorder changes only:
+- Front camera recorder preview/output uses true left/right orientation (no mirror).
+- Recorder screen uses a narrower natural camera frame; no stretched wide face.
+- Removed Voice tab from camera recorder. Voice remains in the chat microphone button.
+- Filters are a horizontal swipe/scroll slider on mobile and desktop.
+- Camera remembers the selected chat recipient and renders successful photo/video sends immediately.
+- Completed photos have a Save button for a local copy.
+- Completed photo preview supports pinch zoom on touch devices and mouse-wheel zoom on desktop.
+- Existing Build 6778 video-call filter signaling and media backend are preserved.
