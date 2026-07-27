@@ -523,7 +523,7 @@ body{position:fixed;inset:0;overflow:hidden}
   .workspace-sidebar .user.active{background:#f5f6f6}
   .workspace-sidebar .user .avatar{width:52px;height:52px;border-radius:50%}
   .workspace-sidebar .user-info strong{font-size:16px;color:#111}
-  .workspace-sidebar .user-info span{font-size:13px;color:#667781}
+  .workspace-sidebar .user-info span{font-size:13px;color:#667811}
   .account-dock{display:none}
 
   /* Bottom navigation is shown on lists and workspace pages. */
@@ -1600,5 +1600,26 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 @media(max-width:800px){.camera-filter-bar{justify-content:flex-start;padding:7px 10px}.camera-filter-bar button{padding:7px 10px;font-size:12px}}
 
 
-/* Build 6778: call local preview already contains the same processed orientation/filter sent to the peer. */
+/* Build 6781: call local preview already contains the same processed orientation/filter sent to the peer. */
 #localVideo{transform:none!important;}
+
+
+/* Build 6781 — Photo/Video recorder only; stable 6778 base */
+#captureOverlay .front-camera-corrected,#captureOverlay #captureVideo{transform:none!important}
+#captureOverlay .capture-preview{display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
+#captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{display:block;object-fit:contain!important;transform:none}
+@media(max-width:800px){
+  #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
+    width:auto!important;height:min(62vh,680px)!important;max-width:94vw!important;aspect-ratio:9/16
+  }
+}
+@media(min-width:801px){
+  #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
+    width:min(72vw,760px)!important;height:auto!important;max-height:68vh!important;aspect-ratio:4/3
+  }
+}
+#captureOverlay .capture-filter-control{flex:0 0 auto;width:min(92vw,560px);margin:6px auto;display:flex;align-items:center;gap:10px;padding:0 10px}
+#captureOverlay .capture-filter-control label{font-size:12px;opacity:.75}
+#captureOverlay #cameraFilterSelect{flex:1;max-width:none;min-width:0;height:42px}
+#captureOverlay .capture-actions #captureSaveBtn{background:#252525}
+#captureOverlay #captureCanvas{touch-action:none}
