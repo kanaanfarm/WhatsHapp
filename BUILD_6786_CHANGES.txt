@@ -1,0 +1,8 @@
+Build 6786 — mobile photo filter persistence fix only, based on confirmed Build 6785.
+
+- Selected photo filter is baked directly into captured JPEG pixels.
+- Fixes mobile browsers where the live CSS filter is visible but canvas capture returns the original image.
+- The filtered JPEG used for preview is the same blob sent to the selected chat.
+- Confirmed photo orientation correction is preserved.
+- Confirmed video orientation/filter path is unchanged.
+- Login, chat, calls, notifications, upload and server handling are unchanged.

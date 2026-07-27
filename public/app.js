@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6785"}
+    data:{url:"/?v=6786"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6785: call video is processed into true left/right orientation.
+  // Build 6786: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1790,20 +1790,61 @@ function buildFilteredVideoRecordingStream(){
   return processed;
 }
 
+
+function applyPhotoPixelFilter(ctx,width,height,filterName){
+  if(!ctx||filterName==="normal")return;
+  let image;
+  try{image=ctx.getImageData(0,0,width,height)}catch{return}
+  const d=image.data;
+  for(let i=0;i<d.length;i+=4){
+    let r=d[i],g=d[i+1],b=d[i+2];
+
+    if(filterName==="bw"){
+      const y=.299*r+.587*g+.114*b;
+      r=g=b=y;
+    }else if(filterName==="warm"){
+      r=r*1.08+10; g=g*1.02+3; b=b*.90;
+    }else if(filterName==="cool"){
+      r=r*.94; g=g*1.01+2; b=b*1.09+8;
+    }else if(filterName==="bright"){
+      r=r*1.16; g=g*1.16; b=b*1.16;
+    }else if(filterName==="soft"){
+      r=(r-128)*.88+128+8;
+      g=(g-128)*.88+128+8;
+      b=(b-128)*.88+128+8;
+    }else if(filterName==="beauty"){
+      // Gentle bright/low-contrast/saturation adjustment matching the existing preview.
+      const avg=(r+g+b)/3;
+      r=((r-128)*.94+128)*1.06;
+      g=((g-128)*.94+128)*1.06;
+      b=((b-128)*.94+128)*1.06;
+      r=avg+(r-avg)*1.04; g=avg+(g-avg)*1.04; b=avg+(b-avg)*1.04;
+    }
+
+    d[i]=Math.max(0,Math.min(255,r));
+    d[i+1]=Math.max(0,Math.min(255,g));
+    d[i+2]=Math.max(0,Math.min(255,b));
+  }
+  ctx.putImageData(image,0,0);
+}
+
 async function captureMain(){
   if(captureMode==="photo"){
     const v=$("captureVideo"),canvas=$("captureCanvas");
     if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
     canvas.width=v.videoWidth;canvas.height=v.videoHeight;
-    const ctx=canvas.getContext("2d");
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
     ctx.save();
-    ctx.filter=captureFilterCss();
+    // Draw the same corrected orientation first.
     if(captureFacing==="user"){
       ctx.translate(canvas.width,0);
       ctx.scale(-1,1);
     }
     ctx.drawImage(v,0,0,canvas.width,canvas.height);
     ctx.restore();
+    // Bake the selected filter into the JPEG pixels. This avoids mobile browsers
+    // that show CSS filters in preview but ignore CanvasRenderingContext2D.filter.
+    applyPhotoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
     captureBlob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",.92));
     if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
     stopCaptureStream();canvas.classList.remove("hidden");v.classList.add("hidden");canvas.style.transform="scale(1)";
