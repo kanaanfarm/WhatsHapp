@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6789"}
+    data:{url:"/?v=6790"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6789: call video is processed into true left/right orientation.
+  // Build 6790: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1675,12 +1675,22 @@ function cancelVoiceRecording(){
   isRecording=false;voiceRecordingStopping=false;audioChunks=[];
   resetVoiceRecorderUi();
 }
-$("recordBtn").onclick=async event=>{
-  event.preventDefault();event.stopPropagation();
+let voiceMicActionAt=0;
+async function handleVoiceMicAction(event){
+  if(event){event.preventDefault();event.stopPropagation()}
+  const now=Date.now();
+  if(now-voiceMicActionAt<450)return;
+  voiceMicActionAt=now;
   if(isRecording)stopVoiceHoldRecording();
   else if(voicePendingFile)toast("Send or cancel the current voice recording first.");
   else await startVoiceHoldRecording();
-};
+}
+const voiceMicButton=$("recordBtn");
+voiceMicButton.onclick=handleVoiceMicAction;
+voiceMicButton.addEventListener("pointerup",event=>{
+  if(event.pointerType==="touch"||event.pointerType==="pen")handleVoiceMicAction(event);
+},{passive:false});
+voiceMicButton.addEventListener("touchend",handleVoiceMicAction,{passive:false});
 $("voiceRecordStop").onclick=stopVoiceHoldRecording;
 $("voiceRecordCancel").onclick=cancelVoiceRecording;
 $("voiceRecordSend").onclick=async()=>{
@@ -2068,6 +2078,7 @@ $("captureSendBtn").onclick=async()=>{
 $("captureSwitchBtn").onclick=async()=>{captureFacing=captureFacing==="environment"?"user":"environment";await prepareCapture(captureMode)};
 document.querySelectorAll(".capture-tabs button").forEach(b=>b.onclick=()=>prepareCapture(b.dataset.mode));
 recordButton.title="Record voice";recordButton.setAttribute("aria-label","Record voice");
+recordButton.disabled=!activeUser||!!activeUser.isAI;
 cameraButton.onclick=()=>openCapture("photo");cameraButton.title="Photo or video";cameraButton.setAttribute("aria-label","Open photo or video recorder");
 
 let capturePinchStart=0,capturePinchBase=1;

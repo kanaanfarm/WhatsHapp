@@ -1631,7 +1631,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #captureVideo{transform-origin:center center}
 
 
-/* Build 6789 — dedicated voice recording preview/send panel */
+/* Build 6790 — dedicated voice recording preview/send panel */
 .voice-record-panel{
   margin:6px 12px 0;
   padding:9px 12px;
@@ -1652,4 +1652,37 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   .voice-record-panel{margin:6px 8px 0;gap:8px}
   .voice-record-panel audio{width:100%;min-width:0;order:3}
   .voice-record-actions{margin-left:auto}
+}
+
+
+/* Build 6790 — voice panel visible above composer on desktop/mobile */
+.composer{
+  flex-wrap:wrap;
+  overflow:visible!important;
+}
+.composer > .voice-record-panel{
+  order:-10;
+  flex:0 0 100%;
+  width:100%;
+  box-sizing:border-box;
+  position:relative;
+  z-index:5;
+  margin:0 0 8px 0;
+  padding:10px 12px;
+  background:var(--surface, #fff);
+  border:1px solid rgba(120,130,150,.22);
+  box-shadow:0 6px 20px rgba(20,30,50,.08);
+}
+.composer > .voice-record-panel.hidden{display:none!important}
+@media(max-width:760px){
+  .composer{overflow:visible!important}
+  .composer > .voice-record-panel{
+    flex-basis:100%;
+    width:100%;
+    margin:0 0 7px 0;
+    padding:9px 10px;
+  }
+  .voice-record-live{min-width:0;flex:1}
+  .voice-record-actions{margin-left:auto}
+  .voice-record-panel audio{flex:0 0 100%;width:100%;order:5}
 }

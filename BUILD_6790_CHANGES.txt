@@ -1,0 +1,8 @@
+Build 6790 — voice recorder desktop/mobile fix, based on tested 6789.
+
+- Voice panel moved inside composer and spans a full row above the chat controls.
+- Fixes desktop panel being hidden behind/under the composer.
+- Mobile microphone action now supports touch/pointer/click with duplicate-event protection.
+- Mic is explicitly enabled only for an active human chat.
+- Existing Stop -> Preview -> Send/Cancel voice flow retained.
+- Photo/video filters, photo/video orientation, camera recorder, calls, login, notifications and server media handling are unchanged.
