@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6796"}
+    data:{url:"/?v=6797"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -788,11 +788,12 @@ async function selectUser(u){
   }
   updateComposer();syncVoiceMicAvailability();
   if(u.isAI){
-    activeConversation=[];
+    activeConversation=[];renderAiAttachmentTray();
     loadAiHistory().forEach(addMessage);
     if(!$("messages").children.length)showAiWelcome();
     loadAiStatus();
   }else{
+    if($("aiAttachmentTray"))$("aiAttachmentTray").classList.add("hidden");
     const history=await api(`/api/messages/${u.id}`);
     activeConversation=history;
     history.forEach(addMessage);
@@ -826,7 +827,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6796: call video is processed into true left/right orientation.
+  // Build 6797: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1320,8 +1321,11 @@ async function sendAi(body){
   try{
     const history=items.slice(0,-1).filter(x=>!x.aiError).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
     const provider=$("aiProviderSelect")?.value||"auto";
-    const attachmentIds=items.filter(x=>x?.aiAttachment?.attachmentId).slice(-5).map(x=>x.aiAttachment.attachmentId);
+    const historyAttachmentIds=items.filter(x=>x?.aiAttachment?.attachmentId).slice(-5).map(x=>x.aiAttachment.attachmentId);
+    const pendingAttachmentIds=aiPendingAttachments.map(x=>x.attachmentId);
+    const attachmentIds=[...new Set([...pendingAttachmentIds,...historyAttachmentIds])].slice(-10);
     const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider,attachmentIds})});
+    aiPendingAttachments=[];renderAiAttachmentTray();
     const source=`${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`;
     const reply=aiMessage("assistant",`${data.answer}\n\n— ${source}`);items.push(reply);saveAiHistory(items);addMessage(reply);
   }catch(error){
@@ -1490,25 +1494,63 @@ $("sendMediaConfirmBtn").onclick=()=>closeMediaConfirmation(true);
 $("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverlay"))closeMediaConfirmation(false)};
 
 
+
+let aiPendingAttachments=[];
+
+function renderAiAttachmentTray(){
+  const tray=$("aiAttachmentTray"),list=$("aiAttachmentTrayList");
+  if(!tray||!list)return;
+  tray.classList.toggle("hidden",!activeUser?.isAI||!aiPendingAttachments.length);
+  list.replaceChildren();
+  for(const item of aiPendingAttachments){
+    const row=document.createElement("div");
+    row.className="ai-attachment-item";
+    row.innerHTML=`<div><b>📎 ${escapeHtml(item.name)}</b><small>${escapeHtml(item.type||"file")} · ${formatMediaSize(Number(item.size||0))}</small></div><button type="button" aria-label="Remove attachment">×</button>`;
+    row.querySelector("button").onclick=()=>{
+      aiPendingAttachments=aiPendingAttachments.filter(x=>x.attachmentId!==item.attachmentId);
+      renderAiAttachmentTray();
+    };
+    list.appendChild(row);
+  }
+}
+if($("clearAiAttachmentsBtn"))$("clearAiAttachmentsBtn").onclick=()=>{aiPendingAttachments=[];renderAiAttachmentTray()};
+
 async function uploadAiFile(file){
   if(!activeUser?.isAI)return false;
   if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
+  const allowed=/\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(file.name||"");
+  if(!allowed){toast("Unsupported AI attachment type.");return false}
+
   const fd=new FormData();
   fd.append("file",file);
   mediaUploadInFlight=true;
-  $("uploadStatus").textContent=`Uploading ${file.name}…`;
+  $("uploadStatus").textContent=`Preparing ${file.name} for AI…`;
   $("uploadStatus").classList.remove("hidden");
   $("attachBtn").disabled=true;
+
   try{
     const data=await api("/api/ai/upload",{method:"POST",body:fd});
+    const item={
+      name:data.name||file.name,
+      type:data.type||file.type||"file",
+      size:Number(data.size||file.size||0),
+      attachmentId:data.attachmentId,
+      extractedChars:Number(data.extractedChars||0),
+      status:data.summary||"Ready for AI analysis"
+    };
+    aiPendingAttachments.push(item);
+    aiPendingAttachments=aiPendingAttachments.slice(-10);
+    renderAiAttachmentTray();
+
     const items=loadAiHistory();
-    const card=aiMessage("user",`📎 ${data.name}\n${data.summary||"File attached to AI chat."}`);
-    card.aiAttachment={name:data.name,type:data.type,size:data.size,attachmentId:data.attachmentId,extractedChars:data.extractedChars||0};
+    const card=aiMessage("user",`📎 ${item.name}\n${item.status}`);
+    card.aiAttachment=item;
     items.push(card);saveAiHistory(items);addMessage(card);
+
     const input=$("messageInput");
-    if(input&&!input.value.trim())input.value=`Summarize the attached file: ${data.name}`;
+    if(input&&!input.value.trim())input.value=`Summarize the attached file: ${item.name}`;
     updateComposer();
-    toast("File attached to ConnectChat AI");
+    toast("Attachment ready for ConnectChat AI");
     return true;
   }catch(e){
     console.error("AI file upload failed",e);
@@ -3176,3 +3218,5 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
     toast(`AI provider: ${$("aiProviderSelect").selectedOptions[0].textContent}`);
   };
 })();
+
+document.addEventListener("dragend",()=>{$("chatPanel")?.classList.remove("file-drop-active")});

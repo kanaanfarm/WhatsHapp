@@ -1,0 +1,17 @@
+Build 6797 — AI Attachment fix only, based on deployed Build 6796.
+
+Fixed/added:
+- AI attachment button opens file picker.
+- Drag/drop into AI chat is supported and visibly highlighted.
+- Uploaded AI files appear in a pending attachment tray before the AI request.
+- Remove/Clear controls for pending AI attachments.
+- Recent/pending attachment IDs are included when sending prompts to ConnectChat AI.
+- PDF, DOCX, XLS/XLSX, CSV and TXT text extraction retained.
+- Images accepted (no OCR/vision yet).
+- PowerPoint accepted with guidance to export to PDF for full text extraction.
+- Attachment lifetime increased for testing and a protected debug endpoint was added.
+
+Not changed:
+- Human chat voice recording
+- Camera/photo/video filters and orientation
+- Calls, notifications and normal media upload

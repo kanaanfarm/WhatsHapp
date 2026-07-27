@@ -1930,3 +1930,56 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   background:#f2fbf8;
 }
 .ai-attachment-card small{opacity:.7}
+
+
+/* Build 6797 — AI attachment UX */
+.ai-attachment-tray{
+  margin:8px 16px 0;
+  padding:10px;
+  border:1px solid var(--line,#e5e7eb);
+  border-radius:14px;
+  background:var(--panel,#fff);
+  display:grid;
+  gap:8px;
+}
+.ai-attachment-tray.hidden{display:none!important}
+.ai-attachment-tray-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ai-attachment-tray-list{display:grid;gap:7px}
+.ai-attachment-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 10px;
+  border-radius:11px;
+  background:#f3fbf8;
+  border:1px solid rgba(0,168,132,.18);
+}
+.ai-attachment-item>div{display:grid;gap:2px;min-width:0}
+.ai-attachment-item b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-attachment-item small{opacity:.7}
+.ai-attachment-item button{
+  flex:0 0 32px;width:32px;height:32px;border:0;border-radius:50%;cursor:pointer;
+}
+.workspace-chat.file-drop-active{
+  outline:2px dashed #00a884!important;
+  outline-offset:-8px;
+}
+.workspace-chat.file-drop-active::after{
+  content:"Drop file here";
+  position:absolute;
+  inset:90px 24px 92px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:rgba(0,168,132,.12);
+  color:#08775d;
+  font-size:22px;
+  font-weight:800;
+  z-index:80;
+  pointer-events:none;
+}
+@media(max-width:760px){
+  .ai-attachment-tray{margin:6px 8px 0;padding:8px}
+  .workspace-chat.file-drop-active::after{inset:72px 10px 76px;font-size:18px}
+}

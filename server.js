@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6796";
+const APP_BUILD = "6797";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -611,8 +611,8 @@ async function extractAiFileText(file){
   if(name.endsWith(".csv")||mime==="text/csv"||mime.startsWith("text/")){
     return cleanExtractedText(buf.toString("utf8"));
   }
-  if(name.endsWith(".pptx")||mime.includes("presentation")){
-    return "[PowerPoint uploaded. Text extraction is not available in this build; use PDF export for full AI analysis.]";
+  if(name.endsWith(".pptx")||name.endsWith(".ppt")||mime.includes("presentation")){
+    return "[PowerPoint uploaded. Export to PDF for full text extraction in ConnectChat AI.]";
   }
   if(mime.startsWith("image/")){
     return "[Image uploaded. OCR/vision extraction is not enabled in this build.]";
@@ -1245,11 +1245,20 @@ async function requestDeepSeek(message, history, signal) {
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
 
 
+
+app.get("/api/ai/attachments", async (req,res)=>{
+  if(!req.session?.user)return res.status(401).json({error:"Not authenticated."});
+  const items=[...aiAttachmentStore.values()]
+    .filter(item=>Number(item.userId)===Number(req.session.user.id))
+    .map(({id,name,type,size,createdAt,text})=>({id,name,type,size,createdAt,extractedChars:(text||"").length}));
+  res.json({items});
+});
+
 app.post("/api/ai/upload", upload.single("file"), async (req,res)=>{
   try{
     if(!req.session?.user)return res.status(401).json({error:"Not authenticated."});
     if(!req.file)return res.status(400).json({error:"No file uploaded."});
-    const allowed = /\.(pdf|docx|xlsx?|csv|txt|pptx|png|jpe?g|webp)$/i.test(req.file.originalname||"")
+    const allowed = /\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(req.file.originalname||"")
       || /^(application\/pdf|text\/|image\/)/i.test(req.file.mimetype||"");
     if(!allowed)return res.status(400).json({error:"This file type is not supported for AI attachments yet."});
     const text=await extractAiFileText(req.file);
@@ -1265,7 +1274,7 @@ app.post("/api/ai/upload", upload.single("file"), async (req,res)=>{
     });
     // Keep store bounded.
     for(const [id,item] of aiAttachmentStore){
-      if(Date.now()-item.createdAt>6*60*60*1000)aiAttachmentStore.delete(id);
+      if(Date.now()-item.createdAt>24*60*60*1000)aiAttachmentStore.delete(id);
     }
     res.json({
       attachmentId,

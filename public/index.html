@@ -123,6 +123,14 @@
       <div id="messages" class="messages empty-state"><div><h3>Your messages</h3><p>Select a user to start chatting.</p></div></div>
       <div id="smartStrip" class="smart-strip smart-popup hidden" aria-label="AI conversation tools"><span>✦ Conversation AI</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
       <div id="typingText" class="typing"></div><div id="uploadStatus" class="upload-status hidden">Uploading…</div>
+
+      <div id="aiAttachmentTray" class="ai-attachment-tray hidden">
+        <div class="ai-attachment-tray-head">
+          <strong>AI attachments</strong>
+          <button id="clearAiAttachmentsBtn" type="button" class="secondary-btn">Clear</button>
+        </div>
+        <div id="aiAttachmentTrayList" class="ai-attachment-tray-list"></div>
+      </div>
 <footer class="composer">
 <div id="voiceRecordPanel" class="voice-record-panel hidden" aria-live="polite">
         <div class="voice-record-live">
@@ -137,7 +145,7 @@
           <button id="voiceRecordSend" type="button" class="send-btn hidden" aria-label="Send voice message">➤</button>
         </div>
       </div>
-        <input id="fileInput" type="file" accept="image/*,audio/*,video/*,application/pdf,text/plain,text/csv,.docx,.xls,.xlsx,.pptx,.zip" multiple hidden>
+        <input id="fileInput" type="file" accept="image/*,application/pdf,text/plain,text/csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
         <input id="videoCameraInput" type="file" accept="video/*" capture="environment" hidden>
         <button id="emojiBtn" class="circle-btn" type="button" title="Emoji">😊</button>
