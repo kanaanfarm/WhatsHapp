@@ -1,0 +1,7 @@
+Build 6798 — AI attachment frontend only.
+- AI 📎 always opens the file picker in an active chat.
+- AI-selected files appear immediately in the attachment tray as Preparing…
+- Tray updates to Ready or Failed after backend response.
+- Drag/drop routes files through the same AI attachment path.
+- No backend extraction/auth changes.
+- No human chat, voice, camera, filters, calls or notification changes.

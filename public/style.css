@@ -1932,7 +1932,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .ai-attachment-card small{opacity:.7}
 
 
-/* Build 6797 — AI attachment UX */
+/* Build 6798 — AI attachment UX */
 .ai-attachment-tray{
   margin:8px 16px 0;
   padding:10px;
@@ -1983,3 +1983,10 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   .ai-attachment-tray{margin:6px 8px 0;padding:8px}
   .workspace-chat.file-drop-active::after{inset:72px 10px 76px;font-size:18px}
 }
+
+
+/* Build 6798 — AI attachment frontend trigger/visibility only */
+.ai-attachment-item.uploading{opacity:.78}
+.ai-attachment-item.error{border-color:#e5a3a3!important;background:#fff4f4!important}
+.ai-attachment-status{display:block;margin-top:2px}
+#aiAttachmentTray{position:relative;z-index:40}

@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6797"}
+    data:{url:"/?v=6798"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -827,7 +827,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6797: call video is processed into true left/right orientation.
+  // Build 6798: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1497,17 +1497,21 @@ $("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverla
 
 let aiPendingAttachments=[];
 
+
 function renderAiAttachmentTray(){
   const tray=$("aiAttachmentTray"),list=$("aiAttachmentTrayList");
   if(!tray||!list)return;
-  tray.classList.toggle("hidden",!activeUser?.isAI||!aiPendingAttachments.length);
+  const show=Boolean(activeUser?.isAI&&aiPendingAttachments.length);
+  tray.classList.toggle("hidden",!show);
   list.replaceChildren();
+
   for(const item of aiPendingAttachments){
     const row=document.createElement("div");
-    row.className="ai-attachment-item";
-    row.innerHTML=`<div><b>📎 ${escapeHtml(item.name)}</b><small>${escapeHtml(item.type||"file")} · ${formatMediaSize(Number(item.size||0))}</small></div><button type="button" aria-label="Remove attachment">×</button>`;
+    row.className=`ai-attachment-item ${item.state||""}`;
+    const status=item.state==="uploading"?"Preparing…":item.state==="error"?(item.error||"Failed"):(item.status||"Ready for AI");
+    row.innerHTML=`<div><b>📎 ${escapeHtml(item.name)}</b><small>${escapeHtml(item.type||"file")} · ${formatMediaSize(Number(item.size||0))}</small><small class="ai-attachment-status">${escapeHtml(status)}</small></div><button type="button" aria-label="Remove attachment">×</button>`;
     row.querySelector("button").onclick=()=>{
-      aiPendingAttachments=aiPendingAttachments.filter(x=>x.attachmentId!==item.attachmentId);
+      aiPendingAttachments=aiPendingAttachments.filter(x=>x.localId!==item.localId);
       renderAiAttachmentTray();
     };
     list.appendChild(row);
@@ -1521,6 +1525,14 @@ async function uploadAiFile(file){
   const allowed=/\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(file.name||"");
   if(!allowed){toast("Unsupported AI attachment type.");return false}
 
+  const localId=`local-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const pending={
+    localId,name:file.name,type:file.type||"file",size:file.size,
+    attachmentId:null,extractedChars:0,status:"Preparing…",state:"uploading"
+  };
+  aiPendingAttachments.push(pending);
+  renderAiAttachmentTray();
+
   const fd=new FormData();
   fd.append("file",file);
   mediaUploadInFlight=true;
@@ -1530,29 +1542,30 @@ async function uploadAiFile(file){
 
   try{
     const data=await api("/api/ai/upload",{method:"POST",body:fd});
-    const item={
+    Object.assign(pending,{
       name:data.name||file.name,
       type:data.type||file.type||"file",
       size:Number(data.size||file.size||0),
       attachmentId:data.attachmentId,
       extractedChars:Number(data.extractedChars||0),
-      status:data.summary||"Ready for AI analysis"
-    };
-    aiPendingAttachments.push(item);
-    aiPendingAttachments=aiPendingAttachments.slice(-10);
+      status:data.summary||"Ready for AI analysis",
+      state:"ready"
+    });
     renderAiAttachmentTray();
 
     const items=loadAiHistory();
-    const card=aiMessage("user",`📎 ${item.name}\n${item.status}`);
-    card.aiAttachment=item;
+    const card=aiMessage("user",`📎 ${pending.name}\n${pending.status}`);
+    card.aiAttachment=pending;
     items.push(card);saveAiHistory(items);addMessage(card);
 
     const input=$("messageInput");
-    if(input&&!input.value.trim())input.value=`Summarize the attached file: ${item.name}`;
+    if(input&&!input.value.trim())input.value=`Summarize the attached file: ${pending.name}`;
     updateComposer();
     toast("Attachment ready for ConnectChat AI");
     return true;
   }catch(e){
+    pending.state="error";pending.error=e.message||"Upload failed";pending.status=pending.error;
+    renderAiAttachmentTray();
     console.error("AI file upload failed",e);
     toast(`AI attachment failed: ${e.message}`);
     return false;
@@ -1603,31 +1616,38 @@ async function uploadFiles(fileList){
 }
 $("attachBtn").onclick=()=>{
   if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI){$("fileInput").click();return;}
   $("fileInput").click();
 };
 $("fileInput").onchange=e=>{
-  uploadFiles(e.target.files);e.target.value="";
+  const files=e.target.files;
+  if(files?.length)uploadFiles(files);
+  e.target.value="";
 };
 $("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"image");e.target.value=""};
 $("videoCameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"video");e.target.value=""};
 
+
 const chatDropTarget=$("chatPanel");
-["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
+["dragenter","dragover"].forEach(type=>{
+  chatDropTarget.addEventListener(type,event=>{
+    if(!activeUser)return;
+    event.preventDefault();event.stopPropagation();
+    if(event.dataTransfer)event.dataTransfer.dropEffect="copy";
+    chatDropTarget.classList.add("file-drop-active");
+  });
+});
+chatDropTarget.addEventListener("drop",event=>{
   if(!activeUser)return;
-  event.preventDefault();event.dataTransfer.dropEffect="copy";chatDropTarget.classList.add("file-drop-active");
-}));
-["dragleave","drop"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
-  if(type==="drop"){event.preventDefault();event.stopPropagation();if(event.dataTransfer?.files?.length&&activeUser)uploadFiles(event.dataTransfer.files)}
-  if(type==="dragleave"&&event.relatedTarget&&chatDropTarget.contains(event.relatedTarget))return;
+  event.preventDefault();event.stopPropagation();
   chatDropTarget.classList.remove("file-drop-active");
-}));
-document.addEventListener("dragover",event=>{
-  if(activeUser&&$("chatPanel")?.contains(event.target))event.preventDefault();
+  const files=event.dataTransfer?.files;
+  if(files?.length)uploadFiles(files);
 });
-document.addEventListener("drop",event=>{
-  if($("chatPanel")?.contains(event.target))event.preventDefault();
+chatDropTarget.addEventListener("dragleave",event=>{
+  if(event.relatedTarget&&chatDropTarget.contains(event.relatedTarget))return;
+  chatDropTarget.classList.remove("file-drop-active");
 });
+document.addEventListener("dragend",()=>chatDropTarget.classList.remove("file-drop-active"));
 
 $("messageInput").addEventListener("paste",e=>{
   const items=[...(e.clipboardData?.items||[])];
