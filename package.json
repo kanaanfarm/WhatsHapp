@@ -23,6 +23,9 @@
     "multer": "^2.2.0",
     "pdfkit": "^0.17.2",
     "socket.io": "^4.8.1",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.9.0",
+    "xlsx": "^0.18.5"
   }
 }

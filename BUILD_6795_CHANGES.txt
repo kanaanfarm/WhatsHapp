@@ -1,0 +1,15 @@
+Build 6795 — AI attachments.
+
+Added:
+- AI chat attachment button enabled.
+- Drag & drop files into AI chat.
+- AI upload endpoint and temporary per-user attachment context.
+- Text extraction for PDF, DOCX, XLS/XLSX, CSV and TXT.
+- Images accepted but OCR/vision is not enabled in this build.
+- PPTX accepted with a note; export to PDF for full text extraction.
+- Recent AI attachments are automatically included when asking the AI follow-up questions.
+
+Preserved:
+- Build 6794 working human chat voice recorder on mobile and laptop.
+- Photo/video filters and orientation.
+- Camera recorder, calls, notifications and normal media uploads.

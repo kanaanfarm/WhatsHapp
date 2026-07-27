@@ -1631,7 +1631,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #captureVideo{transform-origin:center center}
 
 
-/* Build 6794 — dedicated voice recording preview/send panel */
+/* Build 6795 — dedicated voice recording preview/send panel */
 .voice-record-panel{
   margin:6px 12px 0;
   padding:9px 12px;
@@ -1655,7 +1655,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6794 — voice panel visible above composer on desktop/mobile */
+/* Build 6795 — voice panel visible above composer on desktop/mobile */
 .composer{
   flex-wrap:wrap;
   overflow:visible!important;
@@ -1688,7 +1688,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6794 — voice Send arrow + desktop composer visibility */
+/* Build 6795 — voice Send arrow + desktop composer visibility */
 .workspace-chat .composer{
   display:grid!important;
   grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
@@ -1766,7 +1766,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6794 — MOBILE voice flow only */
+/* Build 6795 — MOBILE voice flow only */
 @media(max-width:760px){
   #voiceRecordPanel{
     display:flex;
@@ -1800,7 +1800,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6794 — LAPTOP/Desktop voice recorder fix only */
+/* Build 6795 — LAPTOP/Desktop voice recorder fix only */
 @media(min-width:761px){
   .workspace-chat .composer{
     display:grid!important;
@@ -1887,7 +1887,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6794 — desktop microphone enable-state fix */
+/* Build 6795 — desktop microphone enable-state fix */
 @media(min-width:761px){
   .workspace-chat #recordBtn:not(:disabled){
     cursor:pointer!important;
@@ -1900,3 +1900,33 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
     opacity:.45!important;
   }
 }
+
+
+/* Build 6795 — AI attachments */
+.workspace-chat.file-drop-active{
+  outline:2px dashed #00a884;
+  outline-offset:-10px;
+}
+.workspace-chat.file-drop-active::after{
+  content:"Drop files here for ConnectChat AI";
+  position:absolute;
+  inset:80px 24px 90px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:rgba(0,168,132,.10);
+  color:#08775d;
+  font-weight:800;
+  z-index:25;
+  pointer-events:none;
+}
+.ai-attachment-card{
+  display:grid;
+  gap:4px;
+  margin-top:8px;
+  padding:9px 11px;
+  border:1px solid rgba(0,168,132,.25);
+  border-radius:12px;
+  background:#f2fbf8;
+}
+.ai-attachment-card small{opacity:.7}

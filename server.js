@@ -10,6 +10,9 @@ const crypto = require("crypto");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
+const pdfParse = require("pdf-parse");
+const mammoth = require("mammoth");
+const XLSX = require("xlsx");
 const helmet = require("helmet");
 const PDFDocument = require("pdfkit");
 const ExcelJS = require("exceljs");
@@ -23,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6794";
+const APP_BUILD = "6795";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -574,6 +577,47 @@ async function markPendingMessagesDelivered(receiverId) {
   const { error: updateError } = await supabase.from("messages").update({ delivered_at: deliveredAt }).in("id", ids);
   if (updateError) throw updateError;
   for (const message of pending) emitMessageStatus({ ...message, delivered_at: deliveredAt });
+}
+
+
+const aiAttachmentStore = new Map();
+
+function cleanExtractedText(text){
+  return String(text||"").replace(/\u0000/g," ").replace(/[ \t]+\n/g,"\n").replace(/\n{4,}/g,"\n\n\n").trim().slice(0,120000);
+}
+
+async function extractAiFileText(file){
+  const mime=(file.mimetype||"").toLowerCase();
+  const name=(file.originalname||"").toLowerCase();
+  const buf=file.buffer;
+
+  if(mime==="application/pdf"||name.endsWith(".pdf")){
+    const parsed=await pdfParse(buf);
+    return cleanExtractedText(parsed.text);
+  }
+  if(name.endsWith(".docx")||mime==="application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
+    const result=await mammoth.extractRawText({buffer:buf});
+    return cleanExtractedText(result.value);
+  }
+  if(name.endsWith(".xlsx")||name.endsWith(".xls")||mime.includes("spreadsheet")||mime.includes("excel")){
+    const wb=XLSX.read(buf,{type:"buffer"});
+    const parts=[];
+    for(const sheetName of wb.SheetNames){
+      const ws=wb.Sheets[sheetName];
+      parts.push(`Sheet: ${sheetName}\n${XLSX.utils.sheet_to_csv(ws)}`);
+    }
+    return cleanExtractedText(parts.join("\n\n"));
+  }
+  if(name.endsWith(".csv")||mime==="text/csv"||mime.startsWith("text/")){
+    return cleanExtractedText(buf.toString("utf8"));
+  }
+  if(name.endsWith(".pptx")||mime.includes("presentation")){
+    return "[PowerPoint uploaded. Text extraction is not available in this build; use PDF export for full AI analysis.]";
+  }
+  if(mime.startsWith("image/")){
+    return "[Image uploaded. OCR/vision extraction is not enabled in this build.]";
+  }
+  return "[File uploaded. This file type does not have text extraction enabled in this build.]";
 }
 
 const upload = multer({
@@ -1199,6 +1243,42 @@ async function requestDeepSeek(message, history, signal) {
 }
 
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
+
+
+app.post("/api/ai/upload", requireAuth, upload.single("file"), async (req,res)=>{
+  try{
+    if(!req.file)return res.status(400).json({error:"No file uploaded."});
+    const allowed = /\.(pdf|docx|xlsx?|csv|txt|pptx|png|jpe?g|webp)$/i.test(req.file.originalname||"")
+      || /^(application\/pdf|text\/|image\/)/i.test(req.file.mimetype||"");
+    if(!allowed)return res.status(400).json({error:"This file type is not supported for AI attachments yet."});
+    const text=await extractAiFileText(req.file);
+    const attachmentId=`aiatt-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+    aiAttachmentStore.set(attachmentId,{
+      id:attachmentId,
+      userId:req.session.user.id,
+      name:req.file.originalname,
+      type:req.file.mimetype||"application/octet-stream",
+      size:req.file.size,
+      text,
+      createdAt:Date.now()
+    });
+    // Keep store bounded.
+    for(const [id,item] of aiAttachmentStore){
+      if(Date.now()-item.createdAt>6*60*60*1000)aiAttachmentStore.delete(id);
+    }
+    res.json({
+      attachmentId,
+      name:req.file.originalname,
+      type:req.file.mimetype,
+      size:req.file.size,
+      extractedChars:text.length,
+      summary:text.startsWith("[")?text:`Ready for AI analysis · ${text.length.toLocaleString()} extracted characters`
+    });
+  }catch(error){
+    console.error("AI upload failed",error);
+    res.status(500).json({error:"Could not process this file for AI."});
+  }
+});
 
 app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   try {

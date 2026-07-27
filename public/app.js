@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6794"}
+    data:{url:"/?v=6795"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6794: call video is processed into true left/right orientation.
+  // Build 6795: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1199,6 +1199,13 @@ function updateMessageReceipt(payload){
   const receipt=row?.querySelector(".receipt");if(!receipt)return;
   const info=receiptInfo(payload);receipt.textContent=info.text;receipt.className=info.className;
 }
+
+function renderAiAttachmentMeta(msg){
+  if(!msg?.aiAttachment)return "";
+  const a=msg.aiAttachment;
+  return `<div class="ai-attachment-card"><b>📎 ${escapeHtml(a.name||"Attachment")}</b><small>${escapeHtml(a.type||"file")} · ${formatMediaSize(Number(a.size||0))}</small></div>`;
+}
+
 function addMessage(msg){
   // A message can arrive from the upload response/history refresh and Socket.IO nearly at the same time.
   // Render each persisted message ID only once on this client.
@@ -1313,7 +1320,8 @@ async function sendAi(body){
   try{
     const history=items.slice(0,-1).filter(x=>!x.aiError).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
     const provider=$("aiProviderSelect")?.value||"auto";
-    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider})});
+    const attachmentIds=items.filter(x=>x?.aiAttachment?.attachmentId).slice(-5).map(x=>x.aiAttachment.attachmentId);
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider,attachmentIds})});
     const source=`${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`;
     const reply=aiMessage("assistant",`${data.answer}\n\n— ${source}`);items.push(reply);saveAiHistory(items);addMessage(reply);
   }catch(error){
@@ -1401,7 +1409,7 @@ $("sendBtn").onclick=send;
 $("messageInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}};
 $("messageInput").oninput=()=>{
   updateComposer();syncVoiceMicAvailability();
-  if(!activeUser||activeUser.isAI)return;
+  if(!activeUser)return;
   socket.emit("typing",{receiverId:activeUser.id,isTyping:true});
   clearTimeout(typingTimer);typingTimer=setTimeout(()=>socket.emit("typing",{receiverId:activeUser.id,isTyping:false}),700);
 };
@@ -1481,10 +1489,43 @@ $("cancelMediaConfirmBtn").onclick=()=>closeMediaConfirmation(false);
 $("sendMediaConfirmBtn").onclick=()=>closeMediaConfirmation(true);
 $("mediaConfirmOverlay").onclick=event=>{if(event.target===$("mediaConfirmOverlay"))closeMediaConfirmation(false)};
 
+
+async function uploadAiFile(file){
+  if(!activeUser?.isAI)return false;
+  if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
+  const fd=new FormData();
+  fd.append("file",file);
+  mediaUploadInFlight=true;
+  $("uploadStatus").textContent=`Uploading ${file.name}…`;
+  $("uploadStatus").classList.remove("hidden");
+  $("attachBtn").disabled=true;
+  try{
+    const data=await api("/api/ai/upload",{method:"POST",body:fd});
+    const items=loadAiHistory();
+    const card=aiMessage("user",`📎 ${data.name}\n${data.summary||"File attached to AI chat."}`);
+    card.aiAttachment={name:data.name,type:data.type,size:data.size,attachmentId:data.attachmentId,extractedChars:data.extractedChars||0};
+    items.push(card);saveAiHistory(items);addMessage(card);
+    const input=$("messageInput");
+    if(input&&!input.value.trim())input.value=`Summarize the attached file: ${data.name}`;
+    updateComposer();
+    toast("File attached to ConnectChat AI");
+    return true;
+  }catch(e){
+    console.error("AI file upload failed",e);
+    toast(`AI attachment failed: ${e.message}`);
+    return false;
+  }finally{
+    mediaUploadInFlight=false;
+    $("uploadStatus").classList.add("hidden");
+    $("uploadStatus").textContent="Uploading…";
+    $("attachBtn").disabled=false;
+  }
+}
+
 async function uploadFile(file,kind){
   if(mediaUploadInFlight){toast("Please wait for the current upload to finish.");return false}
   if(!activeUser){toast("Select a user first.");return false}
-  if(activeUser.isAI){toast("Attachments are available in human chats. AI document analysis is not enabled yet.");return false}
+  
   if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
   const caption=$("messageInput").value.trim();
   const receiverId=Number(activeUser.id);
@@ -1507,16 +1548,20 @@ function attachmentKind(file){return file.type.startsWith("image/")?"image":file
 async function uploadFiles(fileList){
   const files=[...fileList].slice(0,10);
   if(!files.length)return;
-  for(const file of files){
-    const kind=attachmentKind(file);
-    if(["image","voice","video"].includes(kind))await previewAndUploadMedia(file,kind);
-    else await uploadFile(file,kind);
+  if(activeUser?.isAI){
+    for(const file of files)await uploadAiFile(file);
+  }else{
+    for(const file of files){
+      const kind=attachmentKind(file);
+      if(["image","voice","video"].includes(kind))await previewAndUploadMedia(file,kind);
+      else await uploadFile(file,kind);
+    }
   }
   if(fileList.length>10)toast("A maximum of 10 files can be added at one time.");
 }
 $("attachBtn").onclick=()=>{
   if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI)return toast("Attachments are available in human chats.");
+  if(activeUser.isAI){$("fileInput").click();return;}
   $("fileInput").click();
 };
 $("fileInput").onchange=e=>{
@@ -1527,16 +1572,16 @@ $("videoCameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUplo
 
 const chatDropTarget=$("chatPanel");
 ["dragenter","dragover"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
-  if(!activeUser||activeUser.isAI)return;
+  if(!activeUser)return;
   event.preventDefault();event.dataTransfer.dropEffect="copy";chatDropTarget.classList.add("file-drop-active");
 }));
 ["dragleave","drop"].forEach(type=>chatDropTarget.addEventListener(type,event=>{
-  if(type==="drop"){event.preventDefault();event.stopPropagation();if(event.dataTransfer?.files?.length&&activeUser&&!activeUser.isAI)uploadFiles(event.dataTransfer.files)}
+  if(type==="drop"){event.preventDefault();event.stopPropagation();if(event.dataTransfer?.files?.length&&activeUser)uploadFiles(event.dataTransfer.files)}
   if(type==="dragleave"&&event.relatedTarget&&chatDropTarget.contains(event.relatedTarget))return;
   chatDropTarget.classList.remove("file-drop-active");
 }));
 document.addEventListener("dragover",event=>{
-  if(activeUser&&!activeUser.isAI&&$("chatPanel")?.contains(event.target))event.preventDefault();
+  if(activeUser&&$("chatPanel")?.contains(event.target))event.preventDefault();
 });
 document.addEventListener("drop",event=>{
   if($("chatPanel")?.contains(event.target))event.preventDefault();
