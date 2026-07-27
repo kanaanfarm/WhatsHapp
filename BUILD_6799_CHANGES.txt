@@ -1,0 +1,11 @@
+Build 6799 — AI attachment authentication + AI context fix.
+
+Root cause shown in UI:
+- Attachment upload returned "Not authenticated."
+
+Fixes:
+- /api/ai/upload now uses the existing ConnectChat `auth` middleware.
+- /api/ai/attachments now uses the same auth middleware.
+- Attachment ownership uses req.currentUser.id, matching the rest of the server.
+- /api/ai/chat now reads attachmentIds from the frontend and appends the extracted file text to the AI prompt.
+- Human chat, voice, camera, filters, calls and notifications are unchanged.

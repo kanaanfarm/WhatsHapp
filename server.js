@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6798";
+const APP_BUILD = "6799";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1246,17 +1246,15 @@ app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
 
 
 
-app.get("/api/ai/attachments", async (req,res)=>{
-  if(!req.session?.user)return res.status(401).json({error:"Not authenticated."});
+app.get("/api/ai/attachments", auth, async (req,res)=>{
   const items=[...aiAttachmentStore.values()]
-    .filter(item=>Number(item.userId)===Number(req.session.user.id))
+    .filter(item=>Number(item.userId)===Number(req.currentUser.id))
     .map(({id,name,type,size,createdAt,text})=>({id,name,type,size,createdAt,extractedChars:(text||"").length}));
   res.json({items});
 });
 
-app.post("/api/ai/upload", upload.single("file"), async (req,res)=>{
+app.post("/api/ai/upload", auth, upload.single("file"), async (req,res)=>{
   try{
-    if(!req.session?.user)return res.status(401).json({error:"Not authenticated."});
     if(!req.file)return res.status(400).json({error:"No file uploaded."});
     const allowed = /\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(req.file.originalname||"")
       || /^(application\/pdf|text\/|image\/)/i.test(req.file.mimetype||"");
@@ -1265,7 +1263,7 @@ app.post("/api/ai/upload", upload.single("file"), async (req,res)=>{
     const attachmentId=`aiatt-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
     aiAttachmentStore.set(attachmentId,{
       id:attachmentId,
-      userId:req.session?.user?.id,
+      userId:req.currentUser.id,
       name:req.file.originalname,
       type:req.file.mimetype||"application/octet-stream",
       size:req.file.size,
@@ -1299,6 +1297,15 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     }
     const message = cleanText(req.body?.message, 4000);
     if (!message) return res.status(400).json({ error: "Please enter a message." });
+    const attachmentIds = Array.isArray(req.body?.attachmentIds) ? req.body.attachmentIds.slice(-10) : [];
+    const attachmentContext = attachmentIds
+      .map(id => aiAttachmentStore.get(String(id)))
+      .filter(item => item && Number(item.userId) === Number(req.currentUser.id))
+      .map(item => `FILE: ${item.name}\n${item.text}`)
+      .join("\n\n---\n\n");
+    const messageWithFiles = attachmentContext
+      ? `${message}\n\nAttached file contents:\n${attachmentContext}`
+      : message;
     const rawHistory = Array.isArray(req.body?.history) ? req.body.history.slice(-12) : [];
     const history = rawHistory.map(item => ({
       role: item?.role === "assistant" ? "assistant" : "user",
@@ -1330,10 +1337,10 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
       const timeout = setTimeout(() => controller.abort(), attemptTimeout);
       try {
         answer = provider === "ollama"
-          ? await requestOllama(message, history, controller.signal)
+          ? await requestOllama(messageWithFiles, history, controller.signal)
           : provider === "deepseek"
-            ? await requestDeepSeek(message, history, controller.signal)
-            : await requestOpenAI(message, history, controller.signal);
+            ? await requestDeepSeek(messageWithFiles, history, controller.signal)
+            : await requestOpenAI(messageWithFiles, history, controller.signal);
         if (answer) { usedProvider = provider; break; }
       } catch (error) {
         lastError = error;
