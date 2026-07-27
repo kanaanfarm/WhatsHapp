@@ -1,0 +1,6 @@
+ConnectChat Pro v6.7.3 Build 6770
+
+Mobile call Wi-Fi indicator visibility fix only.
+Working photo/voice/video messaging path is unchanged.
+
+After deployment verify /health reports build 6770.

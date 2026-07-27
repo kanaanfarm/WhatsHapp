@@ -1532,3 +1532,32 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   }
   .call-title{padding-left:58px;padding-right:58px}
 }
+
+
+/* Build 6770: keep call Wi-Fi badge visible on mobile voice/video calls. */
+.call-overlay > .call-network-quality{
+  position:fixed!important;
+  top:calc(env(safe-area-inset-top, 0px) + 12px)!important;
+  right:12px!important;
+  left:auto!important;
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  z-index:2147483647!important;
+  background:rgba(17,24,39,.86)!important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.call-overlay.hidden > .call-network-quality{display:none!important}
+@media(max-width:800px){
+  .call-overlay > .call-network-quality{
+    top:calc(env(safe-area-inset-top, 0px) + 10px)!important;
+    right:10px!important;
+    min-height:32px!important;
+    padding:5px 9px!important;
+    border-radius:16px!important;
+  }
+  .call-overlay > .call-network-quality .network-wifi-icon{width:18px!important;height:18px!important}
+  .call-overlay > .call-network-quality span{display:inline!important;font-size:12px!important;line-height:1!important}
+  .call-card{position:relative;z-index:1}
+}
