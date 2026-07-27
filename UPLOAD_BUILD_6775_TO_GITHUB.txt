@@ -1,0 +1,2 @@
+ConnectChat Pro v6.7.3 Build 6775
+Fixes: front camera true left/right on mobile and desktop; full camera filter chips visible on both mobile and desktop. Media upload path unchanged.

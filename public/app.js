@@ -178,7 +178,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6774"}
+    data:{url:"/?v=6775"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -815,10 +815,11 @@ function applyCameraFilter(){
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
   if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
+  document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.cameraFilter===cameraFilter));
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6774: counter the mirrored front-camera preview so physical left/right
+  // Build 6775: counter the mirrored front-camera preview so physical left/right
   // stays correct. This affects only live local previews, never remote video.
   const local=$("localVideo");
   if(local)local.classList.toggle("front-camera-corrected",currentFacingMode==="user"&&!screenStream);
@@ -1584,7 +1585,7 @@ async function prepareCapture(mode){
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
   captureRecorder=null;captureChunks=[];
   stopCaptureStream();stopCaptureClock();resetCaptureResult();
-  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
+  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.toggle("voice-mode",mode==="voice");$("captureOverlay").classList.remove("recording");
   $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));if($("cameraFilterSelect"))$("cameraFilterSelect").classList.toggle("hidden",mode==="voice");
   try{
     captureStream=await navigator.mediaDevices.getUserMedia(mode==="voice"?{audio:true}:{video:{facingMode:{ideal:captureFacing}},audio:mode==="video"});
@@ -1661,6 +1662,7 @@ const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterS
 function setCameraFilter(value){cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();}
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
+document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.onclick=()=>setCameraFilter(btn.dataset.cameraFilter));
 
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;

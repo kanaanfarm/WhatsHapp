@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6774">
+  <link rel="stylesheet" href="style.css?v=6775">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -220,7 +220,17 @@
     <div class="capture-shell">
       <div class="capture-top"><button id="captureCloseBtn" type="button">×</button><b id="captureTitle">Photo</b><span id="captureTimer">00:00</span></div>
       <div id="capturePreview" class="capture-preview"><video id="captureVideo" autoplay playsinline muted></video><audio id="captureAudio" class="hidden" playsinline preload="metadata"></audio><canvas id="captureCanvas" class="hidden"></canvas><div id="voiceWave" class="voice-wave hidden">▂▅▇▃▆▂▇▅▃▆▂▅▇</div></div>
-      <div class="capture-tabs"><button data-mode="photo">PHOTO</button><button data-mode="video">VIDEO</button><button data-mode="voice">VOICE</button><select id="cameraFilterSelect" class="camera-filter-select" aria-label="Camera filter"><option value="normal">Normal</option><option value="beauty">Beauty</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="bw">B&amp;W</option><option value="bright">Bright</option><option value="soft">Soft</option></select></div>
+      <div class="capture-tabs"><button data-mode="photo">PHOTO</button><button data-mode="video">VIDEO</button><button data-mode="voice">VOICE</button></div>
+      <div id="cameraFilterBar" class="camera-filter-bar" aria-label="Camera filters">
+        <button type="button" data-camera-filter="normal" class="active">Normal</button>
+        <button type="button" data-camera-filter="beauty">Beauty / Smooth</button>
+        <button type="button" data-camera-filter="warm">Warm</button>
+        <button type="button" data-camera-filter="cool">Cool</button>
+        <button type="button" data-camera-filter="bw">Black &amp; White</button>
+        <button type="button" data-camera-filter="bright">Bright</button>
+        <button type="button" data-camera-filter="soft">Soft contrast</button>
+      </div>
+      <select id="cameraFilterSelect" class="camera-filter-select hidden" aria-label="Camera filter"><option value="normal">Normal</option><option value="beauty">Beauty / Smooth</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="bw">Black &amp; White</option><option value="bright">Bright</option><option value="soft">Soft contrast</option></select>
       <div class="capture-actions"><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button">↻</button></div>
     </div>
   </section>
@@ -387,6 +397,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6774"></script>
+  <script src="app.js?v=6775"></script>
 </body>
 </html>
