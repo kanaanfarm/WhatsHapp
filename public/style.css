@@ -1631,7 +1631,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #captureVideo{transform-origin:center center}
 
 
-/* Build 6790 — dedicated voice recording preview/send panel */
+/* Build 6791 — dedicated voice recording preview/send panel */
 .voice-record-panel{
   margin:6px 12px 0;
   padding:9px 12px;
@@ -1655,7 +1655,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6790 — voice panel visible above composer on desktop/mobile */
+/* Build 6791 — voice panel visible above composer on desktop/mobile */
 .composer{
   flex-wrap:wrap;
   overflow:visible!important;
@@ -1685,4 +1685,82 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   .voice-record-live{min-width:0;flex:1}
   .voice-record-actions{margin-left:auto}
   .voice-record-panel audio{flex:0 0 100%;width:100%;order:5}
+}
+
+
+/* Build 6791 — voice Send arrow + desktop composer visibility */
+.workspace-chat .composer{
+  display:grid!important;
+  grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
+  grid-template-areas:
+    "voice voice voice voice voice voice"
+    "emoji attach camera entry mic send"!important;
+  align-items:center!important;
+  overflow:visible!important;
+  flex-wrap:initial!important;
+}
+.workspace-chat .composer > #voiceRecordPanel{
+  grid-area:voice!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0 0 8px 0!important;
+  padding:10px 12px!important;
+  box-sizing:border-box!important;
+  position:relative!important;
+  inset:auto!important;
+  transform:none!important;
+  z-index:30!important;
+  display:flex;
+}
+.workspace-chat .composer > #voiceRecordPanel.hidden{display:none!important}
+.workspace-chat .composer > #emojiBtn{grid-area:emoji!important}
+.workspace-chat .composer > #attachBtn{grid-area:attach!important}
+.workspace-chat .composer > #cameraBtn{grid-area:camera!important}
+.workspace-chat .composer > .message-entry{grid-area:entry!important;min-width:0!important}
+.workspace-chat .composer > #recordBtn{
+  grid-area:mic!important;
+  display:grid!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:relative!important;
+  inset:auto!important;
+  transform:none!important;
+  z-index:31!important;
+}
+.workspace-chat .composer.has-text > #recordBtn{display:none!important}
+.workspace-chat .composer > #sendBtn{grid-area:send!important}
+.voice-record-actions #voiceRecordSend{
+  width:50px!important;
+  height:50px!important;
+  border-radius:50%!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  background:#00a884!important;
+  color:#fff!important;
+  font-size:24px!important;
+  border:0!important;
+}
+.voice-record-actions #voiceRecordSend:not(.hidden){display:inline-flex!important}
+.voice-record-actions #voiceRecordSend.hidden{display:none!important}
+
+@media(max-width:760px){
+  .workspace-chat .composer{
+    grid-template-columns:auto auto auto minmax(0,1fr) auto!important;
+    grid-template-areas:
+      "voice voice voice voice voice"
+      "emoji attach camera entry mic"!important;
+  }
+  .workspace-chat .composer > #sendBtn{display:none!important}
+  .workspace-chat .composer > #voiceRecordPanel{
+    flex-wrap:wrap!important;
+    width:100%!important;
+  }
+  .workspace-chat .composer > #recordBtn{
+    display:grid!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .workspace-chat .composer.has-text > #recordBtn{display:none!important}
+  .voice-record-panel audio{order:3;flex:0 0 100%!important;width:100%!important}
 }

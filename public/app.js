@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6790"}
+    data:{url:"/?v=6791"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6790: call video is processed into true left/right orientation.
+  // Build 6791: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1581,7 +1581,7 @@ function resetVoiceRecorderUi(){
   if(audio){audio.pause();audio.removeAttribute("src");audio.load();audio.classList.add("hidden")}
   $("voiceRecordPanel").classList.add("hidden");
   $("voiceRecordStop").classList.remove("hidden");
-  $("voiceRecordSend").classList.add("hidden");
+  $("voiceRecordSend").classList.add("hidden");$("voiceRecordSend").style.display="none";
   $("voiceRecordState").textContent="Recording voice";
   $("voiceRecordTimer").textContent="00:00";
   $("recordBtn").classList.remove("recording");
@@ -1604,7 +1604,7 @@ function showVoicePreview(blob,file){
   audio.src=voicePendingUrl;audio.classList.remove("hidden");audio.load();
   $("voiceRecordPanel").classList.remove("hidden");
   $("voiceRecordStop").classList.add("hidden");
-  $("voiceRecordSend").classList.remove("hidden");
+  $("voiceRecordSend").classList.remove("hidden");$("voiceRecordSend").style.display="inline-flex";
   $("voiceRecordState").textContent="Voice ready";
   $("recordBtn").classList.remove("recording");
 }
@@ -1657,7 +1657,6 @@ function stopVoiceHoldRecording(){
   $("voiceRecordState").textContent="Finishing…";
   $("voiceRecordStop").classList.add("hidden");
   if(mediaRecorder?.state==="recording"){
-    try{mediaRecorder.requestData()}catch{}
     try{mediaRecorder.stop()}catch{
       voiceRecordingStopping=false;isRecording=false;
       voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;

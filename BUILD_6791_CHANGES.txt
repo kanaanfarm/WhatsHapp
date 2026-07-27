@@ -1,0 +1,16 @@
+Build 6791 — voice recorder fixes based on tested Build 6790.
+
+Mobile:
+- Send arrow is explicitly shown after Stop when the audio preview is ready.
+- Avoids forcing MediaRecorder.requestData() immediately before stop.
+
+Desktop:
+- Composer layout is explicitly rebuilt with a dedicated voice-panel row.
+- Microphone button is forced back into its correct visible position.
+- Voice panel stays fully above the normal message controls.
+
+Unchanged:
+- Photo/video filters and orientation
+- Camera recorder
+- Calls, login, notifications
+- Server upload/media handling
