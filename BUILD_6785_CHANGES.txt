@@ -1,0 +1,6 @@
+Build 6785 — front-camera VIDEO RECORDING orientation fix only.
+
+- The processed video recording canvas now mirrors front-camera frames the same way as the corrected Build 6784 photo.
+- The recorded/sent selfie video should match the corrected selfie orientation.
+- Rear-camera recording is unchanged.
+- Photo orientation/filter, video filters, login, chat, calls, notifications, upload and server handling are unchanged.

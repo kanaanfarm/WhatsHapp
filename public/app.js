@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6784"}
+    data:{url:"/?v=6785"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6784: call video is processed into true left/right orientation.
+  // Build 6785: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1773,6 +1773,10 @@ function buildFilteredVideoRecordingStream(){
     if(!captureFilterCanvas||!captureStream?.active)return;
     ctx.save();
     ctx.filter=captureFilterCss();
+    if(captureFacing==="user"){
+      ctx.translate(canvas.width,0);
+      ctx.scale(-1,1);
+    }
     ctx.drawImage(live,0,0,canvas.width,canvas.height);
     ctx.restore();
     captureFilterFrame=requestAnimationFrame(draw);
