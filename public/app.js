@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6792"}
+    data:{url:"/?v=6793"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6792: call video is processed into true left/right orientation.
+  // Build 6793: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1644,7 +1644,7 @@ async function startVoiceHoldRecording(){
       },mobileVoice?350:120);
     };
     const mobileVoice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||"")||window.matchMedia?.("(max-width: 760px)")?.matches;
-    mediaRecorder.start(mobileVoice?250:undefined);
+    if(mobileVoice)mediaRecorder.start(250);else mediaRecorder.start();
     isRecording=true;showVoiceRecordingUi();
   }catch{
     voiceRecordingStream?.getTracks().forEach(t=>t.stop());voiceRecordingStream=null;

@@ -1631,7 +1631,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #captureVideo{transform-origin:center center}
 
 
-/* Build 6792 — dedicated voice recording preview/send panel */
+/* Build 6793 — dedicated voice recording preview/send panel */
 .voice-record-panel{
   margin:6px 12px 0;
   padding:9px 12px;
@@ -1655,7 +1655,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6792 — voice panel visible above composer on desktop/mobile */
+/* Build 6793 — voice panel visible above composer on desktop/mobile */
 .composer{
   flex-wrap:wrap;
   overflow:visible!important;
@@ -1688,7 +1688,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6792 — voice Send arrow + desktop composer visibility */
+/* Build 6793 — voice Send arrow + desktop composer visibility */
 .workspace-chat .composer{
   display:grid!important;
   grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
@@ -1766,7 +1766,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 }
 
 
-/* Build 6792 — MOBILE voice flow only */
+/* Build 6793 — MOBILE voice flow only */
 @media(max-width:760px){
   #voiceRecordPanel{
     display:flex;
@@ -1796,5 +1796,92 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
     opacity:1!important;
     position:relative!important;
     z-index:50!important;
+  }
+}
+
+
+/* Build 6793 — LAPTOP/Desktop voice recorder fix only */
+@media(min-width:761px){
+  .workspace-chat .composer{
+    display:grid!important;
+    grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
+    grid-template-areas:
+      "voice voice voice voice voice voice"
+      "emoji attach camera entry mic send"!important;
+    align-items:center!important;
+    overflow:visible!important;
+    position:absolute!important;
+    left:16px!important;
+    right:16px!important;
+    bottom:14px!important;
+    height:auto!important;
+    min-height:64px!important;
+  }
+
+  .workspace-chat .composer > #voiceRecordPanel{
+    grid-area:voice!important;
+    display:flex;
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    position:relative!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    margin:0 0 8px 0!important;
+    padding:10px 12px!important;
+    z-index:50!important;
+    background:#fff!important;
+    border:1px solid rgba(120,130,150,.22)!important;
+    border-radius:14px!important;
+    box-shadow:0 6px 20px rgba(20,30,50,.08)!important;
+  }
+  .workspace-chat .composer > #voiceRecordPanel.hidden{display:none!important}
+
+  .workspace-chat .composer > #emojiBtn{grid-area:emoji!important}
+  .workspace-chat .composer > #attachBtn{grid-area:attach!important}
+  .workspace-chat .composer > #cameraBtn{grid-area:camera!important}
+  .workspace-chat .composer > .message-entry{grid-area:entry!important;min-width:0!important}
+
+  .workspace-chat .composer > #recordBtn{
+    grid-area:mic!important;
+    display:grid!important;
+    place-items:center!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    inset:auto!important;
+    transform:none!important;
+    width:44px!important;
+    height:44px!important;
+    z-index:60!important;
+  }
+  .workspace-chat .composer.has-text > #recordBtn{display:none!important}
+
+  .workspace-chat .composer > #sendBtn{
+    grid-area:send!important;
+  }
+
+  #voiceRecordPreview:not(.hidden){
+    display:block!important;
+    flex:1 1 280px!important;
+    min-width:220px!important;
+    height:38px!important;
+  }
+
+  #voiceRecordSend:not(.hidden){
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:50px!important;
+    height:50px!important;
+    border-radius:50%!important;
+    background:#00a884!important;
+    color:#fff!important;
+    border:0!important;
+    font-size:24px!important;
+    visibility:visible!important;
+    opacity:1!important;
   }
 }

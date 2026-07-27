@@ -1,0 +1,17 @@
+Build 6793 — laptop/desktop voice recorder fix only, based on working mobile Build 6792.
+
+Desktop:
+- Mic button forced into correct visible composer position.
+- Voice recording panel spans a dedicated row above normal message controls.
+- Preview player and Send arrow are forced visible after Stop.
+- Desktop MediaRecorder uses normal start()/stop() final-blob flow.
+
+Mobile:
+- Working Build 6792 voice logic remains unchanged.
+
+Other confirmed systems unchanged:
+- Photo/video filters
+- Photo/video orientation
+- Camera recorder
+- Calls, login, notifications
+- Server upload/media handling
