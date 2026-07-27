@@ -1,0 +1,10 @@
+ConnectChat Pro v6.7.3 Build 6772
+
+Changes:
+- Strong in-app missed-call popup when an offline missed call is delivered on app open/reconnect.
+- Calls workspace highlights missed incoming calls in red.
+- Missed-call count badge on Calls navigation.
+- High-priority persistent/vibrating push presentation for call notifications where supported.
+- Working media send/recording path from Build 6767 was not changed.
+
+After deploy verify /health reports build 6772.

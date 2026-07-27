@@ -23,7 +23,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6771";
+const APP_BUILD = "6772";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2847,7 +2847,7 @@ io.on("connection", async socket => {
           caller_id: userId, receiver_id: receiverId, mode, status: "missed"
         });
         if (error) throw error;
-        const pushResult = await sendPushToUser(receiverId, { type: "call", title: `Incoming ${mode === "video" ? "video" : "voice"} call`, body: `${username} is calling you`, tag: `incoming-call-${userId}`, url: "/?callFrom="+userId });
+        const pushResult = await sendPushToUser(receiverId, { type: "call", title: `Incoming ${mode === "video" ? "video" : "voice"} call`, body: `${username} is calling you`, tag: `incoming-call-${userId}`, url: `/?missedCall=1&callFrom=${userId}&mode=${mode}` });
         return socket.emit("call:queued", { receiverId, receiverName: receiver.username, mode, deliveredNow: Number(pushResult?.sent || 0) > 0 });
       } catch (error) {
         console.error("Could not save missed call:", error);

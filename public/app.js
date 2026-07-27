@@ -176,7 +176,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6771"}
+    data:{url:"/?v=6772"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -569,7 +569,9 @@ function connectSocket(){
     const mode=payload?.mode==="video"?"video":"voice";
     toast(`Missed ${mode} call from ${payload?.callerName||"a ConnectChat user"}.`);
     showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`);
+    showMissedCallAlert(payload);
     if(currentWorkspaceSection==="calls")renderCallsWorkspace();
+    else refreshCallsBadge();
   });
   socket.on("message:error",p=>toast(p.error||"Message could not be sent."));
 }
@@ -869,6 +871,31 @@ function showIncomingCall(data){
   if(!callsEnabled||peer||pendingCall){socket.emit("call:reject",{receiverId:data.callerId});return}
   pendingCall=data;callPeerId=data.callerId;callMode=data.mode;
   showCallUi(data.callerName,`Incoming ${data.mode} call`,data.mode,true);
+}
+
+function showMissedCallAlert(payload){
+  const existing=document.getElementById("missedCallAlert");if(existing)existing.remove();
+  const mode=payload?.mode==="video"?"video":"voice";
+  const caller=payload?.callerName||"ConnectChat user";
+  const when=payload?.startedAt?time(payload.startedAt):"Just now";
+  const overlay=document.createElement("div");
+  overlay.id="missedCallAlert";overlay.className="missed-call-alert-overlay";
+  overlay.innerHTML=`<div class="missed-call-alert-card" role="alertdialog" aria-modal="true" aria-label="Missed call"><div class="missed-call-alert-icon">${mode==="video"?VIDEO_ICON_SVG:PHONE_ICON_SVG}</div><div class="missed-call-alert-copy"><small>Missed ${mode} call</small><h2>${sectionEscape(caller)}</h2><p>${sectionEscape(when)}</p></div><div class="missed-call-alert-actions"><button type="button" class="secondary" data-action="dismiss">Dismiss</button><button type="button" data-action="calls">View calls</button></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-action="dismiss"]').onclick=()=>overlay.remove();
+  overlay.querySelector('[data-action="calls"]').onclick=async()=>{overlay.remove();await openWorkspaceSection("calls")};
+  if(navigator.vibrate)try{navigator.vibrate([250,120,250,120,450])}catch{}
+}
+
+async function refreshCallsBadge(){
+  try{
+    const calls=await api("/api/calls");
+    const count=(calls||[]).filter(c=>String(c.status).toLowerCase()==="missed"&&Number(c.receiver_id)===Number(me.id)).length;
+    const btn=document.querySelector('[data-section="calls"]');if(!btn)return;
+    let badge=btn.querySelector(".calls-missed-badge");
+    if(count){if(!badge){badge=document.createElement("b");badge.className="calls-missed-badge";btn.appendChild(badge)}badge.textContent=count>99?"99+":String(count);btn.classList.add("has-missed-calls")}
+    else{badge?.remove();btn.classList.remove("has-missed-calls")}
+  }catch{}
 }
 
 async function acceptIncomingCall(){
@@ -2445,8 +2472,18 @@ async function renderCallsWorkspace(){
   $("sectionContent").innerHTML=`<div class="workspace-loading">Loading call history…</div>`;
   try{
     const calls=await api("/api/calls");
-    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls</h2><p>Call history and quick calling with approved contacts.</p></div>${calls.length?'<button id="clearCallHistoryBtn" type="button" class="danger-link">🗑 Clear call history</button>':""}</div>${renderPeopleCards("Call","call")}<h2 class="workspace-subtitle">Recent call history</h2>${calls.length?`<div class="workspace-list">${calls.map(c=>{const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;return `<article><div class="workspace-list-icon call-symbol">${c.mode==="video"?VIDEO_ICON_SVG:PHONE_ICON_SVG}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p>${sectionEscape(c.status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`}).join("")}</div>`:workspaceEmpty(PHONE_ICON_SVG,"No calls yet","Voice and video calls will appear here.")}`;
+    const missedCount=(calls||[]).filter(c=>String(c.status).toLowerCase()==="missed"&&Number(c.receiver_id)===Number(me.id)).length;
+    const history=calls.length?`<div class="workspace-list call-history-list">${calls.map(c=>{
+      const incoming=Number(c.receiver_id)===Number(me.id);
+      const missed=String(c.status).toLowerCase()==="missed"&&incoming;
+      const other=Number(c.caller_id)===Number(me.id)?c.receiver:c.caller;
+      const type=c.mode==="video"?"Video":"Voice";
+      const status=missed?`Missed ${type.toLowerCase()} call`:String(c.status||"Call");
+      return `<article class="call-history-item${missed?" missed-call-item":""}"><div class="workspace-list-icon call-symbol">${c.mode==="video"?VIDEO_ICON_SVG:PHONE_ICON_SVG}</div><div><h3>${sectionEscape(other?.username||"User")}</h3><p class="call-history-status">${sectionEscape(status)} · ${sectionEscape(time(c.started_at))}</p></div></article>`
+    }).join("")}</div>`:workspaceEmpty(PHONE_ICON_SVG,"No calls yet","Voice and video calls will appear here.");
+    $("sectionContent").innerHTML=`<div class="workspace-toolbar"><div><h2>Calls${missedCount?` <span class="missed-call-heading-count">${missedCount} missed</span>`:""}</h2><p>Call history and quick calling with approved contacts.</p></div>${calls.length?'<button id="clearCallHistoryBtn" type="button" class="danger-link">🗑 Clear call history</button>':""}</div>${renderPeopleCards("Call","call")}<h2 class="workspace-subtitle">Recent call history</h2>${history}`;
     bindWorkspaceUserActions();
+    await refreshCallsBadge();
     if($("clearCallHistoryBtn"))$("clearCallHistoryBtn").onclick=async()=>{
       if(!confirm("Clear your complete call history? This cannot be undone."))return;
       const button=$("clearCallHistoryBtn");
