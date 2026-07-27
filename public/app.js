@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6786"}
+    data:{url:"/?v=6787"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6786: call video is processed into true left/right orientation.
+  // Build 6787: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1761,6 +1761,45 @@ function stopCaptureProcessedStream(){
   if(captureProcessedStream){captureProcessedStream.getTracks().forEach(t=>t.stop());captureProcessedStream=null}
   captureFilterCanvas=null;
 }
+
+function applyVideoPixelFilter(ctx,width,height,filterName){
+  if(!ctx||filterName==="normal")return;
+  let image;
+  try{image=ctx.getImageData(0,0,width,height)}catch{return}
+  const d=image.data;
+  for(let i=0;i<d.length;i+=4){
+    let r=d[i],g=d[i+1],b=d[i+2];
+
+    if(filterName==="bw"){
+      const y=.299*r+.587*g+.114*b;
+      r=g=b=y;
+    }else if(filterName==="warm"){
+      r=r*1.08+10; g=g*1.02+3; b=b*.90;
+    }else if(filterName==="cool"){
+      r=r*.94; g=g*1.01+2; b=b*1.09+8;
+    }else if(filterName==="bright"){
+      r=r*1.16; g=g*1.16; b=b*1.16;
+    }else if(filterName==="soft"){
+      r=(r-128)*.88+128+8;
+      g=(g-128)*.88+128+8;
+      b=(b-128)*.88+128+8;
+    }else if(filterName==="beauty"){
+      const avg=(r+g+b)/3;
+      r=((r-128)*.94+128)*1.06;
+      g=((g-128)*.94+128)*1.06;
+      b=((b-128)*.94+128)*1.06;
+      r=avg+(r-avg)*1.04;
+      g=avg+(g-avg)*1.04;
+      b=avg+(b-avg)*1.04;
+    }
+
+    d[i]=Math.max(0,Math.min(255,r));
+    d[i+1]=Math.max(0,Math.min(255,g));
+    d[i+2]=Math.max(0,Math.min(255,b));
+  }
+  ctx.putImageData(image,0,0);
+}
+
 function buildFilteredVideoRecordingStream(){
   const live=$("captureVideo");
   if(!live||!live.videoWidth||!live.videoHeight||!live.captureStream&&typeof document.createElement("canvas").captureStream!=="function")return null;
@@ -1772,13 +1811,15 @@ function buildFilteredVideoRecordingStream(){
   const draw=()=>{
     if(!captureFilterCanvas||!captureStream?.active)return;
     ctx.save();
-    ctx.filter=captureFilterCss();
+    // Draw corrected orientation first. Do not rely on ctx.filter on mobile:
+    // the selected filter is baked into the frame pixels below.
     if(captureFacing==="user"){
       ctx.translate(canvas.width,0);
       ctx.scale(-1,1);
     }
     ctx.drawImage(live,0,0,canvas.width,canvas.height);
     ctx.restore();
+    applyVideoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
     captureFilterFrame=requestAnimationFrame(draw);
   };
   draw();

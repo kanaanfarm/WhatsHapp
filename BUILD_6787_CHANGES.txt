@@ -1,0 +1,8 @@
+Build 6787 — MOBILE video filter persistence fix only, based on confirmed Build 6786.
+
+- Mobile recorded video now bakes the selected filter into every processed recording frame.
+- Uses pixel processing rather than relying on CanvasRenderingContext2D.filter, which is unreliable on some mobile browsers.
+- Front-camera video orientation correction from Build 6785 is preserved.
+- Mobile photo filter persistence from Build 6786 is unchanged.
+- Microphone audio remains part of recorded video.
+- Login, chat, calls, notifications, upload and server handling are unchanged.
