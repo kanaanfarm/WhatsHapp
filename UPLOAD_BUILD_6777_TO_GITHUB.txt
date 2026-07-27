@@ -1,2 +1,2 @@
-ConnectChat Pro v6.7.3 Build 6777
+ConnectChat Pro v6.7.3 Build 6778
 Call camera orientation + transmitted filters fix.

@@ -1600,5 +1600,5 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 @media(max-width:800px){.camera-filter-bar{justify-content:flex-start;padding:7px 10px}.camera-filter-bar button{padding:7px 10px;font-size:12px}}
 
 
-/* Build 6777: call local preview already contains the same processed orientation/filter sent to the peer. */
+/* Build 6778: call local preview already contains the same processed orientation/filter sent to the peer. */
 #localVideo{transform:none!important;}

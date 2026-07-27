@@ -23,7 +23,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6777";
+const APP_BUILD = "6778";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2922,6 +2922,15 @@ io.on("connection", async socket => {
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validIceCandidate(payload.candidate)) {
       io.to(`user:${receiverId}`).emit("call:ice", { userId, candidate: payload.candidate });
+    }
+  });
+  socket.on("call:filter", payload => {
+    if (!CALLS_ENABLED || !payload || typeof payload !== "object") return;
+    const receiverId = Number(payload.receiverId);
+    const allowed = new Set(["normal","beauty","warm","cool","bw","bright","soft"]);
+    const filter = allowed.has(String(payload.filter || "")) ? String(payload.filter) : "normal";
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
+      io.to(`user:${receiverId}`).emit("call:filter", { userId, filter });
     }
   });
   socket.on("call:reject", payload => {

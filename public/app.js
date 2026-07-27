@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6777"}
+    data:{url:"/?v=6778"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -562,6 +562,12 @@ function connectSocket(){
     if(!peer||!peer.remoteDescription){pendingIce.push(p.candidate);return}
     try{await peer.addIceCandidate(p.candidate)}catch(e){console.warn("ICE candidate failed",e)}
   });
+  socket.on("call:filter",p=>{
+    if(Number(p?.userId)!==Number(callPeerId))return;
+    const filter=CAMERA_FILTERS[p?.filter]?p.filter:"normal";
+    const remote=$("remoteVideo");
+    if(remote)remote.style.filter=CAMERA_FILTERS[filter]||"none";
+  });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
@@ -820,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6777: call video is processed into true left/right orientation.
+  // Build 6778: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1062,6 +1068,7 @@ async function stopScreenShare(){
 }
 
 function finishCall(message="Call ended",notify=true){
+  const remoteFilterVideo=$("remoteVideo");if(remoteFilterVideo)remoteFilterVideo.style.filter="none";
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
@@ -1755,7 +1762,16 @@ async function captureMain(){
   captureAutoStopTimer=setTimeout(()=>{if(captureRecorder?.state==="recording")captureMain()},60000);
 }
 const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
-function setCameraFilter(value){cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();}
+function setCameraFilter(value){
+  cameraFilter=CAMERA_FILTERS[value]?value:"normal";
+  applyCameraFilter();
+  // Build 6778: always mirror the selected call filter to the peer UI as a
+  // signaling fallback. This makes filters visible to the other user even on
+  // iPhone/Safari versions that cannot publish a processed canvas/WebCodecs track.
+  if(peer&&callPeerId&&callMode==="video"){
+    try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter})}catch{}
+  }
+}
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.onclick=()=>setCameraFilter(btn.dataset.cameraFilter));
