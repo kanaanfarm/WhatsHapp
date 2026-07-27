@@ -1605,7 +1605,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 
 
 /* Build 6781 — Photo/Video recorder only; stable 6778 base */
-#captureOverlay .front-camera-corrected,#captureOverlay #captureVideo{transform:none!important}
+#captureOverlay .front-camera-corrected{transform:none!important}
 #captureOverlay .capture-preview{display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
 #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{display:block;object-fit:contain!important;transform:none}
 @media(max-width:800px){
@@ -1623,3 +1623,9 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay #cameraFilterSelect{flex:1;max-width:none;min-width:0;height:42px}
 #captureOverlay .capture-actions #captureSaveBtn{background:#252525}
 #captureOverlay #captureCanvas{touch-action:none}
+
+
+/* Build 6783 — recorder orientation only
+   Front-camera live preview is corrected by JS.
+   Captured photo and processed recorded video use raw camera frames (no mirror). */
+#captureOverlay #captureVideo{transform-origin:center center}

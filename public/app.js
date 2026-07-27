@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6782"}
+    data:{url:"/?v=6783"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -826,7 +826,7 @@ function applyCameraFilter(){
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6782: call video is processed into true left/right orientation.
+  // Build 6783: call video is processed into true left/right orientation.
   // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
   if(local)local.classList.remove("front-camera-corrected");
@@ -1666,7 +1666,13 @@ function stopCaptureStream(){
   }
 }
 function captureFilterCss(){return CAMERA_FILTERS[cameraFilter]||"none"}
-function applyCaptureFilterOnly(){const v=$("captureVideo");if(v)v.style.filter=captureFilterCss()}
+function applyCaptureFilterOnly(){
+  const v=$("captureVideo");
+  if(v){
+    v.style.filter=captureFilterCss();
+    v.style.transform=captureFacing==="user"?"scaleX(-1)":"none";
+  }
+}
 function setCaptureSendReady(ready){
   const send=$("captureSendBtn");send.disabled=!ready;send.classList.toggle("hidden",!ready);
   send.textContent="➤ Send";send.title="Send";send.setAttribute("aria-label","Send");
@@ -1686,7 +1692,7 @@ function resetCaptureResult(){
   $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
   $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
   $("captureSwitchBtn").classList.remove("hidden");
-  const v=$("captureVideo");v.classList.remove("hidden");v.style.transform="none";applyCaptureFilterOnly();
+  const v=$("captureVideo");v.classList.remove("hidden");applyCaptureFilterOnly();
   const voice=$("voiceWave");if(voice)voice.classList.add("hidden");
   const aud=$("captureAudio");if(aud){aud.pause();aud.removeAttribute("src");aud.load();aud.classList.add("hidden")}
 }
@@ -1713,7 +1719,7 @@ async function prepareCapture(mode){
   try{
     captureStream=await navigator.mediaDevices.getUserMedia({video:captureVideoConstraints(),audio:mode==="video"});
     const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;
-    live.classList.remove("front-camera-corrected");live.style.transform="none";applyCaptureFilterOnly();
+    live.classList.remove("front-camera-corrected");applyCaptureFilterOnly();
     await live.play().catch(()=>{});
   }catch{
     toast(mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");

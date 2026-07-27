@@ -1,0 +1,7 @@
+Build 6783 — orientation correction only, based on tested Build 6782.
+
+- Front-camera Photo/Video live recorder preview is corrected for actual left/right.
+- Captured photos remain raw/non-mirrored.
+- Filtered recorded video remains raw/non-mirrored.
+- Rear camera remains unchanged.
+- No intentional changes to filters, login, chat, calls, notifications, upload or server media handling.
