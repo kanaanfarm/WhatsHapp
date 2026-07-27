@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6795";
+const APP_BUILD = "6796";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -1245,8 +1245,9 @@ async function requestDeepSeek(message, history, signal) {
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
 
 
-app.post("/api/ai/upload", requireAuth, upload.single("file"), async (req,res)=>{
+app.post("/api/ai/upload", upload.single("file"), async (req,res)=>{
   try{
+    if(!req.session?.user)return res.status(401).json({error:"Not authenticated."});
     if(!req.file)return res.status(400).json({error:"No file uploaded."});
     const allowed = /\.(pdf|docx|xlsx?|csv|txt|pptx|png|jpe?g|webp)$/i.test(req.file.originalname||"")
       || /^(application\/pdf|text\/|image\/)/i.test(req.file.mimetype||"");
@@ -1255,7 +1256,7 @@ app.post("/api/ai/upload", requireAuth, upload.single("file"), async (req,res)=>
     const attachmentId=`aiatt-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
     aiAttachmentStore.set(attachmentId,{
       id:attachmentId,
-      userId:req.session.user.id,
+      userId:req.session?.user?.id,
       name:req.file.originalname,
       type:req.file.mimetype||"application/octet-stream",
       size:req.file.size,

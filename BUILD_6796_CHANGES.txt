@@ -1,0 +1,9 @@
+Build 6796 — AI attachment deploy fix.
+
+Root cause from Render:
+ReferenceError: requireAuth is not defined
+
+Fix:
+- Replaced the undefined requireAuth middleware on /api/ai/upload.
+- Uses an explicit session authentication check inside the AI upload route.
+- No changes to the working human chat voice, photo/video filters, orientation, calls or normal uploads.
