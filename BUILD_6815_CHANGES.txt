@@ -1,0 +1,12 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6815
+
+- Tap the small video during a call to swap it with the large video.
+- Tap the new small video to swap the two views back.
+- Each participant controls only their own screen layout.
+- Works on mobile and laptop.
+- Build 6814 front-camera orientation behavior is preserved.
+
+Deploy the contents of 01_RENDER_SERVER_WEBSITE, verify /api/health reports
+build 6815, close old tabs on both devices, then open:
+
+https://connectchat-pro-kanaan.onrender.com/?v=6815

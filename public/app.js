@@ -189,7 +189,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6814"}
+    data:{url:"/?v=6815"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -923,6 +923,26 @@ function applyRemoteOrientationCorrection(){
   if(remote)remote.style.setProperty("transform",remoteFrontOrientationCorrection?"scaleX(-1)":"none","important");
 }
 
+function setCallVideoSwap(swapped){
+  const stage=$("videoStage");
+  if(!stage||stage.classList.contains("audio-only"))return;
+  stage.classList.toggle("self-main",Boolean(swapped));
+  const local=$("localVideo"),remote=$("remoteVideo");
+  if(local)local.setAttribute("aria-label",swapped?"Your camera, large view":"Your camera, tap to enlarge");
+  if(remote)remote.setAttribute("aria-label",swapped?"Other participant, tap to enlarge":"Other participant, large view");
+}
+
+function bindCallVideoSwap(){
+  const stage=$("videoStage"),local=$("localVideo"),remote=$("remoteVideo");
+  if(!stage||!local||!remote)return;
+  local.onclick=()=>{
+    if(!stage.classList.contains("self-main")&&!stage.classList.contains("audio-only"))setCallVideoSwap(true);
+  };
+  remote.onclick=()=>{
+    if(stage.classList.contains("self-main")&&!stage.classList.contains("audio-only"))setCallVideoSwap(false);
+  };
+}
+
 function outgoingFrontOrientationCorrection(){
   // Mirror every front camera consistently for both participants.
   // Rear cameras and screen sharing remain unmirrored.
@@ -1078,7 +1098,8 @@ function showCallUi(name,status,mode,incoming=false){
   $("callOverlay").classList.remove("hidden");
   $("videoStage").classList.toggle("audio-only",mode==="audio");
   $("videoStage").classList.toggle("waiting-remote",mode==="video");
-  $("videoStage").classList.remove("local-camera-off");
+  $("videoStage").classList.remove("local-camera-off","self-main");
+  setCallVideoSwap(false);
   $("cameraToggleBtn").textContent="📹 Camera";
   $("acceptCallBtn").classList.toggle("hidden",!incoming);
   $("declineCallBtn").classList.toggle("hidden",!incoming);
@@ -1210,7 +1231,7 @@ function finishCall(message="Call ended",notify=true){
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
   stopCallVideoProcessor();
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
-  cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off")
+  cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off","self-main")
   $("localVideo").srcObject=null;$("localVideo").classList.remove("front-camera-corrected");$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
   remoteFrontOrientationCorrection=false;
@@ -3410,6 +3431,7 @@ document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onc
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden")});
 $("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").classList.add("hidden")};
 
+bindCallVideoSwap();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 (async()=>{try{me=await api("/api/me");await startApp()}catch{}})();
 
