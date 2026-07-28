@@ -1,0 +1,13 @@
+ConnectChat Pro v6.7.3 — Build 6803
+
+WHATSAPP-STYLE MOBILE CAMERA
+- Mobile portrait preview now fills the available camera screen.
+- Removed the wide landscape letterbox and black empty space.
+- Photo and recorded-video results use the same centered 9:16 crop shown in
+  the mobile preview.
+- Desktop camera preview and output remain landscape.
+
+PRESERVED
+- Build 6802 face-aware Beauty and all live-call filters.
+- Existing confirmation, upload, message, attachment and Supabase paths.
+- Corrected front-camera processing and channels-removed layout.

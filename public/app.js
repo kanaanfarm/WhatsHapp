@@ -187,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6802"}
+    data:{url:"/?v=6803"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1914,6 +1914,32 @@ function captureVideoConstraints(){
     aspectRatio:{ideal:mobile?(9/16):(4/3)}
   };
 }
+function isMobileCapture(){
+  return Boolean(window.matchMedia?.("(max-width: 800px) and (orientation: portrait)")?.matches);
+}
+function captureOutputDimensions(sourceWidth,sourceHeight){
+  if(!isMobileCapture())return {width:sourceWidth,height:sourceHeight};
+  const targetRatio=9/16;
+  if(sourceWidth/sourceHeight>targetRatio){
+    return {width:Math.max(1,Math.round(sourceHeight*targetRatio)),height:sourceHeight};
+  }
+  return {width:sourceWidth,height:Math.max(1,Math.round(sourceWidth/targetRatio))};
+}
+function drawCaptureCover(ctx,source,destinationWidth,destinationHeight){
+  const sourceWidth=source.videoWidth||source.displayWidth||source.width||destinationWidth;
+  const sourceHeight=source.videoHeight||source.displayHeight||source.height||destinationHeight;
+  const sourceRatio=sourceWidth/sourceHeight;
+  const destinationRatio=destinationWidth/destinationHeight;
+  let sx=0,sy=0,sw=sourceWidth,sh=sourceHeight;
+  if(sourceRatio>destinationRatio){
+    sw=sourceHeight*destinationRatio;
+    sx=(sourceWidth-sw)/2;
+  }else if(sourceRatio<destinationRatio){
+    sh=sourceWidth/destinationRatio;
+    sy=(sourceHeight-sh)/2;
+  }
+  ctx.drawImage(source,sx,sy,sw,sh,0,0,destinationWidth,destinationHeight);
+}
 function clearCapturePreviewUrl(){if(capturePreviewUrl){URL.revokeObjectURL(capturePreviewUrl);capturePreviewUrl=null}}
 function stopCaptureStream(){
   stopCaptureProcessedStream();
@@ -2064,7 +2090,8 @@ function buildFilteredVideoRecordingStream(){
   const live=$("captureVideo");
   if(!live||!live.videoWidth||!live.videoHeight||!live.captureStream&&typeof document.createElement("canvas").captureStream!=="function")return null;
   const canvas=document.createElement("canvas");
-  canvas.width=live.videoWidth;canvas.height=live.videoHeight;
+  const output=captureOutputDimensions(live.videoWidth,live.videoHeight);
+  canvas.width=output.width;canvas.height=output.height;
   const ctx=canvas.getContext("2d",{alpha:false});
   if(!ctx||typeof canvas.captureStream!=="function")return null;
   captureFilterCanvas=canvas;
@@ -2077,7 +2104,7 @@ function buildFilteredVideoRecordingStream(){
       ctx.translate(canvas.width,0);
       ctx.scale(-1,1);
     }
-    ctx.drawImage(live,0,0,canvas.width,canvas.height);
+    drawCaptureCover(ctx,live,canvas.width,canvas.height);
     ctx.restore();
     applyVideoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
     captureFilterFrame=requestAnimationFrame(draw);
@@ -2133,7 +2160,8 @@ async function captureMain(){
   if(captureMode==="photo"){
     const v=$("captureVideo"),canvas=$("captureCanvas");
     if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
-    canvas.width=v.videoWidth;canvas.height=v.videoHeight;
+    const output=captureOutputDimensions(v.videoWidth,v.videoHeight);
+    canvas.width=output.width;canvas.height=output.height;
     const ctx=canvas.getContext("2d",{willReadFrequently:true});
     ctx.save();
     // Draw the same corrected orientation first.
@@ -2141,7 +2169,7 @@ async function captureMain(){
       ctx.translate(canvas.width,0);
       ctx.scale(-1,1);
     }
-    ctx.drawImage(v,0,0,canvas.width,canvas.height);
+    drawCaptureCover(ctx,v,canvas.width,canvas.height);
     ctx.restore();
     // Bake the selected filter into the JPEG pixels. This avoids mobile browsers
     // that show CSS filters in preview but ignore CanvasRenderingContext2D.filter.

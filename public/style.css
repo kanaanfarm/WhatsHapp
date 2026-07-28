@@ -1678,8 +1678,18 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 #captureOverlay .capture-preview{display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
 #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{display:block;object-fit:contain!important;transform:none}
 @media(max-width:800px){
+  #captureOverlay .capture-preview{
+    width:100%;
+    min-height:0;
+  }
   #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
-    width:auto!important;height:min(62vh,680px)!important;max-width:94vw!important;aspect-ratio:9/16
+    width:100%!important;
+    height:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    aspect-ratio:auto;
+    object-fit:cover!important;
+    object-position:center center;
   }
 }
 @media(min-width:801px){
