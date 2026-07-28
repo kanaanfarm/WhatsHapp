@@ -1,0 +1,18 @@
+ConnectChat Pro v6.7.3 — Build 6809
+
+CAMERA ORIENTATION AND FILTER DELIVERY CORRECTION
+
+- Removes the forced horizontal flip from the outgoing front-camera call video.
+- Preserves true left/right orientation: actual right remains right and actual left remains left.
+- Sends the selected filter state when starting, answering, and connecting a call.
+- Re-sends the filter state after WebRTC reconnection.
+- Ensures iPhone/iPad receivers apply the sender's selected filter when Safari
+  must use the raw-video compatibility path.
+- Keeps the adaptive Full HD request, 30 fps processing, enhanced audio, and
+  WebRTC bitrate configuration introduced in Build 6808.
+
+TEST
+
+Use two different accounts on two devices. Hold printed text in front of the
+front camera to verify it is not horizontally reversed. Select B&W, Warm, and
+Beauty one at a time and confirm the other device visibly changes.
