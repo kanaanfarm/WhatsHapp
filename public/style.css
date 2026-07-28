@@ -1590,7 +1590,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .video-stage.audio-only~.call-controls .call-filter-select{display:none}
 @media(max-width:800px){.capture-tabs{flex-wrap:wrap}.capture-tabs .camera-filter-select{flex:0 0 auto;max-width:120px;padding:7px 10px}.call-filter-select{max-width:105px;font-size:12px;padding:8px}}
 
-/* Build 6801: strong Instagram/WhatsApp-style live call filters. */
+/* Build 6802: strong live-call filters with face-aware Beauty processing. */
 .call-filter-button{
   background:linear-gradient(135deg,#6d42e8,#d63f8c)!important;
 }
@@ -1640,7 +1640,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   background:linear-gradient(135deg,#d6a379,#553323);
 }
 .filter-normal{filter:none}
-.filter-beauty{filter:brightness(1.16) contrast(.88) saturate(1.14)}
+.filter-beauty{filter:brightness(1.06) contrast(.98) saturate(1.06)}
 .filter-warm{filter:sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08)}
 .filter-cool{filter:saturate(1.22) hue-rotate(20deg) brightness(1.08)}
 .filter-bw{filter:grayscale(1) contrast(1.28)}

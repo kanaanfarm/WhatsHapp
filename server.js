@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6801";
+const APP_BUILD = "6802";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -149,7 +149,7 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "blob:", supabaseOrigin],
       mediaSrc: ["'self'", "blob:", supabaseOrigin],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
       styleSrc: ["'self'"],
       upgradeInsecureRequests: IS_PRODUCTION ? [] : null
     }

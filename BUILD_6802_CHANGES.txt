@@ -1,0 +1,15 @@
+ConnectChat Pro v6.7.3 — Build 6802
+
+FACE-AWARE BEAUTY FILTER
+- Added locally bundled MediaPipe Face Landmarker processing.
+- Beauty smooths the forehead and cheeks while preserving eyes, glasses,
+  hair, nose, mouth, moustache, beard, clothing and background detail.
+- Reduced the full-frame Beauty brightness so faces remain clear instead of
+  appearing washed out.
+- Face detection is throttled for better mobile performance.
+- GPU processing is preferred, with CPU and standard-filter fallbacks.
+
+UNCHANGED
+- Normal, Warm, Cool, B&W, Bright and Soft live-call filters remain available.
+- Chat photo, video, voice, attachment and message upload paths are unchanged.
+- Channels remain removed.

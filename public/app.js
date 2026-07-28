@@ -10,7 +10,7 @@ let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
 const CAMERA_FILTERS={
   normal:"none",
-  beauty:"brightness(1.16) contrast(.88) saturate(1.14) blur(.35px)",
+  beauty:"brightness(1.06) contrast(.98) saturate(1.06)",
   warm:"sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08) contrast(1.04)",
   cool:"saturate(1.22) hue-rotate(20deg) brightness(1.08) contrast(1.06)",
   bw:"grayscale(1) contrast(1.28) brightness(1.05)",
@@ -187,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6801"}
+    data:{url:"/?v=6802"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -882,7 +882,9 @@ async function buildCallProcessedStream(rawStream){
       ctx.save();ctx.clearRect(0,0,w,h);ctx.filter=CAMERA_FILTERS[cameraFilter]||"none";
       if(currentFacingMode==="user"){ctx.translate(w,0);ctx.scale(-1,1)}
       try{ctx.drawImage(source,0,0,w,h)}catch{}
-      ctx.restore();callProcessorRaf=requestAnimationFrame(draw);
+      ctx.restore();
+      if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
+      callProcessorRaf=requestAnimationFrame(draw);
     };
     draw();
     const videoTrack=canvas.captureStream(24).getVideoTracks()[0];
@@ -917,6 +919,7 @@ async function buildCallProcessedStream(rawStream){
             c.save();c.clearRect(0,0,w,h);c.filter=CAMERA_FILTERS[cameraFilter]||"none";
             if(currentFacingMode==="user"){c.translate(w,0);c.scale(-1,1)}
             c.drawImage(frame,0,0,w,h);c.restore();
+            if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
             const out=new VideoFrame(canvas,{timestamp:frame.timestamp||0,duration:frame.duration||undefined});
             await callTrackWriter.write(out);out.close();
           }catch(error){console.warn("Mobile call video frame processing failed",error)}
