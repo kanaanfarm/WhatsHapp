@@ -188,7 +188,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6807"}
+    data:{url:"/?v=6808"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -249,7 +249,10 @@ function startNetworkQualityMonitor(){
 window.addEventListener("online",measureNetworkQuality);
 window.addEventListener("offline",measureNetworkQuality);
 const browserConnection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
-browserConnection?.addEventListener?.("change",measureNetworkQuality);
+browserConnection?.addEventListener?.("change",()=>{
+  measureNetworkQuality();
+  configureVideoSenderQuality().catch(()=>{});
+});
 function setMode(mode){
   authMode=mode;
   $("loginTab").classList.toggle("active",mode==="login");
@@ -819,11 +822,63 @@ async function getIceConfig(){
 }
 
 let currentFacingMode="user";
+function callAudioConstraints(){
+  return {echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1};
+}
+function callVideoConstraints(quality="hd"){
+  const full=quality==="full-hd";
+  return {
+    facingMode:{ideal:currentFacingMode},
+    width:{ideal:full?1920:1280},
+    height:{ideal:full?1080:720},
+    frameRate:{ideal:30,max:30}
+  };
+}
+function tuneVideoTrack(track){
+  if(!track)return;
+  try{track.contentHint="detail"}catch{}
+}
 async function getMedia(mode){
-  const video=mode==="video"
-    ?{facingMode:{ideal:currentFacingMode},width:{ideal:1280},height:{ideal:720}}
-    :false;
-  return navigator.mediaDevices.getUserMedia({audio:true,video});
+  if(mode!=="video")return navigator.mediaDevices.getUserMedia({audio:callAudioConstraints(),video:false});
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:callAudioConstraints(),video:callVideoConstraints("full-hd")});
+    tuneVideoTrack(stream.getVideoTracks()[0]);
+    return stream;
+  }catch(error){
+    if(error?.name==="NotAllowedError"||error?.name==="SecurityError")throw error;
+    const stream=await navigator.mediaDevices.getUserMedia({audio:callAudioConstraints(),video:callVideoConstraints("hd")});
+    tuneVideoTrack(stream.getVideoTracks()[0]);
+    return stream;
+  }
+}
+
+function preferredVideoBitrate(){
+  const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  const effective=connection?.effectiveType||"";
+  const downlink=Number(connection?.downlink||0);
+  if(!navigator.onLine||effective==="slow-2g"||effective==="2g")return 650000;
+  if(effective==="3g"||(downlink>0&&downlink<2.5))return 1500000;
+  return window.innerWidth<=800?3000000:4000000;
+}
+
+async function configureVideoSenderQuality(pc=peer){
+  const sender=pc?.getSenders?.().find(item=>item.track?.kind==="video");
+  if(!sender?.getParameters||!sender?.setParameters)return;
+  const parameters=sender.getParameters();
+  if(!parameters.encodings?.length)parameters.encodings=[{}];
+  parameters.encodings[0].maxBitrate=preferredVideoBitrate();
+  parameters.encodings[0].maxFramerate=30;
+  parameters.degradationPreference="maintain-resolution";
+  try{
+    await sender.setParameters(parameters);
+  }catch(error){
+    try{
+      delete parameters.degradationPreference;
+      await sender.setParameters(parameters);
+    }catch(fallbackError){
+      console.warn("Adaptive call quality is unavailable on this browser",fallbackError);
+    }
+  }
 }
 
 function applyCameraFilter(){
@@ -901,8 +956,9 @@ async function buildCallProcessedStream(rawStream){
       callProcessorRaf=requestAnimationFrame(draw);
     };
     draw();
-    const videoTrack=canvas.captureStream(24).getVideoTracks()[0];
+    const videoTrack=canvas.captureStream(30).getVideoTracks()[0];
     if(videoTrack){
+      tuneVideoTrack(videoTrack);
       callProcessorVideo=source;callProcessorCanvas=canvas;
       callProcessedStream=new MediaStream([videoTrack,...rawStream.getAudioTracks()]);
       callFilterBakedForPeer=true;
@@ -1016,6 +1072,7 @@ async function startCall(mode){
     $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(callPeerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
+    await configureVideoSenderQuality(peer);
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
     socket.emit("call:start",{receiverId:callPeerId,mode,offer});
   }catch(e){finishCall("Could not start call",false);toast("Camera and microphone permission is required.")}
@@ -1062,6 +1119,7 @@ async function acceptIncomingCall(){
     $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(data.callerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
+    await configureVideoSenderQuality(peer);
     await peer.setRemoteDescription(data.offer);
     await flushPendingIce();
     const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
@@ -1080,6 +1138,7 @@ async function toggleScreenShare(){
     if(!sender)throw new Error("Video sender is unavailable");
     cameraVideoTrack=sender.track;
     await sender.replaceTrack(screenTrack);
+    await configureVideoSenderQuality(peer);
     $("localVideo").srcObject=screenStream;$("localVideo").classList.remove("front-camera-corrected");$("localVideo").style.filter="none";
     $("videoStage").classList.add("screen-sharing");
     button.textContent="⏹ Stop sharing";button.classList.add("share-active");
@@ -1095,6 +1154,7 @@ async function stopScreenShare(){
   const sender=peer?.getSenders().find(x=>x.track&&x.track.kind==="video");
   const returnTrack=cameraVideoTrack||localStream?.getVideoTracks()[0];
   try{if(sender&&returnTrack)await sender.replaceTrack(returnTrack)}catch{}
+  await configureVideoSenderQuality(peer);
   screenStream.getTracks().forEach(t=>t.stop());screenStream=null;
   $("localVideo").srcObject=localStream;syncFrontCameraOrientation();
   $("videoStage").classList.remove("screen-sharing");
@@ -1164,17 +1224,19 @@ $("switchCameraBtn").onclick=async()=>{
     button.disabled=true;
     currentFacingMode=currentFacingMode==="user"?"environment":"user";
     const replacement=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:currentFacingMode},width:{ideal:1280},height:{ideal:720}},
+      video:callVideoConstraints("full-hd"),
       audio:false
     });
     const newTrack=replacement.getVideoTracks()[0];
     if(!newTrack)throw new Error("Camera track unavailable");
+    tuneVideoTrack(newTrack);
     const sender=peer.getSenders().find(item=>item.track?.kind==="video");
     localStream?.getVideoTracks().forEach(track=>{localStream.removeTrack(track);track.stop()});
     localStream.addTrack(newTrack);
     const rebuilt=await buildCallProcessedStream(localStream);
     const processedTrack=rebuilt.getVideoTracks()[0]||newTrack;
     if(sender)await sender.replaceTrack(processedTrack);
+    await configureVideoSenderQuality(peer);
     $("localVideo").srcObject=localStream;
     syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});

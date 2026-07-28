@@ -1,0 +1,20 @@
+ConnectChat Pro v6.7.3 — Build 6808
+
+ADAPTIVE HD CALL QUALITY
+
+- Requests Full HD (1920x1080) camera video at up to 30 fps when supported.
+- Falls back safely to HD (1280x720) on devices without Full HD capture.
+- Raises processed-filter video from 24 fps to 30 fps.
+- Uses a detail-oriented video track hint for clearer faces and edges.
+- Configures WebRTC for up to 4 Mbps on desktop and 3 Mbps on mobile.
+- Reduces bitrate adaptively on 3G, 2G, and weak connections.
+- Prefers maintaining resolution when bandwidth becomes constrained.
+- Reapplies quality settings after camera switching, screen sharing, and connection changes.
+- Enables echo cancellation, noise suppression, and automatic microphone gain.
+- Preserves the iPhone remote-filter compatibility from Build 6807.
+
+DEPLOYMENT
+
+Upload only the contents of 01_RENDER_SERVER_WEBSITE to the Render-connected
+GitHub repository. After Render finishes, verify /api/health reports build 6808,
+then open the site with ?v=6808 on both devices and fully close older tabs.
