@@ -1590,6 +1590,76 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .video-stage.audio-only~.call-controls .call-filter-select{display:none}
 @media(max-width:800px){.capture-tabs{flex-wrap:wrap}.capture-tabs .camera-filter-select{flex:0 0 auto;max-width:120px;padding:7px 10px}.call-filter-select{max-width:105px;font-size:12px;padding:8px}}
 
+/* Build 6801: strong Instagram/WhatsApp-style live call filters. */
+.call-filter-button{
+  background:linear-gradient(135deg,#6d42e8,#d63f8c)!important;
+}
+.call-filter-tray{
+  flex:1 0 100%;
+  width:100%;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:12px;
+  overflow-x:auto;
+  padding:10px 8px 4px;
+  border-radius:18px;
+  background:rgba(7,12,24,.82);
+  backdrop-filter:blur(14px);
+  scrollbar-width:none;
+  scroll-snap-type:x proximity;
+}
+.call-filter-tray::-webkit-scrollbar{display:none}
+.call-filter-tray.hidden{display:none!important}
+.call-filter-tray button{
+  flex:0 0 70px;
+  display:grid;
+  justify-items:center;
+  gap:5px;
+  padding:5px!important;
+  border:0;
+  border-radius:14px!important;
+  background:transparent!important;
+  color:#e8edf5!important;
+  scroll-snap-align:center;
+}
+.call-filter-tray button.active{
+  color:#fff!important;
+  background:rgba(255,255,255,.14)!important;
+  outline:2px solid #fff;
+  outline-offset:1px;
+}
+.call-filter-tray button b{font-size:10px;white-space:nowrap}
+.filter-swatch{
+  display:block;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.76);
+  box-shadow:0 4px 13px rgba(0,0,0,.35);
+  background:linear-gradient(135deg,#d6a379,#553323);
+}
+.filter-normal{filter:none}
+.filter-beauty{filter:brightness(1.16) contrast(.88) saturate(1.14)}
+.filter-warm{filter:sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08)}
+.filter-cool{filter:saturate(1.22) hue-rotate(20deg) brightness(1.08)}
+.filter-bw{filter:grayscale(1) contrast(1.28)}
+.filter-bright{filter:brightness(1.38) contrast(1.08)}
+.filter-soft{filter:brightness(1.15) contrast(.76) saturate(.9)}
+.video-stage.audio-only~.call-controls .call-filter-button,
+.video-stage.audio-only~.call-controls .call-filter-tray{display:none!important}
+@media(max-width:800px){
+  .call-filter-tray{
+    grid-column:1/-1;
+    justify-content:flex-start;
+    gap:8px;
+    margin-top:2px;
+    padding:8px 5px 4px;
+  }
+  .call-filter-tray button{flex-basis:62px}
+  .filter-swatch{width:43px;height:43px}
+}
+
 /* Build 6775: true left/right front-camera preview and filter chips visible on desktop + mobile. */
 .camera-filter-bar{flex:0 0 auto;display:flex;gap:8px;overflow-x:auto;padding:8px 12px;background:#000;justify-content:center;scrollbar-width:none}
 .camera-filter-bar::-webkit-scrollbar{display:none}

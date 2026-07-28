@@ -1,0 +1,16 @@
+Build 6801 — Strong live call filters
+
+- Replaced the small call filter dropdown with an Instagram/WhatsApp-style
+  horizontal filter carousel.
+- Added clearly visible Normal, Beauty, Warm, Cool, B&W, Bright and Soft
+  effects.
+- Filters update immediately in the call preview.
+- The existing processed WebRTC video path continues applying the chosen
+  effect to the outgoing video.
+- Preserved the non-mirrored front-camera orientation.
+- No changes to chat photo/video capture, voice notes, attachments, AI,
+  notifications, calls, groups, files, sheets or database constraints.
+
+Deploy the contents of 01_RENDER_SERVER_WEBSITE.
+Verify /api/health shows "build":"6801".
+Open the application with ?v=6801.

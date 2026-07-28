@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6800">
+  <link rel="stylesheet" href="style.css?v=6801">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -284,7 +284,17 @@
         <button id="muteBtn" class="call-control hidden">🎤 Mute</button>
         <button id="cameraToggleBtn" class="call-control hidden">📹 Camera</button>
         <button id="switchCameraBtn" class="call-control hidden">🔄 Switch</button>
-        <button id="shareScreenBtn" class="call-control hidden">🖥 Share screen</button><select id="callFilterSelect" class="call-filter-select" aria-label="Camera filter"><option value="normal">Normal</option><option value="beauty">Beauty</option><option value="warm">Warm</option><option value="cool">Cool</option><option value="bw">B&amp;W</option><option value="bright">Bright</option><option value="soft">Soft</option></select>
+        <button id="shareScreenBtn" class="call-control hidden">🖥 Share screen</button>
+        <button id="callFilterBtn" class="call-control call-filter-button hidden" type="button" aria-expanded="false" aria-controls="callFilterTray">✨ Normal</button>
+        <div id="callFilterTray" class="call-filter-tray hidden" aria-label="Live camera filters">
+          <button type="button" class="active" data-call-filter="normal"><span class="filter-swatch filter-normal"></span><b>Normal</b></button>
+          <button type="button" data-call-filter="beauty"><span class="filter-swatch filter-beauty"></span><b>Beauty</b></button>
+          <button type="button" data-call-filter="warm"><span class="filter-swatch filter-warm"></span><b>Warm</b></button>
+          <button type="button" data-call-filter="cool"><span class="filter-swatch filter-cool"></span><b>Cool</b></button>
+          <button type="button" data-call-filter="bw"><span class="filter-swatch filter-bw"></span><b>B&amp;W</b></button>
+          <button type="button" data-call-filter="bright"><span class="filter-swatch filter-bright"></span><b>Bright</b></button>
+          <button type="button" data-call-filter="soft"><span class="filter-swatch filter-soft"></span><b>Soft</b></button>
+        </div>
         <button id="endCallBtn" class="end-call hidden">End call</button>
       </div>
     </div>
@@ -419,6 +429,6 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=6800"></script>
+  <script src="app.js?v=6801"></script>
 </body>
 </html>

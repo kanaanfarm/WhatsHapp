@@ -8,7 +8,15 @@ let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
-const CAMERA_FILTERS={normal:"none",beauty:"brightness(1.06) contrast(.96) saturate(1.04)",warm:"sepia(.12) saturate(1.18) hue-rotate(-6deg)",cool:"saturate(.95) hue-rotate(10deg) brightness(1.03)",bw:"grayscale(1) contrast(1.08)",bright:"brightness(1.18) contrast(1.02)",soft:"brightness(1.06) contrast(.9) saturate(.94)"};
+const CAMERA_FILTERS={
+  normal:"none",
+  beauty:"brightness(1.16) contrast(.88) saturate(1.14) blur(.35px)",
+  warm:"sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08) contrast(1.04)",
+  cool:"saturate(1.22) hue-rotate(20deg) brightness(1.08) contrast(1.06)",
+  bw:"grayscale(1) contrast(1.28) brightness(1.05)",
+  bright:"brightness(1.38) contrast(1.08) saturate(1.10)",
+  soft:"brightness(1.15) contrast(.76) saturate(.90) blur(.25px)"
+};
 let currentUserFilter="all";
 let currentWorkspaceSection="chats";
 let profileTarget=null;
@@ -179,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6800"}
+    data:{url:"/?v=6801"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -566,7 +574,9 @@ function connectSocket(){
     if(Number(p?.userId)!==Number(callPeerId))return;
     const filter=CAMERA_FILTERS[p?.filter]?p.filter:"normal";
     const remote=$("remoteVideo");
-    if(remote)remote.style.filter=CAMERA_FILTERS[filter]||"none";
+    // Processed streams already contain the effect. CSS is only a compatibility
+    // fallback for browsers that cannot generate a filtered outbound track.
+    if(remote)remote.style.filter=p?.processed?"none":(CAMERA_FILTERS[filter]||"none");
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
@@ -824,6 +834,9 @@ function applyCameraFilter(){
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
   if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
   document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.cameraFilter===cameraFilter));
+  document.querySelectorAll("[data-call-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.callFilter===cameraFilter));
+  const filterButton=$("callFilterBtn");
+  if(filterButton)filterButton.innerHTML=`✨ ${FILTER_LABELS[cameraFilter]||"Filters"}`;
 }
 
 function syncFrontCameraOrientation(){
@@ -965,6 +978,8 @@ function showCallUi(name,status,mode,incoming=false){
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("switchCameraBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
+  $("callFilterBtn")?.classList.toggle("hidden",incoming||mode==="audio");
+  if(incoming||mode==="audio")$("callFilterTray")?.classList.add("hidden");
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
 
@@ -2151,13 +2166,26 @@ async function captureMain(){
   recorder.start();$("captureOverlay").classList.add("recording");$("captureMainBtn").setAttribute("aria-label","Stop recording");startCaptureClock();
   captureAutoStopTimer=setTimeout(()=>{if(captureRecorder?.state==="recording")captureMain()},60000);
 }
+const FILTER_LABELS={normal:"Normal",beauty:"Beauty",warm:"Warm",cool:"Cool",bw:"B&W",bright:"Bright",soft:"Soft"};
 const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
 function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();applyCaptureFilterOnly();
-  if(peer&&callPeerId&&callMode==="video"){try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter})}catch{}}
+  if(peer&&callPeerId&&callMode==="video"){
+    try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter,processed:Boolean(callProcessedStream&&callProcessedStream!==localStream)})}catch{}
+  }
 }
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
+const callFilterButton=$("callFilterBtn"),callFilterTray=$("callFilterTray");
+if(callFilterButton)callFilterButton.onclick=()=>{
+  if(!callFilterTray)return;
+  callFilterTray.classList.toggle("hidden");
+  callFilterButton.setAttribute("aria-expanded",String(!callFilterTray.classList.contains("hidden")));
+};
+document.querySelectorAll("[data-call-filter]").forEach(button=>button.onclick=()=>{
+  setCameraFilter(button.dataset.callFilter);
+  button.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+});
 
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
