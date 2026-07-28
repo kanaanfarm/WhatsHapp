@@ -9,6 +9,7 @@ let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callP
 let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
 let callFilterBakedForPeer=false;
+let remoteFrontOrientationCorrection=false;
 const CAMERA_FILTERS={
   normal:"none",
   beauty:"brightness(1.12) contrast(.90) saturate(1.10)",
@@ -188,7 +189,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6811"}
+    data:{url:"/?v=6812"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -565,6 +566,8 @@ function connectSocket(){
   });
   socket.on("call:answered",async p=>{
     if(!peer||p.userId!==callPeerId)return;
+    remoteFrontOrientationCorrection=p?.correctFrontOrientation===true;
+    applyRemoteOrientationCorrection();
     await peer.setRemoteDescription(p.answer);
     await flushPendingIce();
     await configureVideoSenderQuality(peer);
@@ -584,8 +587,14 @@ function connectSocket(){
     // fallback for browsers that cannot generate a filtered outbound track.
     if(remote){
       remote.style.filter=p?.processed?"none":(CAMERA_FILTERS[filter]||"none");
-      remote.style.setProperty("transform",p?.correctFrontOrientation?"scaleX(-1)":"none","important");
+      remoteFrontOrientationCorrection=p?.correctFrontOrientation===true;
+      applyRemoteOrientationCorrection();
     }
+  });
+  socket.on("call:orientation",p=>{
+    if(Number(p?.userId)!==Number(callPeerId))return;
+    remoteFrontOrientationCorrection=p?.correctFrontOrientation===true;
+    applyRemoteOrientationCorrection();
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
@@ -895,7 +904,9 @@ function applyCameraFilter(){
   // This is reliable on iPhone and avoids showing an unfiltered self-preview.
   if(local){
     local.style.filter=screenStream?"none":css;
-    local.style.setProperty("transform",!screenStream&&currentFacingMode==="user"&&needsRemoteCallFilterFallback()?"scaleX(-1)":"none","important");
+    // Safari's local front-camera preview is already in the correct readable
+    // orientation. Do not flip the small self-preview.
+    local.style.setProperty("transform","none","important");
   }
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
@@ -904,6 +915,15 @@ function applyCameraFilter(){
   document.querySelectorAll("[data-call-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.callFilter===cameraFilter));
   const filterButton=$("callFilterBtn");
   if(filterButton)filterButton.innerHTML=`✨ ${FILTER_LABELS[cameraFilter]||"Filters"}`;
+}
+
+function applyRemoteOrientationCorrection(){
+  const remote=$("remoteVideo");
+  if(remote)remote.style.setProperty("transform",remoteFrontOrientationCorrection?"scaleX(-1)":"none","important");
+}
+
+function outgoingFrontOrientationCorrection(){
+  return callMode==="video"&&currentFacingMode==="user"&&needsRemoteCallFilterFallback()&&!callFilterBakedForPeer;
 }
 
 function syncFrontCameraOrientation(){
@@ -1084,7 +1104,7 @@ async function startCall(mode){
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
     await configureVideoSenderQuality(peer);
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
-    socket.emit("call:start",{receiverId:callPeerId,mode,offer});
+    socket.emit("call:start",{receiverId:callPeerId,mode,offer,correctFrontOrientation:outgoingFrontOrientationCorrection()});
     sendCurrentCallFilter();
   }catch(e){finishCall("Could not start call",false);toast("Camera and microphone permission is required.")}
 }
@@ -1092,6 +1112,8 @@ async function startCall(mode){
 function showIncomingCall(data){
   if(!callsEnabled||peer||pendingCall){socket.emit("call:reject",{receiverId:data.callerId});return}
   pendingCall=data;callPeerId=data.callerId;callMode=data.mode;
+  remoteFrontOrientationCorrection=data?.correctFrontOrientation===true;
+  applyRemoteOrientationCorrection();
   showCallUi(data.callerName,`Incoming ${data.mode} call`,data.mode,true);
 }
 
@@ -1134,7 +1156,7 @@ async function acceptIncomingCall(){
     await peer.setRemoteDescription(data.offer);
     await flushPendingIce();
     const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
-    socket.emit("call:answer",{receiverId:data.callerId,answer});
+    socket.emit("call:answer",{receiverId:data.callerId,answer,correctFrontOrientation:outgoingFrontOrientationCorrection()});
     sendCurrentCallFilter();
   }catch(e){socket.emit("call:reject",{receiverId:data.callerId});finishCall("Call failed",false);toast("Camera and microphone permission is required.")}
 }
@@ -1188,6 +1210,7 @@ function finishCall(message="Call ended",notify=true){
   cameraVideoTrack=null;$("shareScreenBtn").textContent="🖥 Share screen";$("shareScreenBtn").classList.remove("share-active");$("videoStage").classList.remove("screen-sharing","waiting-remote","local-camera-off")
   $("localVideo").srcObject=null;$("localVideo").classList.remove("front-camera-corrected");$("remoteVideo").srcObject=null;
   pendingCall=null;callPeerId=null;pendingIce=[];
+  remoteFrontOrientationCorrection=false;
   $("callStatus").textContent=message;
   setTimeout(()=>{$("callOverlay").classList.add("hidden");document.body.classList.remove("call-active")},500);
 }
@@ -1254,6 +1277,7 @@ $("switchCameraBtn").onclick=async()=>{
     if(sender)await sender.replaceTrack(processedTrack);
     await configureVideoSenderQuality(peer);
     sendCurrentCallFilter();
+    socket.emit("call:orientation",{receiverId:callPeerId,correctFrontOrientation:outgoingFrontOrientationCorrection()});
     $("localVideo").srcObject=localStream;
     syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});
@@ -2315,7 +2339,7 @@ function sendCurrentCallFilter(){
         receiverId:callPeerId,
         filter:cameraFilter,
         processed:callFilterBakedForPeer,
-        correctFrontOrientation:currentFacingMode==="user"&&needsRemoteCallFilterFallback()&&!callFilterBakedForPeer
+        correctFrontOrientation:outgoingFrontOrientationCorrection()
       });
     }catch{}
   }

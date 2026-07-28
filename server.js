@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6811";
+const APP_BUILD = "6812";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -2960,7 +2960,8 @@ io.on("connection", async socket => {
       callerId: userId,
       callerName: username,
       mode: payload.mode === "audio" ? "audio" : "video",
-      offer: payload.offer
+      offer: payload.offer,
+      correctFrontOrientation: payload.correctFrontOrientation === true
     });
   });
 
@@ -3011,7 +3012,11 @@ io.on("connection", async socket => {
     if (!CALLS_ENABLED || !eventAllowed(socket, "call", 40, 60 * 1000) || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validDescription(payload.answer, "answer")) {
-      io.to(`user:${receiverId}`).emit("call:answered", { userId, answer: payload.answer });
+      io.to(`user:${receiverId}`).emit("call:answered", {
+        userId,
+        answer: payload.answer,
+        correctFrontOrientation: payload.correctFrontOrientation === true
+      });
     }
   });
   socket.on("call:ice", payload => {
@@ -3031,6 +3036,16 @@ io.on("connection", async socket => {
         userId,
         filter,
         processed: payload.processed === true,
+        correctFrontOrientation: payload.correctFrontOrientation === true
+      });
+    }
+  });
+  socket.on("call:orientation", payload => {
+    if (!CALLS_ENABLED || !payload || typeof payload !== "object") return;
+    const receiverId = Number(payload.receiverId);
+    if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
+      io.to(`user:${receiverId}`).emit("call:orientation", {
+        userId,
         correctFrontOrientation: payload.correctFrontOrientation === true
       });
     }

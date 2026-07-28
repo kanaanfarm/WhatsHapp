@@ -1,0 +1,15 @@
+ConnectChat Pro v6.7.3 — Build 6812
+
+PROVEN IPHONE FRONT-CAMERA ORIENTATION
+
+Based on the LEFT/RIGHT tests:
+
+- Leaves the iPhone small self-preview unflipped so text remains readable.
+- Carries the iPhone front-camera orientation directly in the WebRTC call offer
+  and answer instead of relying only on the filter event.
+- Corrects the iPhone video once on the receiving laptop/mobile screen.
+- Re-sends orientation after reconnection and camera switching.
+- Does not flip laptop cameras, rear cameras, or screen sharing.
+- Keeps filters synchronized between both participants.
+- Keeps Archived permanently visible in the two-row filter grid.
+- No new Supabase SQL migration is required.
