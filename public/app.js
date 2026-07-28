@@ -10,7 +10,7 @@ let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
 const CAMERA_FILTERS={
   normal:"none",
-  beauty:"brightness(1.06) contrast(.98) saturate(1.06)",
+  beauty:"brightness(1.12) contrast(.90) saturate(1.10)",
   warm:"sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08) contrast(1.04)",
   cool:"saturate(1.22) hue-rotate(20deg) brightness(1.08) contrast(1.06)",
   bw:"grayscale(1) contrast(1.28) brightness(1.05)",
@@ -187,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6804"}
+    data:{url:"/?v=6805"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -2077,12 +2077,12 @@ function applyVideoPixelFilter(ctx,width,height,filterName){
       b=(b-128)*.88+128+8;
     }else if(filterName==="beauty"){
       const avg=(r+g+b)/3;
-      r=((r-128)*.94+128)*1.06;
-      g=((g-128)*.94+128)*1.06;
-      b=((b-128)*.94+128)*1.06;
-      r=avg+(r-avg)*1.04;
-      g=avg+(g-avg)*1.04;
-      b=avg+(b-avg)*1.04;
+      r=((r-128)*.90+128)*1.12+4;
+      g=((g-128)*.90+128)*1.09+3;
+      b=((b-128)*.90+128)*1.07+2;
+      r=avg+(r-avg)*1.06;
+      g=avg+(g-avg)*1.06;
+      b=avg+(b-avg)*1.06;
     }
 
     d[i]=Math.max(0,Math.min(255,r));
@@ -2113,6 +2113,7 @@ function buildFilteredVideoRecordingStream(){
     drawCaptureCover(ctx,live,canvas.width,canvas.height);
     ctx.restore();
     applyVideoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
+    if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
     captureFilterFrame=requestAnimationFrame(draw);
   };
   draw();
@@ -2147,12 +2148,11 @@ function applyPhotoPixelFilter(ctx,width,height,filterName){
       g=(g-128)*.88+128+8;
       b=(b-128)*.88+128+8;
     }else if(filterName==="beauty"){
-      // Gentle bright/low-contrast/saturation adjustment matching the existing preview.
       const avg=(r+g+b)/3;
-      r=((r-128)*.94+128)*1.06;
-      g=((g-128)*.94+128)*1.06;
-      b=((b-128)*.94+128)*1.06;
-      r=avg+(r-avg)*1.04; g=avg+(g-avg)*1.04; b=avg+(b-avg)*1.04;
+      r=((r-128)*.90+128)*1.12+4;
+      g=((g-128)*.90+128)*1.09+3;
+      b=((b-128)*.90+128)*1.07+2;
+      r=avg+(r-avg)*1.06; g=avg+(g-avg)*1.06; b=avg+(b-avg)*1.06;
     }
 
     d[i]=Math.max(0,Math.min(255,r));
@@ -2180,6 +2180,9 @@ async function captureMain(){
     // Bake the selected filter into the JPEG pixels. This avoids mobile browsers
     // that show CSS filters in preview but ignore CanvasRenderingContext2D.filter.
     applyPhotoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
+    if(cameraFilter==="beauty"&&window.ConnectChatFaceBeauty?.processStill){
+      await window.ConnectChatFaceBeauty.processStill(canvas);
+    }
     captureBlob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",.92));
     if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
     stopCaptureStream();canvas.classList.remove("hidden");v.classList.add("hidden");canvas.style.transform="scale(1)";
@@ -2207,6 +2210,7 @@ const FILTER_LABELS={normal:"Normal",beauty:"Beauty",warm:"Warm",cool:"Cool",bw:
 const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
 function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();applyCaptureFilterOnly();
+  if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.warmUp();
   if(peer&&callPeerId&&callMode==="video"){
     try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter,processed:Boolean(callProcessedStream&&callProcessedStream!==localStream)})}catch{}
   }

@@ -27,13 +27,15 @@ async function createLandmarker(delegate) {
 }
 
 function ensureReady() {
-  if (landmarker || disabled) return;
+  if (landmarker) return Promise.resolve(landmarker);
+  if (disabled) return Promise.resolve(null);
   if (!initializing) {
     initializing = createLandmarker("GPU")
       .catch(() => createLandmarker("CPU"))
       .then(instance => {
         landmarker = instance;
         document.documentElement.dataset.faceBeauty = "ready";
+        return instance;
       })
       .catch(error => {
         disabled = true;
@@ -44,6 +46,7 @@ function ensureReady() {
         initializing = null;
       });
   }
+  return initializing;
 }
 
 function faceBounds(landmarks, width, height) {
@@ -167,8 +170,28 @@ function process(canvas) {
   if (lastLandmarks) applySkinSmoothing(canvas, lastLandmarks);
 }
 
+async function processStill(canvas) {
+  if (!canvas?.width || !canvas?.height || disabled) return false;
+  const instance = landmarker || await ensureReady();
+  if (!instance) return false;
+  try {
+    const now = performance.now();
+    const result = instance.detectForVideo(canvas, now);
+    const landmarks = result?.faceLandmarks?.[0] || null;
+    if (!landmarks) return false;
+    lastDetectionAt = now;
+    lastLandmarks = landmarks;
+    applySkinSmoothing(canvas, landmarks);
+    return true;
+  } catch (error) {
+    console.warn("Face-aware photo Beauty was skipped.", error);
+    return false;
+  }
+}
+
 window.ConnectChatFaceBeauty = {
   process,
+  processStill,
   warmUp: ensureReady,
   status() {
     if (landmarker) return "ready";

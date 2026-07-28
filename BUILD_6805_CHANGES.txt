@@ -1,0 +1,14 @@
+ConnectChat Pro v6.7.3 — Build 6805
+
+STRONG MOBILE FILTERS RESTORED
+- Beauty/Smooth is clearly visible again in the mobile camera preview.
+- Face-aware Beauty is baked into captured photos.
+- Face-aware Beauty is applied to recorded video when supported.
+- The face model warms up when Beauty is selected to reduce capture delay.
+- Eyes, glasses, hair, moustache and beard remain detailed.
+
+PRESERVED
+- Build 6804 preview/result crop matching with no extra zoom.
+- WhatsApp-style mobile portrait camera layout.
+- Full live-call filter set on mobile and desktop.
+- Existing confirmation, upload, messages and Supabase media paths.

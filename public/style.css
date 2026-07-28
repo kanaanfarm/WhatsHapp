@@ -1640,7 +1640,7 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
   background:linear-gradient(135deg,#d6a379,#553323);
 }
 .filter-normal{filter:none}
-.filter-beauty{filter:brightness(1.06) contrast(.98) saturate(1.06)}
+.filter-beauty{filter:brightness(1.12) contrast(.90) saturate(1.10)}
 .filter-warm{filter:sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08)}
 .filter-cool{filter:saturate(1.22) hue-rotate(20deg) brightness(1.08)}
 .filter-bw{filter:grayscale(1) contrast(1.28)}
