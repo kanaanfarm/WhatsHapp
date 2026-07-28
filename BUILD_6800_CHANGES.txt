@@ -1,0 +1,12 @@
+Build 6800 — Channels removed
+
+- Removed Channels from website navigation.
+- Removed Channels from Android navigation.
+- Removed the Channels workspace route from the client.
+- Existing server/database channel data is left untouched for safety.
+- Chats, Groups, Calls, AI, Files, Sheets, Settings, media and notifications
+  remain unchanged from Build 6799.
+
+Deploy the contents of 01_RENDER_SERVER_WEBSITE.
+Verify /api/health shows "build":"6800".
+Open the application with ?v=6800.

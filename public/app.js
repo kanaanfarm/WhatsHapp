@@ -179,7 +179,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6799"}
+    data:{url:"/?v=6800"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -3180,7 +3180,6 @@ async function openWorkspaceSection(section){
   const titles={
     ai:["AI Assistant","Ask questions, translate text and work with documents."],
     groups:["Groups","Multi-user private conversations."],
-    channels:["Channels","Organized project and announcement spaces."],
     files:["Files","All attachments shared in your conversations."],
     calculations:["Calculation Sheets","Preview shared engineering results; administrator originals are download-protected."],
     calls:["Calls","Voice and video calling workspace."],
@@ -3197,7 +3196,6 @@ async function openWorkspaceSection(section){
   if(currentWorkspaceSection!==section)return;
   if(section==="ai")renderAIWorkspace();
   if(section==="groups")await renderGroupsWorkspace();
-  if(section==="channels")await renderChannelsWorkspace();
   if(section==="files")await renderFilesWorkspace();
   if(section==="calculations")await renderCalculationSheetsWorkspace();
   if(section==="calls")await renderCallsWorkspace();
