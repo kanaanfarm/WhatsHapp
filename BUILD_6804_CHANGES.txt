@@ -1,0 +1,12 @@
+ConnectChat Pro v6.7.3 — Build 6804
+
+CAMERA RESULT MATCHES PREVIEW
+- Mobile photo and video output now use the measured live-preview ratio.
+- Removed the additional zoom that appeared after taking a photo.
+- The result screen displays the complete saved frame without another crop.
+- What the user sees before capture now matches the saved result.
+
+PRESERVED
+- WhatsApp-style portrait camera layout from Build 6803.
+- Face-aware Beauty and the complete filter set from Build 6802.
+- Existing confirmation, upload, messages and Supabase media paths.

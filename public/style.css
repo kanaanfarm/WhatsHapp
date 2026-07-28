@@ -1691,6 +1691,10 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
     object-fit:cover!important;
     object-position:center center;
   }
+  #captureOverlay.result-ready .capture-preview video,
+  #captureOverlay.result-ready .capture-preview canvas{
+    object-fit:contain!important;
+  }
 }
 @media(min-width:801px){
   #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{

@@ -187,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6803"}
+    data:{url:"/?v=6804"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -1919,7 +1919,13 @@ function isMobileCapture(){
 }
 function captureOutputDimensions(sourceWidth,sourceHeight){
   if(!isMobileCapture())return {width:sourceWidth,height:sourceHeight};
-  const targetRatio=9/16;
+  const preview=$("capturePreview");
+  const measuredRatio=preview?.clientWidth&&preview?.clientHeight
+    ?preview.clientWidth/preview.clientHeight
+    :3/4;
+  // Match the exact portrait window shown before capture. The clamp protects
+  // against a temporary zero/abnormal layout while the overlay opens.
+  const targetRatio=Math.max(.56,Math.min(.92,measuredRatio));
   if(sourceWidth/sourceHeight>targetRatio){
     return {width:Math.max(1,Math.round(sourceHeight*targetRatio)),height:sourceHeight};
   }
