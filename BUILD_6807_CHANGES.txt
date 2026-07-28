@@ -1,0 +1,20 @@
+ConnectChat Pro v6.7.3 — Build 6807
+
+IPHONE OUTGOING CALL FILTER COMPATIBILITY
+- Added an iPhone/iPad Safari-specific WebRTC filter fallback.
+- iPhone keeps the selected effect on its local self-preview.
+- The receiving phone or laptop now applies the same selected effect to the
+  incoming iPhone video.
+- Desktop Chrome continues sending a truly processed filtered video stream.
+- Avoids unreliable Canvas-to-WebRTC filtering on iOS and reduces mobile load.
+
+WHY THIS IS REQUIRED
+- The ConnectChat code is shared, but browser media capabilities differ.
+- Desktop Chromium reliably supports filtered Canvas capture for WebRTC.
+- iPhone Safari can show CSS effects but may transmit an unfiltered Canvas
+  track; Build 6807 uses receiver-side rendering for that browser.
+
+PRESERVED
+- Build 6806 self-preview correction.
+- Strong filters, face-aware photo/video capture and camera crop matching.
+- Calls, confirmations, uploads, messages and Supabase media paths.

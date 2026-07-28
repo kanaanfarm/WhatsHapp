@@ -8,6 +8,7 @@ let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
 let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
+let callFilterBakedForPeer=false;
 const CAMERA_FILTERS={
   normal:"none",
   beauty:"brightness(1.12) contrast(.90) saturate(1.10)",
@@ -187,7 +188,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6806"}
+    data:{url:"/?v=6807"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -862,11 +863,21 @@ function stopCallVideoProcessor(){
   try{callProcessedStream?.getVideoTracks().forEach(t=>t.stop())}catch{}
   try{if(callProcessorVideo){callProcessorVideo.pause();callProcessorVideo.srcObject=null}}catch{}
   callProcessedStream=null;callProcessorVideo=null;callProcessorCanvas=null;
+  callFilterBakedForPeer=false;
+}
+
+function needsRemoteCallFilterFallback(){
+  const ua=navigator.userAgent||"";
+  return /iPad|iPhone|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
 }
 
 async function buildCallProcessedStream(rawStream){
   if(!rawStream?.getVideoTracks?.().length||typeof HTMLCanvasElement==="undefined")return rawStream;
   stopCallVideoProcessor();callProcessorAbort=false;
+  // iPhone/iPad can display CSS filters locally, but Safari does not reliably
+  // bake Canvas filters into a captured WebRTC track. Send the raw track and
+  // tell the receiving device to apply the matching visual filter instead.
+  if(needsRemoteCallFilterFallback())return rawStream;
   const rawTrack=rawStream.getVideoTracks()[0];
 
   // Preferred path (desktop/Android and browsers that expose canvas.captureStream).
@@ -894,6 +905,7 @@ async function buildCallProcessedStream(rawStream){
     if(videoTrack){
       callProcessorVideo=source;callProcessorCanvas=canvas;
       callProcessedStream=new MediaStream([videoTrack,...rawStream.getAudioTracks()]);
+      callFilterBakedForPeer=true;
       return callProcessedStream;
     }
   }
@@ -931,6 +943,7 @@ async function buildCallProcessedStream(rawStream){
       };
       loop().catch(error=>console.warn("Mobile call video processor stopped",error));
       callProcessedStream=new MediaStream([generator,...rawStream.getAudioTracks()]);
+      callFilterBakedForPeer=true;
       source.pause();source.srcObject=null;
       return callProcessedStream;
     }catch(error){console.warn("Mobile filtered call track unavailable",error)}
@@ -2215,7 +2228,7 @@ function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();applyCaptureFilterOnly();
   if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.warmUp();
   if(peer&&callPeerId&&callMode==="video"){
-    try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter,processed:Boolean(callProcessedStream&&callProcessedStream!==localStream)})}catch{}
+    try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter,processed:callFilterBakedForPeer})}catch{}
   }
 }
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
