@@ -1,0 +1,13 @@
+ConnectChat Pro v6.7.3 — Build 6813
+
+MOBILE FRONT-CAMERA TRUE ORIENTATION
+
+Based on Mohamad's left-hand test:
+
+- Identifies iPhone, iPad, Android, and other touch/mobile camera devices.
+- Marks every mobile front-camera call for one receiver-side orientation correction.
+- A raised left hand therefore appears on the viewer's right, as in real life.
+- Leaves the small local preview, laptop cameras, rear cameras, and screen
+  sharing unchanged.
+- Keeps call filters and the visible Archived filter from earlier builds.
+- No new Supabase SQL migration is required.

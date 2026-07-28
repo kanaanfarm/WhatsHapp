@@ -189,7 +189,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6812"}
+    data:{url:"/?v=6814"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -904,9 +904,10 @@ function applyCameraFilter(){
   // This is reliable on iPhone and avoids showing an unfiltered self-preview.
   if(local){
     local.style.filter=screenStream?"none":css;
-    // Safari's local front-camera preview is already in the correct readable
-    // orientation. Do not flip the small self-preview.
-    local.style.setProperty("transform","none","important");
+    // Use the same familiar selfie orientation on laptop and mobile.
+    // The user's right side stays on the right side of their screen.
+    const mirrorFront=callMode==="video"&&currentFacingMode==="user"&&!screenStream;
+    local.style.setProperty("transform",mirrorFront?"scaleX(-1)":"none","important");
   }
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
@@ -923,7 +924,9 @@ function applyRemoteOrientationCorrection(){
 }
 
 function outgoingFrontOrientationCorrection(){
-  return callMode==="video"&&currentFacingMode==="user"&&needsRemoteCallFilterFallback()&&!callFilterBakedForPeer;
+  // Mirror every front camera consistently for both participants.
+  // Rear cameras and screen sharing remain unmirrored.
+  return callMode==="video"&&currentFacingMode==="user"&&!screenStream;
 }
 
 function syncFrontCameraOrientation(){

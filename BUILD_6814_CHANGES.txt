@@ -1,0 +1,11 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6814
+
+- Front-camera orientation is now consistent on laptop and mobile.
+- A user's right side appears on the right side of the screen for both participants.
+- Local preview and received front-camera video use the same mirrored selfie orientation.
+- Rear cameras and screen sharing remain unmirrored.
+
+Deploy the contents of 01_RENDER_SERVER_WEBSITE, verify /api/health reports
+build 6814, close old tabs on both devices, then open:
+
+https://connectchat-pro-kanaan.onrender.com/?v=6814
