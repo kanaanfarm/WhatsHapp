@@ -188,7 +188,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6809"}
+    data:{url:"/?v=6811"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -582,7 +582,10 @@ function connectSocket(){
     const remote=$("remoteVideo");
     // Processed streams already contain the effect. CSS is only a compatibility
     // fallback for browsers that cannot generate a filtered outbound track.
-    if(remote)remote.style.filter=p?.processed?"none":(CAMERA_FILTERS[filter]||"none");
+    if(remote){
+      remote.style.filter=p?.processed?"none":(CAMERA_FILTERS[filter]||"none");
+      remote.style.setProperty("transform",p?.correctFrontOrientation?"scaleX(-1)":"none","important");
+    }
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
@@ -890,7 +893,10 @@ function applyCameraFilter(){
   // The small self-preview always shows the raw camera plus the selected CSS
   // effect. The separate processed stream is sent to the other participant.
   // This is reliable on iPhone and avoids showing an unfiltered self-preview.
-  if(local)local.style.filter=screenStream?"none":css;
+  if(local){
+    local.style.filter=screenStream?"none":css;
+    local.style.setProperty("transform",!screenStream&&currentFacingMode==="user"&&needsRemoteCallFilterFallback()?"scaleX(-1)":"none","important");
+  }
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
   if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
@@ -1169,7 +1175,11 @@ async function stopScreenShare(){
 }
 
 function finishCall(message="Call ended",notify=true){
-  const remoteFilterVideo=$("remoteVideo");if(remoteFilterVideo)remoteFilterVideo.style.filter="none";
+  const remoteFilterVideo=$("remoteVideo");
+  if(remoteFilterVideo){
+    remoteFilterVideo.style.filter="none";
+    remoteFilterVideo.style.setProperty("transform","none","important");
+  }
   if(notify&&callPeerId&&socket)socket.emit("call:end",{receiverId:callPeerId});
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
   if(peer){peer.onconnectionstatechange=null;peer.close();peer=null}
@@ -1243,6 +1253,7 @@ $("switchCameraBtn").onclick=async()=>{
     const processedTrack=rebuilt.getVideoTracks()[0]||newTrack;
     if(sender)await sender.replaceTrack(processedTrack);
     await configureVideoSenderQuality(peer);
+    sendCurrentCallFilter();
     $("localVideo").srcObject=localStream;
     syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});
@@ -2299,7 +2310,14 @@ function setCameraFilter(value){
 }
 function sendCurrentCallFilter(){
   if(peer&&callPeerId&&callMode==="video"){
-    try{socket.emit("call:filter",{receiverId:callPeerId,filter:cameraFilter,processed:callFilterBakedForPeer})}catch{}
+    try{
+      socket.emit("call:filter",{
+        receiverId:callPeerId,
+        filter:cameraFilter,
+        processed:callFilterBakedForPeer,
+        correctFrontOrientation:currentFacingMode==="user"&&needsRemoteCallFilterFallback()&&!callFilterBakedForPeer
+      });
+    }catch{}
   }
 }
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);

@@ -1,0 +1,9 @@
+ConnectChat Pro v6.7.3 — Build 6811
+
+VISIBLE ARCHIVED FILTER
+
+- Displays All, Unread, Groups, Pinned, and Archived in a compact two-row grid.
+- Archived is always visible and directly selectable on laptop and mobile.
+- Removes the filter row's horizontal scrolling requirement.
+- Preserves the Build 6810 iPhone front-camera orientation correction.
+- No new Supabase SQL migration is required.

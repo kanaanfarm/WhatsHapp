@@ -1,0 +1,17 @@
+ConnectChat Pro v6.7.3 — Build 6810
+
+IPHONE FRONT-CAMERA ORIENTATION CORRECTION
+
+- Corrects Safari's mirrored raw front-camera preview on iPhone and iPad.
+- Sends a device-specific orientation flag to the receiving participant.
+- Corrects only raw iPhone/iPad front-camera video on the receiving screen.
+- Does not flip desktop cameras, rear cameras, screen sharing, or already
+  processed outbound video.
+- Re-synchronizes orientation after switching cameras and reconnecting.
+- Preserves Build 6809 filter synchronization and Build 6808 call-quality work.
+
+VERIFICATION
+
+Hold normal readable text in front of the iPhone front camera. The letters must
+be readable—not reversed—in both the small self-preview and the other person's
+large received video.

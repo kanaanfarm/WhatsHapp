@@ -1696,6 +1696,30 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
     object-fit:contain!important;
   }
 }
+
+/* Build 6811: keep every conversation filter visible and directly selectable.
+   Five filters wrap into a compact grid instead of hiding Archived off-screen. */
+.workspace-sidebar .filter-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  overflow:visible;
+  padding:12px 4px;
+}
+.workspace-sidebar .chat-filter{
+  width:100%;
+  min-width:0;
+  padding:7px 5px;
+  white-space:nowrap;
+}
+.workspace-sidebar .filter-row::-webkit-scrollbar{display:none}
+@media(max-width:800px){
+  .workspace-sidebar .filter-row{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    padding:5px 2px 10px;
+    overflow:visible;
+  }
+}
 @media(min-width:801px){
   #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
     width:min(72vw,760px)!important;height:auto!important;max-height:68vh!important;aspect-ratio:4/3
