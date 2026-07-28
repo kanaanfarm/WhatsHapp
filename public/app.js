@@ -187,7 +187,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6805"}
+    data:{url:"/?v=6806"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -829,7 +829,10 @@ function applyCameraFilter(){
   const css=CAMERA_FILTERS[cameraFilter]||"none";
   const capture=$("captureVideo"),local=$("localVideo");
   if(capture)capture.style.filter=css;
-  if(local)local.style.filter=(screenStream||callProcessedStream?"none":css);
+  // The small self-preview always shows the raw camera plus the selected CSS
+  // effect. The separate processed stream is sent to the other participant.
+  // This is reliable on iPhone and avoids showing an unfiltered self-preview.
+  if(local)local.style.filter=screenStream?"none":css;
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
   if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
@@ -997,7 +1000,7 @@ async function startCall(mode){
     showCallUi(activeUser.username,"Calling…",mode);
     localStream=await getMedia(mode);
     const outboundStream=mode==="video"?await buildCallProcessedStream(localStream):localStream;
-    $("localVideo").srcObject=outboundStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
+    $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(callPeerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -1043,7 +1046,7 @@ async function acceptIncomingCall(){
     showCallUi(data.callerName,"Connecting…",data.mode);
     localStream=await getMedia(data.mode);
     const outboundStream=data.mode==="video"?await buildCallProcessedStream(localStream):localStream;
-    $("localVideo").srcObject=outboundStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
+    $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
     peer=await createPeer(data.callerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
     await peer.setRemoteDescription(data.offer);
@@ -1159,7 +1162,7 @@ $("switchCameraBtn").onclick=async()=>{
     const rebuilt=await buildCallProcessedStream(localStream);
     const processedTrack=rebuilt.getVideoTracks()[0]||newTrack;
     if(sender)await sender.replaceTrack(processedTrack);
-    $("localVideo").srcObject=rebuilt;
+    $("localVideo").srcObject=localStream;
     syncFrontCameraOrientation();
     $("localVideo").play().catch(()=>{});
     $("videoStage").classList.remove("local-camera-off");

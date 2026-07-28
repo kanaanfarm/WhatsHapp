@@ -1,0 +1,13 @@
+ConnectChat Pro v6.7.3 — Build 6806
+
+MOBILE CALL SELF-PREVIEW FILTER FIX
+- The small local preview now immediately displays the selected call filter.
+- The raw local camera is used only for the self-preview with a CSS effect.
+- The separately processed video continues to be sent to the other user.
+- Prevents iPhone from showing a color preview while B&W is transmitted.
+- Screen sharing remains unfiltered and returns correctly to the camera.
+
+PRESERVED
+- Strong mobile filters and face-aware capture from Build 6805.
+- Camera preview/result crop matching from Build 6804.
+- Calls, photo/video confirmation, uploads and Supabase media paths.
