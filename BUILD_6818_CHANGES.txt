@@ -1,0 +1,19 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6818
+
+Based on Build 6817.
+
+Orientation:
+- Unified true left/right behavior across laptop and mobile.
+- Front camera is not mirrored in call self-view.
+- Remote received video is not horizontally flipped.
+- Swap between big/small video keeps the same real-world orientation.
+- Photo/video orientation behavior remains aligned with the same left/right rule.
+
+Call layout:
+- Small video window remains in the same picture-in-picture concept.
+- Reduced PiP size so it does not cover too much of the main video.
+- Desktop PiP uses controlled 16:9 sizing and edge spacing.
+- Mobile PiP is smaller with safe margins so the big video stays visible.
+- No intentional changes to call signaling, media pipeline, chat, notifications, Supabase paths, or filter engine.
+
+Verify /api/health reports build 6818.

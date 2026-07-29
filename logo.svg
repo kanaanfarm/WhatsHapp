@@ -1,12 +1,87 @@
-{
-  "name": "ConnectChat Pro Enterprise v6.7.3",
-  "short_name": "ConnectChat",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#eef2f7",
-  "theme_color": "#182132",
-  "description": "Private AI-enhanced collaboration for mobile and PC",
-  "icons": [
-    {"src":"/logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
-  ]
+import { FaceLandmarker, FilesetResolver } from "./vendor/mediapipe/vision_bundle.mjs";
+
+const MODEL_URL="/vendor/mediapipe/face_landmarker.task";
+const WASM_URL="/vendor/mediapipe/wasm";
+const DETECTION_INTERVAL_MS=150;
+let landmarker=null,initializing=null,lastDetectionAt=0,lastLandmarks=null,disabled=false,faceBuffer=null;
+
+async function createLandmarker(delegate){
+  const vision=await FilesetResolver.forVisionTasks(WASM_URL);
+  return FaceLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:MODEL_URL,delegate},
+    runningMode:"VIDEO",numFaces:1,minFaceDetectionConfidence:.58,minFacePresenceConfidence:.58,minTrackingConfidence:.54});
 }
+function ensureReady(){
+  if(landmarker)return Promise.resolve(landmarker);
+  if(disabled)return Promise.resolve(null);
+  if(!initializing)initializing=createLandmarker("GPU").catch(()=>createLandmarker("CPU")).then(x=>{
+    landmarker=x;document.documentElement.dataset.faceBeauty="ready";return x;
+  }).catch(e=>{disabled=true;document.documentElement.dataset.faceBeauty="fallback";console.warn("Face beauty unavailable",e)})
+    .finally(()=>initializing=null);
+  return initializing;
+}
+function bounds(lm,w,h){
+  let a=1,b=1,c=0,d=0;
+  for(const p of lm||[]){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;a=Math.min(a,p.x);b=Math.min(b,p.y);c=Math.max(c,p.x);d=Math.max(d,p.y)}
+  if(c<=a||d<=b)return null;
+  return{x:a*w,y:b*h,w:(c-a)*w,h:(d-b)*h,cx:(a+c)*w/2,cy:(b+d)*h/2};
+}
+function clipEllipse(ctx,B,cx,cy,rx,ry,rot=0){ctx.beginPath();ctx.ellipse(B.x+B.w*cx,B.y+B.h*cy,B.w*rx,B.h*ry,rot,0,Math.PI*2);ctx.clip()}
+function skin(ctx,buf,B,r,blur,alpha){
+  ctx.save();clipEllipse(ctx,B,r[0],r[1],r[2],r[3],r[4]||0);ctx.globalAlpha=alpha;
+  ctx.filter=`blur(${blur}px) brightness(1.035) saturate(1.02)`;ctx.drawImage(buf,B.x,B.y,B.w,B.h);ctx.restore();
+}
+function apply(canvas,lm,mode="beauty"){
+  const ctx=canvas.getContext("2d",{alpha:false}); if(!ctx)return;
+  const B=bounds(lm,canvas.width,canvas.height); if(!B||B.w<40)return;
+  if(!faceBuffer)faceBuffer=document.createElement("canvas");
+  const cw=Math.max(1,Math.ceil(B.w)),ch=Math.max(1,Math.ceil(B.h));
+  if(faceBuffer.width!==cw)faceBuffer.width=cw;if(faceBuffer.height!==ch)faceBuffer.height=ch;
+  const bc=faceBuffer.getContext("2d",{alpha:false});bc.clearRect(0,0,cw,ch);bc.drawImage(canvas,B.x,B.y,B.w,B.h,0,0,cw,ch);
+
+  const young=mode==="youngslim";
+  const blur=Math.max(2.2,Math.min(8,B.w*(young?.018:.024)));
+  skin(ctx,faceBuffer,B,[.5,.20,.25,.10],blur,young?.46:.50);
+  skin(ctx,faceBuffer,B,[.285,.56,.17,.14,-.12],blur,young?.50:.54);
+  skin(ctx,faceBuffer,B,[.715,.56,.17,.14,.12],blur,young?.50:.54);
+
+  // Even tone and reduce forehead/cheek shine without covering eyes, glasses, mouth or beard.
+  ctx.save();clipEllipse(ctx,B,.5,.46,.35,.36);ctx.globalCompositeOperation="soft-light";
+  ctx.globalAlpha=young?.055:.035;ctx.fillStyle="#f2c8b5";ctx.fillRect(B.x,B.y,B.w,B.h*.76);ctx.restore();
+
+  // Under-eye lift.
+  if(young && lm.length>363){
+    for(const q of [[33,133],[362,263]]){
+      const ex=(lm[q[0]].x+lm[q[1]].x)*canvas.width/2, ey=(lm[q[0]].y+lm[q[1]].y)*canvas.height/2;
+      ctx.save();ctx.beginPath();ctx.ellipse(ex,ey+B.h*.035,B.w*.10,B.h*.038,0,0,Math.PI*2);ctx.clip();
+      ctx.globalCompositeOperation="screen";ctx.globalAlpha=.045;ctx.filter="blur(3px)";ctx.fillStyle="#eaded4";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();
+    }
+  }
+
+  // Young + Slim: restrained horizontal cheek/jaw shaping. Keep identity and avoid cartoon distortion.
+  if(young){
+    const copy=document.createElement("canvas");copy.width=canvas.width;copy.height=canvas.height;
+    copy.getContext("2d",{alpha:false}).drawImage(canvas,0,0);
+    const top=B.y+B.h*.34,bot=B.y+B.h*.96,n=30,bh=(bot-top)/n;
+    for(let i=0;i<n;i++){
+      const y=top+i*bh,u=i/(n-1),mid=Math.sin(Math.PI*u),lower=Math.max(0,(u-.48)/.52);
+      const squeeze=.018*mid+.022*Math.max(mid*.72,lower);
+      const sw=B.w*1.10,dw=sw*(1-squeeze);
+      ctx.drawImage(copy,B.cx-sw/2,y,sw,bh+1,B.cx-dw/2,y,dw,bh+1);
+    }
+    // Restore crisp facial detail after smoothing.
+    ctx.save();clipEllipse(ctx,B,.5,.49,.35,.38);ctx.globalCompositeOperation="overlay";ctx.globalAlpha=.09;
+    ctx.filter="contrast(1.14) saturate(1.02)";ctx.drawImage(copy,0,0);ctx.restore();
+  }
+}
+function process(canvas,mode="beauty"){
+  if(!canvas?.width||!canvas?.height||disabled)return;
+  if(!landmarker){ensureReady();return}
+  const now=performance.now();
+  if(now-lastDetectionAt>=DETECTION_INTERVAL_MS){lastDetectionAt=now;try{lastLandmarks=landmarker.detectForVideo(canvas,now)?.faceLandmarks?.[0]||null}catch{lastLandmarks=null}}
+  if(lastLandmarks)apply(canvas,lastLandmarks,mode);
+}
+async function processStill(canvas,mode="beauty"){
+  const instance=landmarker||await ensureReady();if(!instance)return false;
+  try{const now=performance.now(),lm=instance.detectForVideo(canvas,now)?.faceLandmarks?.[0]||null;if(!lm)return false;lastLandmarks=lm;lastDetectionAt=now;apply(canvas,lm,mode);return true}catch{return false}
+}
+window.ConnectChatFaceBeauty={process,processStill,warmUp:ensureReady,status(){return landmarker?"ready":disabled?"fallback":initializing?"loading":"idle"}};

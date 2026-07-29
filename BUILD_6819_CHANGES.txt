@@ -1,0 +1,23 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6819
+
+Fix for Build 6818 test showing no visible change.
+
+Root cause:
+- index.html was still loading style.css?v=6816 and app.js?v=6816, so the browser could keep using cached 6816 assets.
+- The 6818 PiP override targeted generic '.small' classes that the actual call videos do not use.
+
+Fixes:
+- Cache-bust updated to style.css?v=6819 and app.js?v=6819.
+- PiP now targets the actual elements:
+  #localVideo normally, and #remoteVideo after swap.
+- Desktop PiP reduced to max about 185 x 105 px.
+- Mobile PiP reduced to max about 118 x 72 px.
+- Large video keeps full stage and is not covered as much.
+- Local, remote, capture preview and capture canvas are forced non-mirrored.
+- Actual left stays left; actual right stays right.
+- Swap keeps the same orientation.
+- Existing call signaling, Supabase/media path, filters and responsive call logic remain unchanged.
+
+Local test:
+Open http://localhost:3000/?v=6819 or hard refresh once.
+Verify /api/health shows build 6819.

@@ -1,0 +1,14 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6816
+
+- Prevents the swapped mobile video from collapsing into a narrow strip.
+- Mobile filters close automatically after a filter is selected.
+- Mobile filter choices open as a temporary tray without changing video height.
+- Mobile call controls are smaller and use less vertical space.
+- Laptop main video has a controlled centered 16:9 size.
+- Small call video is wider and shorter at 16:9 on mobile and laptop.
+- Tap-to-swap and Build 6814 camera orientation are preserved.
+
+Deploy the contents of 01_RENDER_SERVER_WEBSITE, verify /api/health reports
+build 6816, close old tabs on both devices, then open:
+
+https://connectchat-pro-kanaan.onrender.com/?v=6816

@@ -1,0 +1,13 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6817
+
+Beauty integration based on Build 6816.
+
+- Added 🌿 Young + Slim to camera capture and live video-call filters.
+- Stronger face-aware clean-skin treatment while preserving eyes, glasses, mouth, moustache and beard detail.
+- Added under-eye brightening, even-tone treatment, detail restoration and restrained cheek/jaw slimming.
+- Front camera is NON-MIRRORED in live self preview, photo capture and processed video recording:
+  actual left stays on the left and actual right stays on the right.
+- Existing Build 6816 responsive call layout, tap-to-swap, mobile filter tray behaviour, chat/media/server paths are preserved.
+- Beauty and Young + Slim are processed into outgoing call video where supported.
+
+Deploy 01_RENDER_SERVER_WEBSITE and verify /api/health reports build 6817.
