@@ -2176,6 +2176,18 @@ function captureOutputDimensions(sourceWidth,sourceHeight){
   return {width:sourceWidth,height:Math.max(1,Math.round(sourceWidth/targetRatio))};
 }
 
+function limitFilterDimensions(dimensions,maxPixels=921600){
+  let width=Math.max(1,Number(dimensions?.width)||1);
+  let height=Math.max(1,Number(dimensions?.height)||1);
+  const pixels=width*height;
+  if(pixels>maxPixels){
+    const scale=Math.sqrt(maxPixels/pixels);
+    width=Math.max(1,Math.round(width*scale));
+    height=Math.max(1,Math.round(height*scale));
+  }
+  return {width,height};
+}
+
 function getVideoNativeSize(video){
   return {width:Math.max(1,video?.videoWidth||1280),height:Math.max(1,video?.videoHeight||720)};
 }
@@ -2251,14 +2263,20 @@ function refreshCaptureLivePreview(){
   }
 
   window.ConnectChatFaceBeauty?.warmUp();
-  const draw=()=>{
+  let lastPreviewFrame=0;
+  const draw=(now=performance.now())=>{
     if(!captureStream?.active||!faceAwareCaptureFilter()||overlay?.classList.contains("result-ready"))return;
+    if(now-lastPreviewFrame<66){
+      captureLivePreviewFrame=requestAnimationFrame(draw);
+      return;
+    }
+    lastPreviewFrame=now;
     if(!v.videoWidth||!v.videoHeight){
       captureLivePreviewFrame=requestAnimationFrame(draw);
       return;
     }
 
-    const output=captureOutputDimensions(v.videoWidth,v.videoHeight);
+    const output=limitFilterDimensions(captureOutputDimensions(v.videoWidth,v.videoHeight));
     if(canvas.width!==output.width)canvas.width=output.width;
     if(canvas.height!==output.height)canvas.height=output.height;
     const ctx=canvas.getContext("2d",{alpha:false,willReadFrequently:true});
@@ -2473,13 +2491,19 @@ function buildFilteredVideoRecordingStream(){
   const live=$("captureVideo");
   if(!live||!live.videoWidth||!live.videoHeight||!live.captureStream&&typeof document.createElement("canvas").captureStream!=="function")return null;
   const canvas=document.createElement("canvas");
-  const output=captureOutputDimensions(live.videoWidth,live.videoHeight);
+  const output=limitFilterDimensions(captureOutputDimensions(live.videoWidth,live.videoHeight));
   canvas.width=output.width;canvas.height=output.height;
   const ctx=canvas.getContext("2d",{alpha:false});
   if(!ctx||typeof canvas.captureStream!=="function")return null;
   captureFilterCanvas=canvas;
-  const draw=()=>{
+  let lastRecordingFrame=0;
+  const draw=(now=performance.now())=>{
     if(!captureFilterCanvas||!captureStream?.active)return;
+    if(now-lastRecordingFrame<42){
+      captureFilterFrame=requestAnimationFrame(draw);
+      return;
+    }
+    lastRecordingFrame=now;
     ctx.save();
     // Draw corrected orientation first. Do not rely on ctx.filter on mobile:
     // the selected filter is baked into the frame pixels below.
@@ -2492,7 +2516,7 @@ function buildFilteredVideoRecordingStream(){
     captureFilterFrame=requestAnimationFrame(draw);
   };
   draw();
-  const fps=30;
+  const fps=24;
   const processed=canvas.captureStream(fps);
   const audioTrack=captureStream.getAudioTracks()[0];
   if(audioTrack)processed.addTrack(audioTrack);

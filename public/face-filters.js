@@ -2,7 +2,7 @@ import { FaceLandmarker, FilesetResolver } from "./vendor/mediapipe/vision_bundl
 
 const MODEL_URL="/vendor/mediapipe/face_landmarker.task";
 const WASM_URL="/vendor/mediapipe/wasm";
-const DETECTION_INTERVAL_MS=115;
+const DETECTION_INTERVAL_MS=180;
 
 let landmarker=null,initializing=null,disabled=false,lastAt=0,lastLandmarks=null;
 let faceBuffer=null,fullCopy=null;
@@ -125,6 +125,7 @@ function apply(canvas,lm,mode="beauty"){
   const ctx=canvas.getContext("2d",{alpha:false});if(!ctx)return;
   const B=getBounds(lm,canvas.width,canvas.height);if(!B||B.w<55)return;
   const young=mode==="youngslim";
+  const sizeNorm=Math.max(.82,Math.min(1.22,360/Math.max(180,B.w)));
 
   faceBuffer=ensureCanvas(faceBuffer,Math.max(1,Math.round(B.w)),Math.max(1,Math.round(B.h)));
   const bc=faceBuffer.getContext("2d",{alpha:false});
@@ -190,26 +191,6 @@ function process(canvas,mode="beauty"){
     try{lastLandmarks=landmarker.detectForVideo(canvas,now)?.faceLandmarks?.[0]||null}catch{lastLandmarks=null}
   }
   if(lastLandmarks)apply(canvas,lastLandmarks,mode);
-}
-
-function stabilizeFaceBox(box){
-  if(!box)return state.stableBox;
-  if(!state.stableBox){
-    state.stableBox={...box};
-    return state.stableBox;
-  }
-  const p=state.stableBox;
-  const centerJump=Math.hypot(
-    (box.x+box.w*.5)-(p.x+p.w*.5),
-    (box.y+box.h*.5)-(p.y+p.h*.5)
-  );
-  const scale=Math.max(1,p.w);
-  const a=centerJump>scale*.22?.42:.24;
-  p.x+=((box.x-p.x)*a);
-  p.y+=((box.y-p.y)*a);
-  p.w+=((box.w-p.w)*a);
-  p.h+=((box.h-p.h)*a);
-  return p;
 }
 
 async function processStill(canvas,mode="beauty"){
