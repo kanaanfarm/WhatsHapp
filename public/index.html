@@ -7,7 +7,7 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6815">
+  <link rel="stylesheet" href="style.css?v=6837">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -242,17 +242,33 @@
       <div id="capturePreview" class="capture-preview"><video id="captureVideo" autoplay playsinline muted></video><audio id="captureAudio" class="hidden" playsinline preload="metadata"></audio><canvas id="captureCanvas" class="hidden"></canvas><div id="voiceWave" class="voice-wave hidden">▂▅▇▃▆▂▇▅▃▆▂▅▇</div></div>
       <div class="capture-tabs"><button data-mode="photo">PHOTO</button><button data-mode="video">VIDEO</button></div>
       <div class="capture-filter-control">
-  <label for="cameraFilterSelect">Filter</label>
-  <select id="cameraFilterSelect" class="camera-filter-select" aria-label="Camera filter">
-    <option value="normal">Normal</option>
-    <option value="beauty">Beauty / Smooth</option>
-    <option value="warm">Warm</option>
-    <option value="cool">Cool</option>
-    <option value="bw">B&amp;W</option>
-    <option value="bright">Bright</option>
-    <option value="soft">Soft</option>
-  </select>
-</div>
+        <label for="cameraFilterButton">Filter</label>
+        <div class="camera-filter-picker">
+          <button id="cameraFilterButton" class="camera-filter-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cameraFilterMenu">
+            <span id="cameraFilterButtonLabel">Normal</span><span class="camera-filter-chevron" aria-hidden="true">⌃</span>
+          </button>
+          <div id="cameraFilterMenu" class="camera-filter-menu hidden" role="listbox" aria-label="Camera filter">
+            <button type="button" role="option" data-camera-filter="normal">Normal</button>
+            <button type="button" role="option" data-camera-filter="beauty">Beauty / Smooth</button>
+            <button type="button" role="option" data-camera-filter="youngslim">🌿 Young + Slim</button>
+            <button type="button" role="option" data-camera-filter="warm">Warm</button>
+            <button type="button" role="option" data-camera-filter="cool">Cool</button>
+            <button type="button" role="option" data-camera-filter="bw">B&amp;W</button>
+            <button type="button" role="option" data-camera-filter="bright">Bright</button>
+            <button type="button" role="option" data-camera-filter="soft">Soft</button>
+          </div>
+        </div>
+        <select id="cameraFilterSelect" class="hidden" tabindex="-1" aria-hidden="true">
+          <option value="normal">Normal</option>
+          <option value="beauty">Beauty / Smooth</option>
+          <option value="youngslim">🌿 Young + Slim</option>
+          <option value="warm">Warm</option>
+          <option value="cool">Cool</option>
+          <option value="bw">B&amp;W</option>
+          <option value="bright">Bright</option>
+          <option value="soft">Soft</option>
+        </select>
+      </div>
       <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button">↻</button></div>
     </div>
   </section>
@@ -289,6 +305,7 @@
         <div id="callFilterTray" class="call-filter-tray hidden" aria-label="Live camera filters">
           <button type="button" class="active" data-call-filter="normal"><span class="filter-swatch filter-normal"></span><b>Normal</b></button>
           <button type="button" data-call-filter="beauty"><span class="filter-swatch filter-beauty"></span><b>Beauty</b></button>
+          <button type="button" data-call-filter="youngslim"><span class="filter-swatch filter-beauty"></span><b>🌿 Young + Slim</b></button>
           <button type="button" data-call-filter="warm"><span class="filter-swatch filter-warm"></span><b>Warm</b></button>
           <button type="button" data-call-filter="cool"><span class="filter-swatch filter-cool"></span><b>Cool</b></button>
           <button type="button" data-call-filter="bw"><span class="filter-swatch filter-bw"></span><b>B&amp;W</b></button>
@@ -429,7 +446,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6815"></script>
-  <script src="app.js?v=6815"></script>
+  <script type="module" src="face-filters.js?v=6837"></script>
+  <script src="app.js?v=6837"></script>
 </body>
 </html>

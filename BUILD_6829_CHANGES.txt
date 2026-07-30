@@ -1,0 +1,17 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6829
+
+YOUNG + SLIM ONLY
+- Reduced forehead and cheek smoothing to preserve natural skin texture.
+- Softer full-face blending with wider feathering.
+- Reduced center-face processed appearance.
+- Kept cheek/jaw-focused slimming behavior.
+- Improved transition toward beard/jaw by lowering local blur strength.
+
+UNCHANGED
+- Corrected left/right orientation.
+- Normal and all other visual filters.
+- Existing camera, Photo/Video, call, PiP and swap behavior.
+
+TEST
+Young + Slim with normal head movement. Check forehead texture, cheeks,
+beard/jaw boundary, and whether any circular patches return.

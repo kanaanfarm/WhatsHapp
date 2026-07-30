@@ -1,0 +1,21 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6832
+
+BASE
+- Continues directly from Build 6831, including 6830 full-face Young + Slim
+  plus 6831 laptop/mobile consistency normalization.
+
+VIDEO CALL ONLY
+- Detects whether each live video source is portrait, landscape or near-square.
+- Main video preserves the actual source orientation.
+- Landscape laptop source uses a controlled centered 16:9 presentation.
+- Portrait mobile source stays portrait and centered; it is not stretched wide.
+- object-fit: contain prevents unwanted cropping of the main participant.
+- PiP remains compact 16:9 and does not determine the main video's orientation.
+- Tap-to-swap remains supported; after swap the new main view follows its own source orientation.
+
+PRESERVED
+- Young + Slim face processing from 6831.
+- Correct left/right orientation.
+- Photo/Video filters.
+- Other filters.
+- Call signaling, media paths, chat and notifications.

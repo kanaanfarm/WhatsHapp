@@ -1,0 +1,27 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6833
+
+BASE
+- Continues from Build 6832.
+- Preserves 6831 Young + Slim consistency and prior orientation/filter work.
+
+CALL LAYOUT
+- Laptop main video enlarged while preserving actual portrait/landscape source ratio.
+- Landscape laptop sources remain controlled 16:9.
+- Portrait laptop sources use more height and remain centered.
+- Mobile main-video sizing from 6832 is retained.
+
+PIP
+- Desktop PiP moved outside the main focal area to the outer right/bottom.
+- Mobile PiP remains compact and is lifted above the lower controls/filter area.
+
+FILTER UI
+- Call filters are one horizontal sliding/scrollable row on laptop and mobile.
+- Mobile filter tray is shorter and more compact.
+- On mobile, selecting a filter closes the tray automatically.
+- Selected filter remains active.
+
+UNCHANGED
+- Left/right orientation.
+- Young + Slim processing.
+- Other filters.
+- Call signaling, chat/media paths and tap-to-swap.

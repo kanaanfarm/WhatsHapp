@@ -1,0 +1,8 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6825 — HD CAMERA PIPELINE
+
+- Requests 1920x1080/30fps when supported, with graceful fallback to 720p and generic camera access.
+- Uses camera native dimensions in processed video where practical.
+- Enables high-quality canvas image smoothing.
+- Young + Slim uses less blur and stronger detail restoration to reduce the soft/washed-out look.
+- Preserves existing camera error handling, orientation, Young + Slim, calls, PiP and swap behavior.
+- Native iPhone Camera may still look better because iOS applies Apple-only computational photography.

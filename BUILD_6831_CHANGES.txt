@@ -1,0 +1,7 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6831
+YOUNG + SLIM ONLY
+- Normalized effect strength for mobile/laptop and near/far face sizes.
+- Reduced excessive mobile brightening/smoothing.
+- Strengthened laptop effect when the detected face is smaller.
+- Preserved 6830 continuous full-face mask, clarity, slimming and no-circle behavior.
+UNCHANGED: orientation, Normal, Beauty/Smooth, Warm, Cool, B&W, Bright, Soft, calls/PiP/swap/media.

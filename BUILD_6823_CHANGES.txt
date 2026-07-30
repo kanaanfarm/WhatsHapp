@@ -1,0 +1,24 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6823
+
+Based on Build 6822.
+
+FIXED ORIENTATION
+- Front/self preview: physical LEFT appears on screen-left; physical RIGHT on screen-right.
+- Same rule for laptop and mobile.
+- Same rule baked into front-camera photo and video recording.
+- Same rule baked into processed outgoing WebRTC video.
+- Remote video is not flipped again.
+- Filters do not change orientation.
+
+FIXED SWAP
+- Tap the small video to swap main/PiP.
+- Tap again to swap back.
+- Orientation and selected filter remain unchanged after swap.
+
+PIP
+- Same bottom-right location.
+- Desktop PiP 132x74.
+- Mobile PiP 100x56.
+- Main video remains clearly visible.
+
+Retains the latest Young + Slim filter from Build 6822.

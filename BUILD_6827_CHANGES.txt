@@ -1,0 +1,18 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6827 — STABLE FACE MASK
+
+Based directly on Build 6826.
+
+PRESERVED
+- 6826 corrected left/right orientation is intentionally unchanged.
+- HD camera pipeline and filter selection behavior are retained.
+
+YOUNG + SLIM / BEAUTY MOTION FIX
+- Reduced localized blur strength that could reveal circular/oval facial patches.
+- Enlarged and softened treatment regions so transitions blend more naturally.
+- Added temporal stabilization for detected face position/size where the face box is available.
+- Reduced mask jumping during head movement.
+- Preserves more eye, glasses, beard, hair and facial-edge detail.
+
+GOAL
+- No visible circles following the face during normal head movement.
+- Young + Slim remains stable between live preview, Photo and Video.

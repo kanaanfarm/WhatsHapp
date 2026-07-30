@@ -1,0 +1,13 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6837
+
+TWO-WAY LAPTOP/MOBILE VIDEO FIX
+
+- Laptop video stage remains centered even when the browser viewport is narrow.
+- Laptop layout now starts above 600px instead of incorrectly requiring 801px.
+- The phone camera appears large and centered on the laptop.
+- The laptop self-camera appears as a small 16:9 window inside the stage.
+- The laptop now sends the original camera track to prevent black canvas frames.
+- The mobile receives the laptop camera as its large main video.
+- The mobile self-camera remains the small bottom-right video.
+- Tap-to-swap behavior remains available.
+- Camera Photo/Video filter selector from Build 6836 is retained.

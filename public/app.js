@@ -13,6 +13,7 @@ let remoteFrontOrientationCorrection=false;
 const CAMERA_FILTERS={
   normal:"none",
   beauty:"brightness(1.12) contrast(.90) saturate(1.10)",
+  youngslim:"brightness(1.07) contrast(1.02) saturate(1.04)",
   warm:"sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08) contrast(1.04)",
   cool:"saturate(1.22) hue-rotate(20deg) brightness(1.08) contrast(1.06)",
   bw:"grayscale(1) contrast(1.28) brightness(1.05)",
@@ -189,7 +190,7 @@ async function showMessageNotification(title,body,tag){
     badge:"/logo.svg",
     tag,
     renotify:true,
-    data:{url:"/?v=6815"}
+    data:{url:"/?v=6816"}
   };
   try{
     if("serviceWorker" in navigator){
@@ -895,24 +896,64 @@ async function configureVideoSenderQuality(pc=peer){
   }
 }
 
+function bindCallFilterScroller(){
+  const tray=$("callFilterTray")||document.querySelector(".call-filter-tray");
+  if(!tray||tray.dataset.scrollBound==="1")return;
+  tray.dataset.scrollBound="1";
+
+  // Mouse wheel on laptop scrolls the filter row horizontally.
+  tray.addEventListener("wheel",event=>{
+    if(Math.abs(event.deltaY)>Math.abs(event.deltaX)){
+      tray.scrollLeft+=event.deltaY;
+      event.preventDefault();
+    }
+  },{passive:false});
+
+  // Mouse/pointer dragging. Touch devices keep native horizontal swipe.
+  let dragging=false,startX=0,startScroll=0,moved=false;
+  tray.addEventListener("pointerdown",event=>{
+    if(event.pointerType==="touch")return;
+    dragging=true;moved=false;startX=event.clientX;startScroll=tray.scrollLeft;
+    tray.setPointerCapture?.(event.pointerId);
+  });
+  tray.addEventListener("pointermove",event=>{
+    if(!dragging)return;
+    const dx=event.clientX-startX;
+    if(Math.abs(dx)>4)moved=true;
+    tray.scrollLeft=startScroll-dx;
+    if(moved)event.preventDefault();
+  });
+  tray.addEventListener("pointerup",()=>{dragging=false});
+  tray.addEventListener("pointercancel",()=>{dragging=false});
+}
+function closeMobileCallFilterTray(){
+  if(window.matchMedia("(max-width:800px)").matches){
+    const tray=$("callFilterTray")||document.querySelector(".call-filter-tray");
+    if(tray)tray.classList.add("hidden");
+    const btn=$("callFilterBtn");
+    if(btn)btn.setAttribute("aria-expanded","false");
+  }
+}
+
 function applyCameraFilter(){
   const css=CAMERA_FILTERS[cameraFilter]||"none";
   const capture=$("captureVideo"),local=$("localVideo");
-  if(capture)capture.style.filter=css;
-  // The small self-preview always shows the raw camera plus the selected CSS
-  // effect. The separate processed stream is sent to the other participant.
-  // This is reliable on iPhone and avoids showing an unfiltered self-preview.
+  if(capture){
+    capture.style.filter=css;
+    capture.style.setProperty("transform",captureFacing==="user"?"scaleX(-1)":"none","important");
+  }
   if(local){
-    local.style.filter=screenStream?"none":css;
-    // Use the same familiar selfie orientation on laptop and mobile.
-    // The user's right side stays on the right side of their screen.
-    const mirrorFront=callMode==="video"&&currentFacingMode==="user"&&!screenStream;
-    local.style.setProperty("transform",mirrorFront?"scaleX(-1)":"none","important");
+    local.style.filter=(screenStream||callFilterBakedForPeer)?"none":css;
+    const frontLive=callMode==="video"&&currentFacingMode==="user"&&!screenStream;
+    local.style.setProperty("transform",frontLive?"scaleX(-1)":"none","important");
   }
   const captureSelect=$("cameraFilterSelect"),callSelect=$("callFilterSelect");
   if(captureSelect&&captureSelect.value!==cameraFilter)captureSelect.value=cameraFilter;
   if(callSelect&&callSelect.value!==cameraFilter)callSelect.value=cameraFilter;
   document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.cameraFilter===cameraFilter));
+  document.querySelectorAll("[data-camera-filter]").forEach(btn=>btn.setAttribute("aria-selected",String(btn.dataset.cameraFilter===cameraFilter)));
+  const cameraFilterLabel=$("cameraFilterButtonLabel");
+  if(cameraFilterLabel)cameraFilterLabel.textContent=FILTER_LABELS[cameraFilter]||"Normal";
   document.querySelectorAll("[data-call-filter]").forEach(btn=>btn.classList.toggle("active",btn.dataset.callFilter===cameraFilter));
   const filterButton=$("callFilterBtn");
   if(filterButton)filterButton.innerHTML=`✨ ${FILTER_LABELS[cameraFilter]||"Filters"}`;
@@ -920,7 +961,34 @@ function applyCameraFilter(){
 
 function applyRemoteOrientationCorrection(){
   const remote=$("remoteVideo");
-  if(remote)remote.style.setProperty("transform",remoteFrontOrientationCorrection?"scaleX(-1)":"none","important");
+  if(remote)remote.style.setProperty("transform","none","important");
+}
+
+
+function classifyCallVideo(video,prefix){
+  if(!video)return;
+  const w=video.videoWidth||0,h=video.videoHeight||0;
+  const stage=$("videoStage");
+  if(!stage||!w||!h)return;
+  const ratio=Math.max(.35,Math.min(2.4,w/h));
+  const orientation=h>w*1.08?"portrait":w>h*1.08?"landscape":"square";
+  stage.classList.remove(`${prefix}-portrait`,`${prefix}-landscape`,`${prefix}-square`);
+  stage.classList.add(`${prefix}-${orientation}`);
+  stage.style.setProperty(`--${prefix}-ar`,String(ratio));
+}
+
+function bindAdaptiveCallFraming(){
+  const local=$("localVideo"),remote=$("remoteVideo");
+  if(local&&!local.dataset.adaptiveFramingBound){
+    local.dataset.adaptiveFramingBound="1";
+    local.addEventListener("loadedmetadata",()=>classifyCallVideo(local,"local"));
+    local.addEventListener("resize",()=>classifyCallVideo(local,"local"));
+  }
+  if(remote&&!remote.dataset.adaptiveFramingBound){
+    remote.dataset.adaptiveFramingBound="1";
+    remote.addEventListener("loadedmetadata",()=>classifyCallVideo(remote,"remote"));
+    remote.addEventListener("resize",()=>classifyCallVideo(remote,"remote"));
+  }
 }
 
 function setCallVideoSwap(swapped){
@@ -944,18 +1012,15 @@ function bindCallVideoSwap(){
 }
 
 function outgoingFrontOrientationCorrection(){
-  // Mirror every front camera consistently for both participants.
-  // Rear cameras and screen sharing remain unmirrored.
-  return callMode==="video"&&currentFacingMode==="user"&&!screenStream;
+  return false;
 }
 
 function syncFrontCameraOrientation(){
-  // Build 6799: call video is processed into true left/right orientation.
-  // Local preview and the transmitted video use the same processed frames.
   const local=$("localVideo");
-  if(local)local.classList.remove("front-camera-corrected");
   const capture=$("captureVideo");
-  if(capture)capture.classList.toggle("front-camera-corrected",captureFacing==="user"&&Boolean(captureStream));
+  const frontLive=callMode==="video"&&currentFacingMode==="user"&&!screenStream;
+  if(local)local.style.setProperty("transform",frontLive?"scaleX(-1)":"none","important");
+  if(capture)capture.style.setProperty("transform",captureFacing==="user"?"scaleX(-1)":"none","important");
   applyCameraFilter();
 }
 
@@ -980,6 +1045,13 @@ function needsRemoteCallFilterFallback(){
 async function buildCallProcessedStream(rawStream){
   if(!rawStream?.getVideoTracks?.().length||typeof HTMLCanvasElement==="undefined")return rawStream;
   stopCallVideoProcessor();callProcessorAbort=false;
+  // BUILD 6837: always send the real camera track. Some desktop browsers
+  // successfully create a canvas track but transmit black frames. The receiver
+  // already applies the selected CSS filter when processed=false, so keeping
+  // the raw track preserves reliable two-way video on laptop and mobile.
+  callFilterBakedForPeer=false;
+  return rawStream;
+  /*
   // iPhone/iPad can display CSS filters locally, but Safari does not reliably
   // bake Canvas filters into a captured WebRTC track. Send the raw track and
   // tell the receiving device to apply the matching visual filter instead.
@@ -1000,9 +1072,11 @@ async function buildCallProcessedStream(rawStream){
       if(callProcessorAbort||!ctx||!source.srcObject)return;
       const w=canvas.width,h=canvas.height;
       ctx.save();ctx.clearRect(0,0,w,h);ctx.filter=CAMERA_FILTERS[cameraFilter]||"none";
+      if(currentFacingMode==="user"&&!screenStream){ctx.translate(w,0);ctx.scale(-1,1);}
       try{ctx.drawImage(source,0,0,w,h)}catch{}
       ctx.restore();
-      if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
+      if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas,"beauty");
+      if(cameraFilter==="youngslim")window.ConnectChatFaceBeauty?.process(canvas,"youngslim");
       callProcessorRaf=requestAnimationFrame(draw);
     };
     draw();
@@ -1038,8 +1112,10 @@ async function buildCallProcessedStream(rawStream){
             if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
             const c=canvas.getContext("2d",{alpha:false});
             c.save();c.clearRect(0,0,w,h);c.filter=CAMERA_FILTERS[cameraFilter]||"none";
+            if(currentFacingMode==="user"&&!screenStream){c.translate(w,0);c.scale(-1,1);}
             c.drawImage(frame,0,0,w,h);c.restore();
-            if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
+            if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas,"beauty");
+      if(cameraFilter==="youngslim")window.ConnectChatFaceBeauty?.process(canvas,"youngslim");
             const out=new VideoFrame(canvas,{timestamp:frame.timestamp||0,duration:frame.duration||undefined});
             await callTrackWriter.write(out);out.close();
           }catch(error){console.warn("Mobile call video frame processing failed",error)}
@@ -1058,6 +1134,7 @@ async function buildCallProcessedStream(rawStream){
   // explain that filters are local-preview only on this browser.
   source.pause();source.srcObject=null;
   return rawStream;
+  */
 }
 
 async function createPeer(peerId){
@@ -1066,7 +1143,7 @@ async function createPeer(peerId){
   pc.onicecandidate=e=>{if(e.candidate)socket.emit("call:ice",{receiverId:peerId,candidate:e.candidate})};
   pc.ontrack=e=>{
     $("remoteVideo").srcObject=e.streams[0];
-    $("remoteVideo").play().catch(()=>{});
+    $("remoteVideo").play().catch(()=>{});setTimeout(()=>classifyCallVideo($("remoteVideo"),"remote"),120);
     if(e.track.kind==="video"){
       $("videoStage").classList.remove("waiting-remote");
       e.track.onmute=()=>$("videoStage").classList.add("waiting-remote");
@@ -1092,6 +1169,8 @@ async function flushPendingIce(){
 }
 
 function showCallUi(name,status,mode,incoming=false){
+  bindCallFilterScroller();
+  bindAdaptiveCallFraming();
   document.body.appendChild($("callOverlay"));
   document.body.classList.add("call-active");
   $("callName").textContent=name;$("callStatus").textContent=status;
@@ -1108,8 +1187,28 @@ function showCallUi(name,status,mode,incoming=false){
   $("switchCameraBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("callFilterBtn")?.classList.toggle("hidden",incoming||mode==="audio");
-  if(incoming||mode==="audio")$("callFilterTray")?.classList.add("hidden");
+  $("callFilterTray")?.classList.add("hidden");
+  $("callFilterBtn")?.setAttribute("aria-expanded","false");
   $("endCallBtn").classList.toggle("hidden",incoming);
+}
+
+
+// BUILD 6823: tap the small call video to swap main/PiP.
+// Orientation and selected filters remain unchanged.
+function bindTapToSwapVideos(){
+  const stage=$("videoStage");
+  if(!stage||stage.dataset.tapSwapBound==="1")return;
+  stage.dataset.tapSwapBound="1";
+  stage.addEventListener("click",event=>{
+    const local=$("localVideo"),remote=$("remoteVideo");
+    if(!local||!remote)return;
+    const selfMain=stage.classList.contains("self-main");
+    const pip=selfMain?remote:local;
+    if(event.target!==pip)return;
+    stage.classList.toggle("self-main");
+    syncFrontCameraOrientation();
+    applyRemoteOrientationCorrection();
+  });
 }
 
 async function startCall(mode){
@@ -1123,7 +1222,8 @@ async function startCall(mode){
     showCallUi(activeUser.username,"Calling…",mode);
     localStream=await getMedia(mode);
     const outboundStream=mode==="video"?await buildCallProcessedStream(localStream):localStream;
-    $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
+    $("localVideo").srcObject=(mode==="video"&&callFilterBakedForPeer)?outboundStream:localStream;
+    syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});setTimeout(()=>classifyCallVideo($("localVideo"),"local"),120);
     peer=await createPeer(callPeerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
     await configureVideoSenderQuality(peer);
@@ -1173,7 +1273,8 @@ async function acceptIncomingCall(){
     showCallUi(data.callerName,"Connecting…",data.mode);
     localStream=await getMedia(data.mode);
     const outboundStream=data.mode==="video"?await buildCallProcessedStream(localStream):localStream;
-    $("localVideo").srcObject=localStream;syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});
+    $("localVideo").srcObject=(data.mode==="video"&&callFilterBakedForPeer)?outboundStream:localStream;
+    syncFrontCameraOrientation();$("localVideo").play().catch(()=>{});setTimeout(()=>classifyCallVideo($("localVideo"),"local"),120);
     peer=await createPeer(data.callerId);
     outboundStream.getTracks().forEach(track=>peer.addTrack(track,outboundStream));
     await configureVideoSenderQuality(peer);
@@ -2037,7 +2138,7 @@ function stopVideoHoldRecording(){
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -2074,6 +2175,26 @@ function captureOutputDimensions(sourceWidth,sourceHeight){
   }
   return {width:sourceWidth,height:Math.max(1,Math.round(sourceWidth/targetRatio))};
 }
+
+function getVideoNativeSize(video){
+  return {width:Math.max(1,video?.videoWidth||1280),height:Math.max(1,video?.videoHeight||720)};
+}
+function configureQualityCanvas(canvas,video,maxPixels=2073600){
+  const native=getVideoNativeSize(video);
+  let w=native.width,h=native.height;
+  const pixels=w*h;
+  if(pixels>maxPixels){
+    const scale=Math.sqrt(maxPixels/pixels);
+    w=Math.max(1,Math.round(w*scale));
+    h=Math.max(1,Math.round(h*scale));
+  }
+  if(canvas.width!==w)canvas.width=w;
+  if(canvas.height!==h)canvas.height=h;
+  const ctx=canvas.getContext("2d",{alpha:false,desynchronized:true});
+  if(ctx){ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";}
+  return {ctx,width:w,height:h};
+}
+
 function drawCaptureCover(ctx,source,destinationWidth,destinationHeight){
   const sourceWidth=source.videoWidth||source.displayWidth||source.width||destinationWidth;
   const sourceHeight=source.videoHeight||source.displayHeight||source.height||destinationHeight;
@@ -2091,6 +2212,7 @@ function drawCaptureCover(ctx,source,destinationWidth,destinationHeight){
 }
 function clearCapturePreviewUrl(){if(capturePreviewUrl){URL.revokeObjectURL(capturePreviewUrl);capturePreviewUrl=null}}
 function stopCaptureStream(){
+  stopCaptureLivePreview();
   stopCaptureProcessedStream();
   captureStream?.getTracks().forEach(t=>t.stop());captureStream=null;
   const v=$("captureVideo");
@@ -2101,12 +2223,72 @@ function stopCaptureStream(){
   }
 }
 function captureFilterCss(){return CAMERA_FILTERS[cameraFilter]||"none"}
+
+function stopCaptureLivePreview(){
+  if(captureLivePreviewFrame){
+    cancelAnimationFrame(captureLivePreviewFrame);
+    captureLivePreviewFrame=0;
+  }
+}
+
+function faceAwareCaptureFilter(){
+  return cameraFilter==="beauty"||cameraFilter==="youngslim";
+}
+
+function refreshCaptureLivePreview(){
+  stopCaptureLivePreview();
+  const v=$("captureVideo"),canvas=$("captureCanvas"),overlay=$("captureOverlay");
+  if(!v||!canvas||!captureStream?.active||captureMode==="voice")return;
+
+  // Non-face filters continue to use the native <video> element.
+  // Its transform is fixed and NEVER changes when the filter changes.
+  if(!faceAwareCaptureFilter()||overlay?.classList.contains("result-ready")){
+    canvas.classList.add("hidden");
+    v.classList.remove("hidden");
+    v.style.filter=captureFilterCss();
+    v.style.setProperty("transform",captureFacing==="user"?"scaleX(-1)":"none","important");
+    return;
+  }
+
+  window.ConnectChatFaceBeauty?.warmUp();
+  const draw=()=>{
+    if(!captureStream?.active||!faceAwareCaptureFilter()||overlay?.classList.contains("result-ready"))return;
+    if(!v.videoWidth||!v.videoHeight){
+      captureLivePreviewFrame=requestAnimationFrame(draw);
+      return;
+    }
+
+    const output=captureOutputDimensions(v.videoWidth,v.videoHeight);
+    if(canvas.width!==output.width)canvas.width=output.width;
+    if(canvas.height!==output.height)canvas.height=output.height;
+    const ctx=canvas.getContext("2d",{alpha:false,willReadFrequently:true});
+    if(!ctx)return;
+
+    ctx.save();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Exactly ONE orientation correction. Filter changes never alter it.
+    if(captureFacing==="user"){ctx.translate(canvas.width,0);ctx.scale(-1,1);}
+    drawCaptureCover(ctx,v,canvas.width,canvas.height);
+    ctx.restore();
+
+    applyVideoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
+    window.ConnectChatFaceBeauty?.process(canvas,cameraFilter);
+
+    v.classList.add("hidden");
+    canvas.classList.remove("hidden");
+    canvas.style.transform="scale(1)";
+    captureLivePreviewFrame=requestAnimationFrame(draw);
+  };
+  draw();
+}
+
 function applyCaptureFilterOnly(){
   const v=$("captureVideo");
   if(v){
     v.style.filter=captureFilterCss();
-    v.style.transform=captureFacing==="user"?"scaleX(-1)":"none";
+    v.style.setProperty("transform",captureFacing==="user"?"scaleX(-1)":"none","important");
   }
+  refreshCaptureLivePreview();
 }
 function setCaptureSendReady(ready){
   const send=$("captureSendBtn");send.disabled=!ready;send.classList.toggle("hidden",!ready);
@@ -2142,22 +2324,68 @@ function startCaptureClock(){
     $("captureTimer").textContent=`${String(Math.floor(sec/60)).padStart(2,"0")}:${String(sec%60).padStart(2,"0")}`;
   },250);
 }
+async function requestCaptureMedia(mode){
+  if(mode==="voice") return navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}
+  });
+
+  const needsAudio=mode==="video";
+  const preferred=captureFacing==="environment"?"environment":"user";
+  const videoAttempts=[
+    {facingMode:{ideal:preferred},width:{ideal:1920,min:1280},height:{ideal:1080,min:720},frameRate:{ideal:30,max:30}},
+    {facingMode:{ideal:preferred},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}},
+    {facingMode:{ideal:preferred}},
+    true
+  ];
+
+  let lastError=null;
+  for(const videoConstraints of videoAttempts){
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:videoConstraints,
+        audio:needsAudio?{echoCancellation:true,noiseSuppression:true,autoGainControl:true}:false
+      });
+      const track=stream.getVideoTracks()[0];
+      const settings=track?.getSettings?.()||{};
+      if(settings.facingMode) captureFacing=settings.facingMode;
+      return stream;
+    }catch(error){
+      lastError=error;
+      if(error?.name==="NotAllowedError"||error?.name==="SecurityError") throw error;
+    }
+  }
+  throw lastError||new Error("Camera unavailable");
+}
+
+function captureMediaErrorMessage(error,mode){
+  const name=error?.name||"";
+  if(name==="NotAllowedError"||name==="SecurityError")
+    return mode==="video"?"Camera or microphone permission was denied.":"Camera permission was denied.";
+  if(name==="NotReadableError"||name==="AbortError")
+    return "Camera is busy or unavailable. Close other camera apps and try again.";
+  if(name==="NotFoundError"||name==="DevicesNotFoundError")
+    return "No camera was found.";
+  if(name==="OverconstrainedError"||name==="ConstraintNotSatisfiedError")
+    return "The requested camera is unavailable.";
+  return `Camera could not start${name?` (${name})`:""}.`;
+}
+
 async function prepareCapture(mode){
-  if(!["photo","video"].includes(mode))mode="photo";
-  captureMode=mode;
-  if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
-  captureRecorder=null;captureChunks=[];stopCaptureStream();stopCaptureClock();resetCaptureResult();
-  $("captureOverlay").classList.toggle("video-mode",mode==="video");
-  $("captureOverlay").classList.remove("voice-mode","recording");
-  $("captureTitle").textContent=mode==="photo"?"Photo":"Video";
+  captureMode=mode; stopCaptureStream(); stopCaptureClock(); resetCaptureResult();
+  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
+  $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);
   document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
   try{
-    captureStream=await navigator.mediaDevices.getUserMedia({video:captureVideoConstraints(),audio:mode==="video"});
-    const live=$("captureVideo");live.autoplay=true;live.muted=true;live.controls=false;live.srcObject=captureStream;
-    live.classList.remove("front-camera-corrected");applyCaptureFilterOnly();
-    await live.play().catch(()=>{});
-  }catch{
-    toast(mode==="video"?"Camera and microphone permission are required.":"Camera permission is required.");
+    captureStream=await requestCaptureMedia(mode);
+    if(mode!=="voice"){
+      const video=$("captureVideo");
+      video.srcObject=captureStream;
+      await video.play();
+      applyCaptureFilterOnly();
+    }
+  }catch(e){
+    console.error("ConnectChat camera start failed:",e);
+    toast(mode==="voice"?"Microphone could not start.":captureMediaErrorMessage(e,mode));
     closeCapture();
   }
 }
@@ -2218,6 +2446,12 @@ function applyVideoPixelFilter(ctx,width,height,filterName){
       r=(r-128)*.88+128+8;
       g=(g-128)*.88+128+8;
       b=(b-128)*.88+128+8;
+    }else if(filterName==="youngslim"){
+      // Shared Young + Slim base tone used by Photo, Video and live preview.
+      r=(r-128)*1.02+128; g=(g-128)*1.02+128; b=(b-128)*1.02+128;
+      r=r*1.07+2; g=g*1.06+2; b=b*1.05+1;
+      const avg=(r+g+b)/3;
+      r=avg+(r-avg)*1.04; g=avg+(g-avg)*1.04; b=avg+(b-avg)*1.04;
     }else if(filterName==="beauty"){
       const avg=(r+g+b)/3;
       r=((r-128)*.90+128)*1.12+4;
@@ -2249,14 +2483,12 @@ function buildFilteredVideoRecordingStream(){
     ctx.save();
     // Draw corrected orientation first. Do not rely on ctx.filter on mobile:
     // the selected filter is baked into the frame pixels below.
-    if(captureFacing==="user"){
-      ctx.translate(canvas.width,0);
-      ctx.scale(-1,1);
-    }
+    if(captureFacing==="user"){ctx.translate(canvas.width,0);ctx.scale(-1,1);}
     drawCaptureCover(ctx,live,canvas.width,canvas.height);
     ctx.restore();
     applyVideoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
-    if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas);
+    if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.process(canvas,"beauty");
+      if(cameraFilter==="youngslim")window.ConnectChatFaceBeauty?.process(canvas,"youngslim");
     captureFilterFrame=requestAnimationFrame(draw);
   };
   draw();
@@ -2290,6 +2522,12 @@ function applyPhotoPixelFilter(ctx,width,height,filterName){
       r=(r-128)*.88+128+8;
       g=(g-128)*.88+128+8;
       b=(b-128)*.88+128+8;
+    }else if(filterName==="youngslim"){
+      // Shared Young + Slim base tone used by Photo, Video and live preview.
+      r=(r-128)*1.02+128; g=(g-128)*1.02+128; b=(b-128)*1.02+128;
+      r=r*1.07+2; g=g*1.06+2; b=b*1.05+1;
+      const avg=(r+g+b)/3;
+      r=avg+(r-avg)*1.04; g=avg+(g-avg)*1.04; b=avg+(b-avg)*1.04;
     }else if(filterName==="beauty"){
       const avg=(r+g+b)/3;
       r=((r-128)*.90+128)*1.12+4;
@@ -2307,24 +2545,22 @@ function applyPhotoPixelFilter(ctx,width,height,filterName){
 
 async function captureMain(){
   if(captureMode==="photo"){
+    stopCaptureLivePreview();
     const v=$("captureVideo"),canvas=$("captureCanvas");
     if(!v.videoWidth||!v.videoHeight)return toast("Camera is not ready yet.");
     const output=captureOutputDimensions(v.videoWidth,v.videoHeight);
     canvas.width=output.width;canvas.height=output.height;
     const ctx=canvas.getContext("2d",{willReadFrequently:true});
     ctx.save();
-    // Draw the same corrected orientation first.
-    if(captureFacing==="user"){
-      ctx.translate(canvas.width,0);
-      ctx.scale(-1,1);
-    }
+    // Front selfie orientation: physical left stays screen-left.
+    if(captureFacing==="user"){ctx.translate(canvas.width,0);ctx.scale(-1,1);}
     drawCaptureCover(ctx,v,canvas.width,canvas.height);
     ctx.restore();
     // Bake the selected filter into the JPEG pixels. This avoids mobile browsers
     // that show CSS filters in preview but ignore CanvasRenderingContext2D.filter.
     applyPhotoPixelFilter(ctx,canvas.width,canvas.height,cameraFilter);
-    if(cameraFilter==="beauty"&&window.ConnectChatFaceBeauty?.processStill){
-      await window.ConnectChatFaceBeauty.processStill(canvas);
+    if((cameraFilter==="beauty"||cameraFilter==="youngslim")&&window.ConnectChatFaceBeauty?.processStill){
+      await window.ConnectChatFaceBeauty.processStill(canvas,cameraFilter);
     }
     captureBlob=await new Promise(r=>canvas.toBlob(r,"image/jpeg",.92));
     if(!captureBlob||captureBlob.size<1024)return toast("Photo capture failed. Please try again.");
@@ -2349,11 +2585,11 @@ async function captureMain(){
   recorder.start();$("captureOverlay").classList.add("recording");$("captureMainBtn").setAttribute("aria-label","Stop recording");startCaptureClock();
   captureAutoStopTimer=setTimeout(()=>{if(captureRecorder?.state==="recording")captureMain()},60000);
 }
-const FILTER_LABELS={normal:"Normal",beauty:"Beauty",warm:"Warm",cool:"Cool",bw:"B&W",bright:"Bright",soft:"Soft"};
+const FILTER_LABELS={normal:"Normal",beauty:"Beauty / Smooth",youngslim:"🌿 Young + Slim",warm:"Warm",cool:"Cool",bw:"B&W",bright:"Bright",soft:"Soft"};
 const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
 function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();applyCaptureFilterOnly();
-  if(cameraFilter==="beauty")window.ConnectChatFaceBeauty?.warmUp();
+  if(cameraFilter==="beauty"||cameraFilter==="youngslim")window.ConnectChatFaceBeauty?.warmUp();
   sendCurrentCallFilter();
 }
 function sendCurrentCallFilter(){
@@ -2370,6 +2606,29 @@ function sendCurrentCallFilter(){
 }
 if(cameraFilterSelect)cameraFilterSelect.onchange=e=>setCameraFilter(e.target.value);
 if(callFilterSelect)callFilterSelect.onchange=e=>setCameraFilter(e.target.value);
+const cameraFilterButton=$("cameraFilterButton"),cameraFilterMenu=$("cameraFilterMenu");
+function closeCameraFilterMenu(){
+  cameraFilterMenu?.classList.add("hidden");
+  cameraFilterButton?.setAttribute("aria-expanded","false");
+}
+if(cameraFilterButton)cameraFilterButton.onclick=event=>{
+  event.stopPropagation();
+  if(!cameraFilterMenu)return;
+  const opening=cameraFilterMenu.classList.contains("hidden");
+  cameraFilterMenu.classList.toggle("hidden",!opening);
+  cameraFilterButton.setAttribute("aria-expanded",String(opening));
+};
+document.querySelectorAll("[data-camera-filter]").forEach(button=>button.onclick=event=>{
+  event.stopPropagation();
+  setCameraFilter(button.dataset.cameraFilter);
+  closeCameraFilterMenu();
+});
+document.addEventListener("click",event=>{
+  if(!event.target.closest(".camera-filter-picker"))closeCameraFilterMenu();
+});
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape")closeCameraFilterMenu();
+});
 const callFilterButton=$("callFilterBtn"),callFilterTray=$("callFilterTray");
 if(callFilterButton)callFilterButton.onclick=()=>{
   if(!callFilterTray)return;
@@ -2379,6 +2638,10 @@ if(callFilterButton)callFilterButton.onclick=()=>{
 document.querySelectorAll("[data-call-filter]").forEach(button=>button.onclick=()=>{
   setCameraFilter(button.dataset.callFilter);
   button.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+  if(window.matchMedia?.("(max-width: 800px)")?.matches){
+    callFilterTray?.classList.add("hidden");
+    callFilterButton?.setAttribute("aria-expanded","false");
+  }
 });
 
 $("captureMainBtn").onclick=captureMain;
@@ -3461,3 +3724,13 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch
 })();
 
 document.addEventListener("dragend",()=>{$("chatPanel")?.classList.remove("file-drop-active")});
+
+try{bindTapToSwapVideos();}catch{}
+
+try{
+  document.addEventListener("click",event=>{
+    const btn=event.target.closest?.("[data-call-filter]");
+    if(!btn)return;
+    setTimeout(closeMobileCallFilterTray,50);
+  });
+}catch{}

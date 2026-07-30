@@ -1,0 +1,11 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6836
+
+CAMERA PHOTO/VIDEO FILTER SELECTOR
+
+- Added the approved vertical filter popup on laptop and mobile.
+- The selected filter is marked with a check.
+- All eight camera filters remain directly available.
+- Selecting a filter immediately updates the live camera preview.
+- The menu closes automatically after selection.
+- Applies to both camera photos and recorded camera videos.
+- Retains the Build 6835 corrected laptop 16:9 call screen.

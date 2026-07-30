@@ -1,10 +1,6 @@
-Build 6781 — safe Photo/Video rebuild from confirmed Build 6778.
-- Recorder contains PHOTO and VIDEO only.
-- Front-camera recorder is non-mirrored.
-- Mobile view is portrait; desktop view uses natural 4:3 framing.
-- One filter selector replaces duplicate filter controls.
-- Photo captures bake the chosen filter.
-- Capture remembers the selected chat while open.
-- Photo preview supports pinch/mouse-wheel zoom.
-- Photo Save button downloads a local copy.
-- Existing login, chat voice recorder, calls, notifications, Build 6778 call filters, and server media pipeline remain unchanged outside this recorder block.
+Build 6785 — front-camera VIDEO RECORDING orientation fix only.
+
+- The processed video recording canvas now mirrors front-camera frames the same way as the corrected Build 6784 photo.
+- The recorded/sent selfie video should match the corrected selfie orientation.
+- Rear-camera recording is unchanged.
+- Photo orientation/filter, video filters, login, chat, calls, notifications, upload and server handling are unchanged.

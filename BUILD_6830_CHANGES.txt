@@ -1,0 +1,23 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6830
+
+YOUNG + SLIM ONLY
+
+FULL-FACE COVERAGE
+- Replaced the multiple visible smoothing islands with one continuous face-shaped skin mask.
+- Coverage extends across forehead, both cheeks, temples, nose area and toward jaw/chin.
+- Mask strength is intentionally gentle to preserve natural texture.
+
+CLARITY
+- Lower blur strength.
+- Stronger detail restoration after skin treatment.
+- Eyes, eyebrows, glasses, nose, lips, moustache, beard and chin are restored from the original frame.
+- Slimming remains a separate geometric effect and does not add blur.
+
+UNCHANGED
+- 6829 orientation behavior.
+- Normal, Beauty/Smooth, Warm, Cool, B&W, Bright, Soft.
+- Camera, Photo/Video, calls, PiP and swap logic.
+
+TEST
+Use Young + Slim at normal distance and move the head slowly left/right.
+Check that both side cheeks remain evenly treated and the face stays clear.

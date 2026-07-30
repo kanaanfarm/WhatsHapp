@@ -1,0 +1,35 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6820
+
+Based on Build 6819. This build directly addresses the user's latest test.
+
+LATEST FILTER:
+- face-filters.js cache-busted to v6820 (6819 still referenced v6816).
+- Young + Slim upgraded to the latest approved treatment:
+  cleaner/even skin, less shine, under-eye lift, stronger detail restoration,
+  restrained cheek/lower-face slimming and jaw definition.
+- Caller self-preview uses the processed outbound stream where supported,
+  so the caller can see the real Young + Slim result during the call.
+
+ORIENTATION:
+- One consistent rule on laptop and mobile:
+  physical LEFT appears on screen LEFT; physical RIGHT appears on screen RIGHT.
+- Front-camera live preview is selfie-oriented.
+- Front-camera processed outgoing WebRTC video bakes the same orientation.
+- Front photo and recorded video bake the same orientation.
+- Receiver applies a fallback mirror only if the sender browser could not bake
+  the processed front-camera track.
+- Swapping big/small video does not change orientation.
+
+PIP:
+- Same bottom-right location as before; location is not moved.
+- Desktop small video is 124x70.
+- Mobile small video is 96x54.
+- This reduces obstruction of the large video.
+
+CACHE:
+- style.css?v=6820
+- app.js?v=6820
+- face-filters.js?v=6820
+
+Existing chat, Supabase/media upload, notifications and call signaling remain unchanged.
+Verify /api/health reports build 6820.

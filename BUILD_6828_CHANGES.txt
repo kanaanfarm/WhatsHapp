@@ -1,0 +1,16 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6828
+
+YOUNG + SLIM ONLY
+- More continuous facial skin coverage.
+- Overlapping forehead/cheek/center-face treatment reduces visible circles and gaps.
+- Lower localized smoothing strength to preserve natural detail.
+- Eyes, beard, moustache, lips and facial edges remain less aggressively processed.
+
+LOCKED / UNCHANGED
+- Build 6827 orientation behavior.
+- Normal.
+- Beauty/Smooth behavior except shared existing engine code.
+- Warm, Cool, B&W, Bright, Soft.
+- Camera/call layout and media behavior.
+
+Test Young + Slim first with no glasses, then with glasses, while moving the head.

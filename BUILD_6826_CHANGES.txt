@@ -1,0 +1,21 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6826
+
+ORIENTATION LOCK
+- Fixed the exact bug where selecting/changing a filter changed horizontal orientation.
+- applyCaptureFilterOnly no longer resets the camera transform.
+- Removed duplicate front-camera mirror operations from filtered Photo and Video canvas paths.
+- Front camera now uses one orientation correction only.
+- Normal -> any filter -> Photo -> Video keeps the same left/right orientation.
+- Reference behavior: the real-world right side stays on the right side of the image.
+
+YOUNG + SLIM CONSISTENCY
+- Beauty and Young + Slim now use a live processed preview canvas.
+- The live preview uses the same ConnectChatFaceBeauty engine used by still Photo and recorded Video.
+- Young + Slim now has a shared mild base tone in Photo, Video and live preview.
+- Video calls continue to use the same face-filters.js Young + Slim engine.
+- Filter changes no longer switch between different orientation rules.
+
+PRESERVED
+- Build 6825 HD camera request/fallback logic.
+- Camera permission/error fix.
+- Calls, PiP, tap-to-swap, chat and media upload paths.

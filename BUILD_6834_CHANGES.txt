@@ -1,0 +1,27 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6834
+
+FIXES AFTER 6833 TEST
+
+LAPTOP VIDEO
+- Fixed inherited 16:9 stage sizing that kept portrait remote video too small.
+- Stage now uses the actual source aspect ratio reported by videoWidth/videoHeight.
+- Portrait remote video uses most of the available laptop height.
+- Landscape sources remain large and centered.
+- No crop/stretch.
+
+FILTER SCROLL
+- Call filters are now a true horizontal scrolling row.
+- Mobile supports native finger swipe.
+- Laptop supports mouse drag and vertical mouse-wheel -> horizontal scroll.
+- Tray stays compact.
+- Mobile still closes after a filter is selected.
+
+PIP
+- Desktop PiP remains outside the main focal area.
+- Mobile PiP is compact and kept away from the filter/control area.
+
+UNCHANGED
+- Young + Slim processing from 6831.
+- Orientation.
+- Other filters.
+- Call signaling/media/chat.

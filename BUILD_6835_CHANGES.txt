@@ -1,0 +1,9 @@
+CONNECTCHAT PRO v6.7.3 — BUILD 6835
+
+LAPTOP VIDEO CALL SCREEN CORRECTED
+
+- Laptop call stage now remains centered at a controlled responsive 16:9 size.
+- Portrait phone video fits naturally inside the laptop stage without stretching.
+- The small video preview is landscape, wider and shorter.
+- The small preview stays inside the bottom-right corner of the video stage.
+- Existing mobile call layout, filters, swapping, and camera orientation are unchanged.

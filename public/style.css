@@ -4,6 +4,86 @@
   --border:#e2e8f0;--accent:#5b6cff;--accent2:#7f56d9;--success:#22b573;
   --danger:#df4b56;--dark:#182132
 }
+
+/* BUILD 6837 FINAL OVERRIDE — must remain last so earlier call-layout builds
+   cannot move the desktop stage or PiP. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
+  }
+}
 html,body{height:100%}
 body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 button,input{font:inherit}.hidden{display:none!important}
@@ -855,6 +935,87 @@ body{position:fixed;inset:0;overflow:hidden}
   }
   .appearance-settings{
     grid-column:auto;
+  }
+}
+
+
+/* BUILD 6837 — center laptop calls at compact browser widths and keep both
+   camera videos visible. Mobile phones remain on the <=600px layout. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
   }
 }
 
@@ -2121,3 +2282,829 @@ body.call-active #callOverlay{display:flex!important;visibility:visible!importan
 .ai-attachment-item.error{border-color:#e5a3a3!important;background:#fff4f4!important}
 .ai-attachment-status{display:block;margin-top:2px}
 #aiAttachmentTray{position:relative;z-index:40}
+
+/* Build 6816: stable swapped-video proportions and compact mobile controls.
+   This block is intentionally last so older responsive rules cannot override it. */
+@media(min-width:801px){
+  .call-card{
+    width:min(920px,calc(100vw - 48px));
+    height:min(750px,calc(100dvh - 28px));
+  }
+  .video-stage{
+    width:min(900px,80vw,calc(52dvh * 16 / 9));
+    max-width:100%;
+    aspect-ratio:16/9;
+    justify-self:center;
+  }
+  #localVideo,
+  .video-stage.self-main #remoteVideo{
+    width:clamp(170px,19vw,230px);
+    height:clamp(96px,10.7vw,130px);
+    aspect-ratio:16/9;
+    object-fit:cover;
+  }
+  .video-stage.self-main #localVideo{
+    width:100%;
+    height:100%;
+    max-width:none;
+    aspect-ratio:auto;
+    object-fit:contain;
+  }
+}
+
+@media(max-width:800px){
+  .call-card{
+    grid-template-rows:58px minmax(240px,1fr) auto;
+    gap:6px;
+    padding:max(env(safe-area-inset-top),6px) 10px max(env(safe-area-inset-bottom),7px);
+  }
+  .call-title{min-height:0;padding:2px 8px}
+  .video-stage{
+    min-height:240px;
+    align-self:stretch;
+  }
+  #localVideo,
+  .video-stage.self-main #remoteVideo{
+    width:140px;
+    height:79px;
+    max-width:38%;
+    aspect-ratio:16/9;
+    object-fit:cover;
+  }
+  .video-stage.self-main #localVideo{
+    width:100%;
+    height:100%;
+    max-width:none;
+    aspect-ratio:auto;
+    object-fit:contain;
+  }
+  .call-controls{
+    position:relative;
+    padding:6px 3px 1px;
+    gap:6px;
+  }
+  .call-controls button,
+  .call-control{
+    min-height:40px;
+    padding:7px 6px;
+    font-size:13px;
+  }
+  .call-filter-tray{
+    position:fixed;
+    left:10px;
+    right:10px;
+    bottom:calc(62px + env(safe-area-inset-bottom));
+    width:auto;
+    z-index:2147483647;
+    margin:0;
+    padding:10px 7px;
+    box-shadow:0 18px 55px rgba(0,0,0,.55);
+  }
+  .call-filter-tray button{flex-basis:58px}
+  .filter-swatch{width:40px;height:40px}
+}
+
+
+/* Build 6818 — call video orientation + PiP layout unification */
+#localVideo,
+#remoteVideo,
+.call-video,
+.video-tile video {
+  transform: none !important;
+}
+
+/* Keep the small video from covering too much of the big video. */
+.call-video-stage,
+.video-call-stage,
+#videoCallStage,
+.call-stage {
+  position: relative;
+}
+
+#localVideo.small,
+#remoteVideo.small,
+.video-tile.small,
+.call-pip,
+.video-pip,
+.pip-video {
+  width: clamp(150px, 18vw, 230px) !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9 !important;
+  max-height: 26vh !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+}
+
+/* Desktop: keep PiP tucked to the edge with a safe margin. */
+@media (min-width: 769px) {
+  .call-pip,
+  .video-pip,
+  .pip-video,
+  #localVideo.small,
+  #remoteVideo.small,
+  .video-tile.small {
+    right: 18px !important;
+    bottom: 88px !important;
+    left: auto !important;
+    top: auto !important;
+  }
+}
+
+/* Mobile: smaller PiP so main video remains clearly visible. */
+@media (max-width: 768px) {
+  .call-pip,
+  .video-pip,
+  .pip-video,
+  #localVideo.small,
+  #remoteVideo.small,
+  .video-tile.small {
+    width: min(34vw, 150px) !important;
+    max-height: 22vh !important;
+    right: 10px !important;
+    bottom: 92px !important;
+    left: auto !important;
+    top: auto !important;
+    border-radius: 12px !important;
+  }
+}
+
+
+/* BUILD 6819 — exact call/camera orientation and PiP overrides.
+   Actual left stays left; actual right stays right. */
+#localVideo,
+#remoteVideo,
+#captureVideo,
+#captureCanvas {
+  transform: none !important;
+}
+
+/* The real PiP elements are #localVideo normally and #remoteVideo after swap. */
+@media (min-width: 801px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position: absolute !important;
+    right: 14px !important;
+    bottom: 14px !important;
+    left: auto !important;
+    top: auto !important;
+    width: clamp(138px, 15vw, 185px) !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 105px !important;
+    object-fit: cover !important;
+    border-radius: 13px !important;
+    z-index: 3 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position: absolute !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    left: auto !important;
+    top: auto !important;
+    width: min(30vw, 118px) !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 72px !important;
+    object-fit: cover !important;
+    border-radius: 11px !important;
+    z-index: 3 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    transform: none !important;
+  }
+}
+
+
+/* BUILD 6820 — exact user-approved orientation and compact PiP.
+   Front camera is selfie-oriented: physical left appears screen-left. */
+#captureVideo.front-camera-corrected,
+#localVideo.front-camera-corrected {
+  transform: scaleX(-1) !important;
+}
+
+/* Do not move the PiP to a new location; keep bottom-right but make it compact. */
+@media (min-width: 801px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position:absolute !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:124px !important;
+    height:70px !important;
+    min-width:0 !important;
+    max-width:124px !important;
+    max-height:70px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:11px !important;
+    border:1px solid rgba(255,255,255,.78) !important;
+    z-index:5 !important;
+  }
+}
+@media (max-width: 800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position:absolute !important;
+    right:8px !important;
+    bottom:8px !important;
+    left:auto !important;
+    top:auto !important;
+    width:96px !important;
+    height:54px !important;
+    min-width:0 !important;
+    max-width:96px !important;
+    max-height:54px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:9px !important;
+    border:1px solid rgba(255,255,255,.78) !important;
+    z-index:5 !important;
+  }
+}
+
+
+/* BUILD 6823 — exact requested orientation + tap-to-swap call layout */
+
+/* Front/self preview: physical left appears on screen-left. */
+#localVideo,
+#captureVideo {
+  transform-origin: center center !important;
+}
+
+/* Main video fills the stage. */
+#videoStage:not(.self-main) #remoteVideo,
+#videoStage.self-main #localVideo {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  max-width:100% !important;
+  max-height:100% !important;
+  object-fit:contain !important;
+  border-radius:inherit !important;
+  z-index:1 !important;
+}
+
+/* Small PiP stays bottom-right, but does not hide much of main video. */
+#videoStage:not(.self-main) #localVideo,
+#videoStage.self-main #remoteVideo {
+  position:absolute !important;
+  right:12px !important;
+  bottom:12px !important;
+  left:auto !important;
+  top:auto !important;
+  width:132px !important;
+  height:74px !important;
+  min-width:132px !important;
+  max-width:132px !important;
+  min-height:74px !important;
+  max-height:74px !important;
+  aspect-ratio:16/9 !important;
+  object-fit:cover !important;
+  border-radius:11px !important;
+  border:1px solid rgba(255,255,255,.8) !important;
+  box-shadow:0 4px 14px rgba(0,0,0,.35) !important;
+  z-index:4 !important;
+  cursor:pointer !important;
+}
+
+/* Mobile parity: same behavior, smaller PiP. */
+@media (max-width:800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    right:8px !important;
+    bottom:8px !important;
+    width:100px !important;
+    height:56px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    min-height:56px !important;
+    max-height:56px !important;
+    border-radius:9px !important;
+  }
+}
+
+
+/* BUILD 6832 — adaptive call framing from Build 6831.
+   Preserve the actual source orientation instead of forcing portrait/landscape. */
+
+#videoStage{
+  overflow:hidden !important;
+}
+
+/* Main video always shows the full source, never stretched/cropped. */
+#videoStage:not(.self-main) #remoteVideo,
+#videoStage.self-main #localVideo{
+  object-fit:contain !important;
+  object-position:center center !important;
+}
+
+/* Landscape main source on desktop: controlled centered 16:9 presentation. */
+@media (min-width:801px){
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    aspect-ratio:16/9 !important;
+    max-height:min(72vh,720px) !important;
+  }
+
+  /* Portrait source stays portrait and centered instead of being stretched wide. */
+  #videoStage.remote-portrait:not(.self-main) #remoteVideo,
+  #videoStage.local-portrait.self-main #localVideo{
+    width:min(100%,520px) !important;
+    height:100% !important;
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%) !important;
+    object-fit:contain !important;
+  }
+}
+
+
+/* BUILD 6836 — camera Photo/Video filter picker matching the approved design. */
+#captureOverlay .capture-filter-control{
+  position:relative !important;
+  overflow:visible !important;
+}
+#captureOverlay .camera-filter-picker{
+  position:relative;
+  flex:1 1 auto;
+  min-width:0;
+}
+#captureOverlay .camera-filter-button{
+  width:100%;
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:2px solid #2687ed;
+  border-radius:999px;
+  padding:9px 16px;
+  background:rgba(30,30,30,.92);
+  color:#fff;
+  font:inherit;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+  box-shadow:0 0 0 3px rgba(38,135,237,.24);
+}
+#captureOverlay .camera-filter-chevron{
+  font-size:17px;
+  line-height:1;
+  transition:transform .18s ease;
+}
+#captureOverlay .camera-filter-button[aria-expanded="true"] .camera-filter-chevron{
+  transform:rotate(180deg);
+}
+#captureOverlay .camera-filter-menu{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:calc(100% + 10px);
+  z-index:20;
+  max-height:min(62vh,520px);
+  overflow-y:auto;
+  padding:16px;
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:30px;
+  background:rgba(235,235,235,.78);
+  -webkit-backdrop-filter:blur(24px) saturate(135%);
+  backdrop-filter:blur(24px) saturate(135%);
+  box-shadow:0 18px 48px rgba(0,0,0,.34);
+}
+#captureOverlay .camera-filter-menu button{
+  position:relative;
+  width:100%;
+  min-height:54px;
+  display:block;
+  border:0;
+  border-radius:14px;
+  padding:10px 12px 10px 48px;
+  background:transparent;
+  color:#111;
+  font:inherit;
+  font-size:clamp(18px,2.1vw,27px);
+  text-align:left;
+  cursor:pointer;
+}
+#captureOverlay .camera-filter-menu button:hover,
+#captureOverlay .camera-filter-menu button:focus-visible{
+  background:rgba(255,255,255,.42);
+  outline:none;
+}
+#captureOverlay .camera-filter-menu button.active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:25px;
+  font-weight:800;
+}
+@media(max-width:800px){
+  #captureOverlay .capture-filter-control{
+    width:min(94vw,560px) !important;
+    margin:7px auto !important;
+  }
+  #captureOverlay .camera-filter-menu{
+    left:-54px;
+    right:0;
+    padding:13px;
+    border-radius:28px;
+    max-height:min(58vh,470px);
+  }
+  #captureOverlay .camera-filter-menu button{
+    min-height:50px;
+    padding-left:45px;
+    font-size:20px;
+  }
+}
+
+/* On mobile, let portrait sources use the available height and landscape sources
+   remain contained without forced cropping. */
+@media (max-width:800px){
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main{
+    min-height:54vh !important;
+  }
+
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    aspect-ratio:16/9 !important;
+    min-height:0 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    object-fit:contain !important;
+  }
+}
+
+/* PiP remains compact 16:9 and does not drive main-video orientation. */
+#videoStage:not(.self-main) #localVideo,
+#videoStage.self-main #remoteVideo{
+  object-fit:cover !important;
+  aspect-ratio:16/9 !important;
+}
+
+
+/* BUILD 6833 — larger adaptive call stage + compact scrolling filter tray */
+@media (min-width:801px){
+  #videoStage{
+    width:min(88vw,1100px) !important;
+    max-width:1100px !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    width:min(86vw,1080px) !important;
+    aspect-ratio:16/9 !important;
+    max-height:72vh !important;
+  }
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main{
+    width:min(52vw,620px) !important;
+    max-width:620px !important;
+    min-height:min(72vh,760px) !important;
+    margin-inline:auto !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:-150px !important;
+    bottom:8px !important;
+    width:132px !important;
+    height:74px !important;
+    max-width:132px !important;
+    max-height:74px !important;
+  }
+}
+@media (max-width:800px){
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:8px !important;
+    bottom:74px !important;
+    width:100px !important;
+    height:56px !important;
+    max-width:100px !important;
+    max-height:56px !important;
+  }
+}
+
+#callFilterTray,
+.call-filter-tray{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  gap:10px !important;
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
+  overscroll-behavior-x:contain !important;
+  -webkit-overflow-scrolling:touch !important;
+  scroll-snap-type:x proximity !important;
+  scrollbar-width:thin !important;
+  max-width:min(94vw,1100px) !important;
+  margin-inline:auto !important;
+  padding:10px 12px !important;
+}
+#callFilterTray > *,
+.call-filter-tray > *{
+  flex:0 0 auto !important;
+  scroll-snap-align:center !important;
+}
+#callFilterTray [data-call-filter],
+.call-filter-tray [data-call-filter]{
+  min-width:88px !important;
+  max-width:104px !important;
+  padding:8px 10px !important;
+  border-radius:14px !important;
+}
+
+@media (max-width:800px){
+  #callFilterTray,
+  .call-filter-tray{
+    max-height:104px !important;
+    padding:8px 10px !important;
+    gap:8px !important;
+  }
+  #callFilterTray [data-call-filter],
+  .call-filter-tray [data-call-filter]{
+    min-width:78px !important;
+    max-width:92px !important;
+    padding:6px 8px !important;
+    font-size:12px !important;
+  }
+}
+
+.call-controls,
+#callControls{
+  position:relative !important;
+  z-index:6 !important;
+}
+
+
+/* BUILD 6834 — exact call sizing + true horizontal filter scrolling */
+
+/* The call stage must not inherit an old fixed 16:9 ratio for portrait sources. */
+@media (min-width:801px){
+  #videoStage.remote-portrait:not(.self-main){
+    height:min(74vh,760px) !important;
+    width:auto !important;
+    aspect-ratio:var(--remote-ar, 0.5625) !important;
+    max-width:min(72vw,620px) !important;
+    min-height:520px !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.local-portrait.self-main{
+    height:min(74vh,760px) !important;
+    width:auto !important;
+    aspect-ratio:var(--local-ar, 0.5625) !important;
+    max-width:min(72vw,620px) !important;
+    min-height:520px !important;
+    margin-inline:auto !important;
+  }
+
+  #videoStage.remote-landscape:not(.self-main){
+    width:min(86vw,1080px) !important;
+    height:auto !important;
+    aspect-ratio:var(--remote-ar,1.7778) !important;
+    max-height:74vh !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.local-landscape.self-main{
+    width:min(86vw,1080px) !important;
+    height:auto !important;
+    aspect-ratio:var(--local-ar,1.7778) !important;
+    max-height:74vh !important;
+    margin-inline:auto !important;
+  }
+
+  /* PiP stays close to the stage edge but outside the participant's face. */
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:-142px !important;
+    bottom:12px !important;
+    width:126px !important;
+    height:71px !important;
+    max-width:126px !important;
+    max-height:71px !important;
+  }
+}
+
+/* Mobile main view preserves actual source aspect ratio, without changing the good 6832 size. */
+@media (max-width:800px){
+  #videoStage.remote-portrait:not(.self-main){
+    aspect-ratio:var(--remote-ar,0.5625) !important;
+  }
+  #videoStage.local-portrait.self-main{
+    aspect-ratio:var(--local-ar,0.5625) !important;
+  }
+
+  /* Lift PiP above the carousel/controls so it doesn't cover the important lower face/body area. */
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:10px !important;
+    bottom:18px !important;
+    width:94px !important;
+    height:53px !important;
+    max-width:94px !important;
+    max-height:53px !important;
+  }
+}
+
+/* Real horizontal scroll/swipe on both laptop and mobile. */
+#callFilterTray,
+.call-filter-tray{
+  justify-content:flex-start !important;
+  overflow-x:scroll !important;
+  overflow-y:hidden !important;
+  touch-action:pan-x !important;
+  -webkit-overflow-scrolling:touch !important;
+  scroll-behavior:smooth !important;
+  scroll-snap-type:x proximity !important;
+  cursor:grab !important;
+}
+#callFilterTray:active,
+.call-filter-tray:active{
+  cursor:grabbing !important;
+}
+#callFilterTray [data-call-filter],
+.call-filter-tray [data-call-filter]{
+  flex:0 0 auto !important;
+  touch-action:pan-x !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+}
+
+/* Mobile tray remains compact; it should never become a tall overlay. */
+@media (max-width:800px){
+  #callFilterTray,
+  .call-filter-tray{
+    left:8px !important;
+    right:8px !important;
+    max-height:98px !important;
+    padding:7px 8px !important;
+    gap:7px !important;
+  }
+  #callFilterTray [data-call-filter],
+  .call-filter-tray [data-call-filter]{
+    min-width:74px !important;
+    max-width:82px !important;
+  }
+}
+
+
+/* BUILD 6835 — corrected laptop call screen.
+   Desktop always uses a controlled 16:9 stage. Portrait phone video is
+   contained inside it without stretching, and PiP remains inside the stage. */
+@media (min-width:801px){
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    width:min(82vw,960px,calc((100vh - 230px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 230px) !important;
+    aspect-ratio:16/9 !important;
+    margin-inline:auto !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center center !important;
+    background:#111827 !important;
+  }
+
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:14px !important;
+    bottom:14px !important;
+    left:auto !important;
+    top:auto !important;
+    width:160px !important;
+    height:90px !important;
+    min-width:160px !important;
+    min-height:90px !important;
+    max-width:160px !important;
+    max-height:90px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:12px !important;
+    z-index:5 !important;
+  }
+}
+
+/* BUILD 6837 LAST RULE — laptop call center and reliable PiP placement. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
+  }
+}

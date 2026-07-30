@@ -1,0 +1,8 @@
+BUILD 6824 — CAMERA ONLY FIX
+- Keeps Build 6823 orientation, Young + Slim filters, calls and PiP swap.
+- Laptop camera starts with front/user camera instead of requesting a rear camera first.
+- Camera request falls back to video:true when facingMode is unavailable.
+- Photo mode requests camera only; video mode requests camera + microphone.
+- Correctly distinguishes permission denied, camera busy, camera missing, and constraint errors.
+- Camera failures are now logged to Console for diagnosis.
+- app.js validated with node --check.

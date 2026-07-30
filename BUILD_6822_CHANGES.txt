@@ -1,0 +1,4 @@
+BUILD 6822
+- Fixed browser JavaScript syntax error preventing login.
+- Retains latest filter/orientation/PiP work.
+- Cache-busted assets to 6822.
