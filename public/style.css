@@ -84,6 +84,211 @@
     margin-inline:auto !important;
   }
 }
+
+/* BUILD 6838 LAST RULE — vertical live video-call filter menu. */
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(430px,calc(100vw - 36px)) !important;
+  max-width:430px !important;
+  max-height:min(62vh,520px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:15px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:30px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:52px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:10px 12px 10px 48px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:21px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:24px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(58vh,470px) !important;
+    padding:12px !important;
+    border-radius:27px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:48px !important;
+    padding-left:44px !important;
+    font-size:19px !important;
+  }
+}
+
+/* BUILD 6838 — the approved vertical filter selector is now used during
+   live video calls on laptop and mobile. */
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(430px,calc(100vw - 36px)) !important;
+  max-width:430px !important;
+  max-height:min(62vh,520px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:15px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:30px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:52px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:10px 12px 10px 48px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:21px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:24px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(58vh,470px) !important;
+    padding:12px !important;
+    border-radius:27px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:48px !important;
+    padding-left:44px !important;
+    font-size:19px !important;
+  }
+}
 html,body{height:100%}
 body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 button,input{font:inherit}.hidden{display:none!important}

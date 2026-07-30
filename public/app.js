@@ -2637,11 +2637,8 @@ if(callFilterButton)callFilterButton.onclick=()=>{
 };
 document.querySelectorAll("[data-call-filter]").forEach(button=>button.onclick=()=>{
   setCameraFilter(button.dataset.callFilter);
-  button.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
-  if(window.matchMedia?.("(max-width: 800px)")?.matches){
-    callFilterTray?.classList.add("hidden");
-    callFilterButton?.setAttribute("aria-expanded","false");
-  }
+  callFilterTray?.classList.add("hidden");
+  callFilterButton?.setAttribute("aria-expanded","false");
 });
 
 $("captureMainBtn").onclick=captureMain;
