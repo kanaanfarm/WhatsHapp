@@ -2613,7 +2613,7 @@ const FILTER_LABELS={normal:"Normal",beauty:"Beauty / Smooth",youngslim:"🌿 Yo
 const cameraFilterSelect=$("cameraFilterSelect"),callFilterSelect=$("callFilterSelect");
 function setCameraFilter(value){
   cameraFilter=CAMERA_FILTERS[value]?value:"normal";applyCameraFilter();applyCaptureFilterOnly();
-  if(cameraFilter==="beauty"||cameraFilter==="youngslim")window.ConnectChatFaceBeauty?.warmUp();
+  if((cameraFilter==="beauty"||cameraFilter==="youngslim")&&captureStream?.active)window.ConnectChatFaceBeauty?.warmUp();
   sendCurrentCallFilter();
 }
 function sendCurrentCallFilter(){
@@ -2654,15 +2654,38 @@ document.addEventListener("keydown",event=>{
   if(event.key==="Escape")closeCameraFilterMenu();
 });
 const callFilterButton=$("callFilterBtn"),callFilterTray=$("callFilterTray");
-if(callFilterButton)callFilterButton.onclick=()=>{
-  if(!callFilterTray)return;
-  callFilterTray.classList.toggle("hidden");
-  callFilterButton.setAttribute("aria-expanded",String(!callFilterTray.classList.contains("hidden")));
-};
-document.querySelectorAll("[data-call-filter]").forEach(button=>button.onclick=()=>{
-  setCameraFilter(button.dataset.callFilter);
+function closeCallFilterTray(){
   callFilterTray?.classList.add("hidden");
   callFilterButton?.setAttribute("aria-expanded","false");
+}
+if(callFilterButton)callFilterButton.onclick=event=>{
+  event.stopPropagation();
+  if(!callFilterTray)return;
+  const opening=callFilterTray.classList.contains("hidden");
+  callFilterTray.classList.toggle("hidden",!opening);
+  callFilterButton.setAttribute("aria-expanded",String(opening));
+};
+document.querySelectorAll("[data-call-filter]").forEach(button=>button.onclick=event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  setCameraFilter(button.dataset.callFilter);
+  closeCallFilterTray();
+  requestAnimationFrame(closeCallFilterTray);
+  setTimeout(closeCallFilterTray,80);
+});
+callFilterTray?.addEventListener("pointerup",event=>{
+  const option=event.target.closest("[data-call-filter]");
+  if(!option)return;
+  event.preventDefault();
+  event.stopPropagation();
+  setCameraFilter(option.dataset.callFilter);
+  closeCallFilterTray();
+  requestAnimationFrame(closeCallFilterTray);
+});
+document.addEventListener("click",event=>{
+  if(!event.target.closest("#callFilterTray,#callFilterBtn")){
+    closeCallFilterTray();
+  }
 });
 
 $("captureMainBtn").onclick=captureMain;
