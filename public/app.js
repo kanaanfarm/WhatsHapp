@@ -1003,12 +1003,26 @@ function setCallVideoSwap(swapped){
 function bindCallVideoSwap(){
   const stage=$("videoStage"),local=$("localVideo"),remote=$("remoteVideo");
   if(!stage||!local||!remote)return;
-  local.onclick=()=>{
-    if(!stage.classList.contains("self-main")&&!stage.classList.contains("audio-only"))setCallVideoSwap(true);
+  if(stage.dataset.whatsappSwapBound==="1")return;
+  stage.dataset.whatsappSwapBound="1";
+  local.tabIndex=0;
+  remote.tabIndex=0;
+  local.setAttribute("role","button");
+  remote.setAttribute("role","button");
+  const swap=event=>{
+    if(stage.classList.contains("audio-only"))return;
+    if(event.target!==local&&event.target!==remote)return;
+    setCallVideoSwap(!stage.classList.contains("self-main"));
+    syncFrontCameraOrientation();
+    applyRemoteOrientationCorrection();
   };
-  remote.onclick=()=>{
-    if(stage.classList.contains("self-main")&&!stage.classList.contains("audio-only"))setCallVideoSwap(false);
-  };
+  stage.addEventListener("click",swap);
+  stage.addEventListener("keydown",event=>{
+    if((event.key==="Enter"||event.key===" ")&&(event.target===local||event.target===remote)){
+      event.preventDefault();
+      swap(event);
+    }
+  });
 }
 
 function outgoingFrontOrientationCorrection(){
@@ -1197,16 +1211,7 @@ function bindTapToSwapVideos(){
   const stage=$("videoStage");
   if(!stage||stage.dataset.tapSwapBound==="1")return;
   stage.dataset.tapSwapBound="1";
-  stage.addEventListener("click",event=>{
-    const local=$("localVideo"),remote=$("remoteVideo");
-    if(!local||!remote)return;
-    const selfMain=stage.classList.contains("self-main");
-    const pip=selfMain?remote:local;
-    if(event.target!==pip)return;
-    stage.classList.toggle("self-main");
-    syncFrontCameraOrientation();
-    applyRemoteOrientationCorrection();
-  });
+  bindCallVideoSwap();
 }
 
 async function startCall(mode){
