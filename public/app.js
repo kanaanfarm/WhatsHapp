@@ -2141,7 +2141,7 @@ function stopVideoHoldRecording(){
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureReviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureReviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0,captureExitTimer=null;
 const captureRecipientIds=new Set();
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
@@ -2448,7 +2448,8 @@ function captureMediaErrorMessage(error,mode){
 
 async function prepareCapture(mode){
   captureMode=mode; stopCaptureStream(); stopCaptureClock(); resetCaptureResult();
-  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");refreshCaptureOrientation();
+  clearTimeout(captureExitTimer);captureExitTimer=null;
+  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.toggle("photo-mode",mode==="photo");$("captureOverlay").classList.remove("recording","show-capture-exit");refreshCaptureOrientation();
   $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);
   document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
   try{
@@ -2473,8 +2474,9 @@ function openCapture(mode){
 }
 function closeCapture(){
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
+  clearTimeout(captureExitTimer);captureExitTimer=null;
   captureRecorder=null;captureChunks=[];captureStopping=false;closeCaptureRecipientPicker();closeCapturePhotoReview();clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;captureReceiverId=null;
-  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording","result-ready","capture-landscape");
+  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording","result-ready","capture-landscape","photo-mode","show-capture-exit");
 }
 function showCaptureResult(){
   stopCaptureClock(false);
@@ -2863,6 +2865,13 @@ recordButton.title="Record voice";recordButton.setAttribute("aria-label","Record
 cameraButton.onclick=()=>openCapture("photo");cameraButton.title="Photo or video";cameraButton.setAttribute("aria-label","Open photo or video recorder");
 
 let capturePinchStart=0,capturePinchBase=1;
+function showCaptureExitTemporarily(){
+  const overlay=$("captureOverlay");
+  if(captureMode!=="photo"||captureBlob||overlay.classList.contains("hidden")||overlay.classList.contains("result-ready"))return;
+  overlay.classList.add("show-capture-exit");
+  clearTimeout(captureExitTimer);
+  captureExitTimer=setTimeout(()=>overlay.classList.remove("show-capture-exit"),3000);
+}
 function setCapturePhotoScale(value){
   capturePhotoScale=Math.max(1,Math.min(4,value));
   const canvas=$("captureCanvas");if(canvas){canvas.style.transform=`scale(${capturePhotoScale})`;canvas.style.transformOrigin="center center";}
@@ -2873,6 +2882,7 @@ $("capturePreview").addEventListener("wheel",event=>{
 $("captureCanvas").addEventListener("click",()=>{
   if(captureMode==="photo"&&captureBlob&&$("captureOverlay").classList.contains("result-ready"))openCapturePhotoReview();
 });
+$("capturePreview").addEventListener("click",showCaptureExitTemporarily);
 document.addEventListener("keydown",event=>{
   if(event.key!=="Escape")return;
   if(!$("captureRecipientPicker")?.classList.contains("hidden")){closeCaptureRecipientPicker();return}
