@@ -1186,9 +1186,7 @@ function showCallUi(name,status,mode,incoming=false){
   $("cameraToggleBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("switchCameraBtn").classList.toggle("hidden",incoming||mode==="audio");
   $("shareScreenBtn").classList.toggle("hidden",incoming||mode==="audio");
-  $("callFilterBtn")?.classList.toggle("hidden",incoming||mode==="audio");
-  $("callFilterTray")?.classList.add("hidden");
-  $("callFilterBtn")?.setAttribute("aria-expanded","false");
+  $("callFilterControl")?.classList.toggle("hidden",incoming||mode==="audio");
   $("endCallBtn").classList.toggle("hidden",incoming);
 }
 
