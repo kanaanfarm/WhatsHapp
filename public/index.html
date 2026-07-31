@@ -7,8 +7,8 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6847">
-  <link rel="stylesheet" href="style-6847.css?v=6847">
+  <link rel="stylesheet" href="style.css?v=6848">
+  <link rel="stylesheet" href="style-6848.css?v=6848">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -281,6 +281,15 @@
           <button id="captureReviewSendBtn" class="capture-review-send" type="button">➤ Send</button>
         </div>
       </div>
+      <div id="captureRecipientPicker" class="capture-recipient-picker hidden" role="dialog" aria-modal="true" aria-label="Share selfie with ConnectChat users">
+        <div class="capture-recipient-card">
+          <div class="capture-recipient-head"><div><b>Share inside ConnectChat</b><small>Select one or more approved users</small></div><button id="captureRecipientCloseBtn" type="button" aria-label="Close recipient list">×</button></div>
+          <input id="captureRecipientSearch" type="search" placeholder="Search users" autocomplete="off">
+          <div id="captureRecipientList" class="capture-recipient-list"></div>
+          <div id="captureRecipientSummary" class="capture-recipient-summary">No users selected</div>
+          <div class="capture-recipient-actions"><button id="captureExternalShareBtn" type="button">↗ Other apps</button><button id="captureRecipientSendBtn" type="button" disabled>➤ Send selected</button></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -459,7 +468,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6847"></script>
-  <script src="app.js?v=6847"></script>
+  <script type="module" src="face-filters.js?v=6848"></script>
+  <script src="app.js?v=6848"></script>
 </body>
 </html>

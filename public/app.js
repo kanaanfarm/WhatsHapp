@@ -2142,6 +2142,7 @@ const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 
 let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureReviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0;
+const captureRecipientIds=new Set();
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -2164,19 +2165,35 @@ function captureVideoConstraints(){
 function isMobileCapture(){
   return Boolean(window.matchMedia?.("(max-width: 800px) and (orientation: portrait)")?.matches);
 }
+function isMobileCaptureDevice(){return Boolean(window.matchMedia?.("(pointer: coarse)")?.matches&&Math.min(screen.width,screen.height)<=900)}
+function captureIsLandscape(){return isMobileCaptureDevice()&&window.innerWidth>window.innerHeight}
 function captureOutputDimensions(sourceWidth,sourceHeight){
-  if(!isMobileCapture())return {width:sourceWidth,height:sourceHeight};
+  if(!isMobileCaptureDevice())return {width:sourceWidth,height:sourceHeight};
   const preview=$("capturePreview");
   const measuredRatio=preview?.clientWidth&&preview?.clientHeight
     ?preview.clientWidth/preview.clientHeight
-    :3/4;
+    :(captureIsLandscape()?16/9:3/4);
   // Match the exact portrait window shown before capture. The clamp protects
   // against a temporary zero/abnormal layout while the overlay opens.
-  const targetRatio=Math.max(.56,Math.min(.92,measuredRatio));
+  const targetRatio=captureIsLandscape()
+    ?Math.max(1.20,Math.min(2.05,measuredRatio))
+    :Math.max(.56,Math.min(.92,measuredRatio));
   if(sourceWidth/sourceHeight>targetRatio){
     return {width:Math.max(1,Math.round(sourceHeight*targetRatio)),height:sourceHeight};
   }
   return {width:sourceWidth,height:Math.max(1,Math.round(sourceWidth/targetRatio))};
+}
+
+let captureOrientationTimer=null;
+function refreshCaptureOrientation(){
+  const overlay=$("captureOverlay");if(!overlay)return;
+  overlay.classList.toggle("capture-landscape",captureIsLandscape());
+  if(overlay.classList.contains("hidden")||captureMode==="voice"||overlay.classList.contains("result-ready"))return;
+  clearTimeout(captureOrientationTimer);
+  captureOrientationTimer=setTimeout(()=>{
+    applyCaptureFilterOnly();
+    const video=$("captureVideo");if(video?.srcObject)video.play().catch(()=>{});
+  },160);
 }
 
 function limitFilterDimensions(dimensions,maxPixels=921600){
@@ -2230,6 +2247,36 @@ function closeCapturePhotoReview(){
   $("capturePhotoReview")?.classList.add("hidden");
   const image=$("captureReviewImage");if(image)image.removeAttribute("src");
   if(captureReviewUrl){URL.revokeObjectURL(captureReviewUrl);captureReviewUrl=null}
+}
+function closeCaptureRecipientPicker(){
+  $("captureRecipientPicker")?.classList.add("hidden");
+  captureRecipientIds.clear();
+  const search=$("captureRecipientSearch");if(search)search.value="";
+}
+function availableCaptureRecipients(){
+  return users.filter(user=>!user.isSelf&&!user.isAI&&!user.isGroup&&Number.isFinite(Number(user.id)));
+}
+function renderCaptureRecipients(){
+  const list=$("captureRecipientList");if(!list)return;
+  const query=String($("captureRecipientSearch")?.value||"").trim().toLowerCase();
+  const contacts=availableCaptureRecipients().filter(user=>{
+    const name=String(user.displayName||user.username||"").toLowerCase();
+    return !query||name.includes(query)||String(user.username||"").toLowerCase().includes(query);
+  });
+  list.innerHTML=contacts.map(user=>{
+    const id=Number(user.id),name=escapeHtml(user.displayName||user.username||`User ${id}`);
+    return `<label class="capture-recipient-row"><input type="checkbox" value="${id}" ${captureRecipientIds.has(id)?"checked":""}><span class="avatar">${avatarHtml(user,initials(user.displayName||user.username||"U"))}</span><span><b>${name}</b><small>${user.online?"Online":"Offline"}</small></span></label>`;
+  }).join("")||'<div class="capture-recipient-empty">No approved users found.</div>';
+  const selected=captureRecipientIds.size;
+  $("captureRecipientSummary").textContent=selected?`${selected} user${selected===1?"":"s"} selected`:"No users selected";
+  $("captureRecipientSendBtn").disabled=!selected;
+}
+function openCaptureRecipientPicker(){
+  if(captureMode!=="photo"||!captureBlob||captureBlob.size<1024)return;
+  captureRecipientIds.clear();
+  $("captureRecipientPicker").classList.remove("hidden");
+  renderCaptureRecipients();
+  $("captureRecipientSearch")?.focus();
 }
 function stopCaptureStream(){
   stopCaptureLivePreview();
@@ -2332,7 +2379,7 @@ function setCaptureShareReady(ready){
   const share=$("captureShareBtn");if(share)share.classList.toggle("hidden",!(ready&&captureMode==="photo"));
 }
 function resetCaptureResult(){
-  closeCapturePhotoReview();clearCapturePreviewUrl();captureBlob=null;captureStopping=false;capturePreviewPlaying=false;capturePhotoScale=1;
+  closeCaptureRecipientPicker();closeCapturePhotoReview();clearCapturePreviewUrl();captureBlob=null;captureStopping=false;capturePreviewPlaying=false;capturePhotoScale=1;
   const canvas=$("captureCanvas");canvas.style.transform="scale(1)";canvas.classList.add("hidden");
   $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);setCapturePreviewReady(false);setCaptureSaveReady(false);setCaptureShareReady(false);
   $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
@@ -2401,7 +2448,7 @@ function captureMediaErrorMessage(error,mode){
 
 async function prepareCapture(mode){
   captureMode=mode; stopCaptureStream(); stopCaptureClock(); resetCaptureResult();
-  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");
+  $("captureOverlay").classList.toggle("video-mode",mode==="video");$("captureOverlay").classList.remove("recording");refreshCaptureOrientation();
   $("captureTitle").textContent=mode[0].toUpperCase()+mode.slice(1);
   document.querySelectorAll(".capture-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
   try{
@@ -2422,12 +2469,12 @@ function openCapture(mode){
   if(!activeUser)return toast("Select a user first.");
   if(activeUser.isAI)return toast("Media recording is available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia)return toast("Camera recording is not supported by this browser.");
-  captureReceiverId=Number(activeUser.id);$("captureOverlay").classList.remove("hidden");prepareCapture(mode);
+  captureReceiverId=Number(activeUser.id);$("captureOverlay").classList.remove("hidden");refreshCaptureOrientation();prepareCapture(mode);
 }
 function closeCapture(){
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
-  captureRecorder=null;captureChunks=[];captureStopping=false;closeCapturePhotoReview();clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;captureReceiverId=null;
-  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording","result-ready");
+  captureRecorder=null;captureChunks=[];captureStopping=false;closeCaptureRecipientPicker();closeCapturePhotoReview();clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;captureReceiverId=null;
+  $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording","result-ready","capture-landscape");
 }
 function showCaptureResult(){
   stopCaptureClock(false);
@@ -2712,7 +2759,7 @@ function saveCapturedPhoto(){
   link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
-async function shareCapturedPhoto(){
+async function shareCapturedPhotoExternal(){
   const file=capturedPhotoFile();if(!file)return;
   try{
     const payload={files:[file],title:"ConnectChat selfie"};
@@ -2724,6 +2771,37 @@ async function shareCapturedPhoto(){
     toast("Sharing is not supported by this browser. The selfie was saved so you can share it manually.");
   }catch(error){
     if(error?.name!=="AbortError")toast("The selfie could not be shared on this device.");
+  }
+}
+function shareCapturedPhoto(){openCaptureRecipientPicker()}
+async function sendCapturedPhotoToRecipients(){
+  const file=capturedPhotoFile();if(!file||captureSendInFlight)return;
+  const allowed=new Set(availableCaptureRecipients().map(user=>Number(user.id)));
+  const receiverIds=[...captureRecipientIds].filter(id=>allowed.has(Number(id)));
+  if(!receiverIds.length)return toast("Select at least one ConnectChat user.");
+  if(mediaUploadInFlight)return toast("Please wait for the current upload to finish.");
+  captureSendInFlight=true;mediaUploadInFlight=true;
+  const sendBtn=$("captureRecipientSendBtn");sendBtn.disabled=true;
+  $("uploadStatus").textContent=`Sharing selfie with ${receiverIds.length} user${receiverIds.length===1?"":"s"}…`;
+  $("uploadStatus").classList.remove("hidden");$("attachBtn").disabled=true;
+  const failed=[],sent=[];
+  try{
+    for(const receiverId of receiverIds){
+      const uploadId=`image:${receiverId}:${file.name}:${file.size}:${file.lastModified||0}`;
+      const fd=new FormData();fd.append("file",file);fd.append("receiverId",receiverId);fd.append("kind","image");fd.append("caption","");fd.append("uploadId",uploadId);
+      try{
+        const saved=await api("/api/upload",{method:"POST",body:fd});
+        if(!saved?.id)throw new Error("Photo upload did not create a message.");
+        sent.push(receiverId);captureRecipientIds.delete(receiverId);
+      }catch(error){console.error("ConnectChat selfie share failed",{receiverId,error});failed.push(receiverId)}
+    }
+    if(!failed.length){toast(`Selfie shared with ${sent.length} user${sent.length===1?"":"s"}.`);closeCapture();return}
+    toast(sent.length?`Shared with ${sent.length}; ${failed.length} failed. Try the remaining users again.`:`Selfie sharing failed. Please try again.`);
+    renderCaptureRecipients();
+  }finally{
+    captureSendInFlight=false;mediaUploadInFlight=false;
+    $("uploadStatus").classList.add("hidden");$("uploadStatus").textContent="Uploading…";$("attachBtn").disabled=false;
+    if(!$("captureRecipientPicker").classList.contains("hidden"))sendBtn.disabled=!captureRecipientIds.size;
   }
 }
 function openCapturePhotoReview(){
@@ -2753,6 +2831,15 @@ $("captureReviewRetakeBtn").onclick=()=>{closeCapturePhotoReview();prepareCaptur
 $("captureReviewSaveBtn").onclick=saveCapturedPhoto;
 $("captureReviewShareBtn").onclick=shareCapturedPhoto;
 $("captureReviewSendBtn").onclick=()=>{closeCapturePhotoReview();$("captureSendBtn").click()};
+$("captureRecipientCloseBtn").onclick=closeCaptureRecipientPicker;
+$("captureRecipientSearch").oninput=renderCaptureRecipients;
+$("captureRecipientList").onchange=event=>{
+  const checkbox=event.target.closest('input[type="checkbox"]');if(!checkbox)return;
+  const id=Number(checkbox.value);if(checkbox.checked)captureRecipientIds.add(id);else captureRecipientIds.delete(id);
+  renderCaptureRecipients();
+};
+$("captureExternalShareBtn").onclick=shareCapturedPhotoExternal;
+$("captureRecipientSendBtn").onclick=sendCapturedPhotoToRecipients;
 $("captureSendBtn").onclick=async()=>{
   if(!captureBlob||captureBlob.size<1024||captureSendInFlight||captureStopping)return;
   if(!captureReceiverId)return toast("The selected conversation is no longer available.");
@@ -2787,8 +2874,12 @@ $("captureCanvas").addEventListener("click",()=>{
   if(captureMode==="photo"&&captureBlob&&$("captureOverlay").classList.contains("result-ready"))openCapturePhotoReview();
 });
 document.addEventListener("keydown",event=>{
-  if(event.key==="Escape"&&!$("capturePhotoReview")?.classList.contains("hidden"))closeCapturePhotoReview();
+  if(event.key!=="Escape")return;
+  if(!$("captureRecipientPicker")?.classList.contains("hidden")){closeCaptureRecipientPicker();return}
+  if(!$("capturePhotoReview")?.classList.contains("hidden"))closeCapturePhotoReview();
 });
+window.addEventListener("orientationchange",refreshCaptureOrientation,{passive:true});
+window.addEventListener("resize",refreshCaptureOrientation,{passive:true});
 $("capturePreview").addEventListener("touchstart",event=>{
   if(captureMode!=="photo"||!captureBlob||event.touches.length!==2)return;
   capturePinchStart=Math.hypot(event.touches[0].clientX-event.touches[1].clientX,event.touches[0].clientY-event.touches[1].clientY);capturePinchBase=capturePhotoScale;
