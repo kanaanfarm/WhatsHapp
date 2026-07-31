@@ -2141,7 +2141,7 @@ function stopVideoHoldRecording(){
 const recordButton=$("recordBtn");
 const cameraButton=$("cameraBtn");
 
-let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0;
+let captureMode="photo",captureStream=null,captureRecorder=null,captureChunks=[],captureBlob=null,captureStartedAt=0,captureClock=null,captureFacing="environment",capturePreviewUrl=null,captureReviewUrl=null,captureStopping=false,capturePreviewPlaying=false,captureAutoStopTimer=null,captureReceiverId=null,capturePhotoScale=1,captureProcessedStream=null,captureFilterCanvas=null,captureFilterFrame=0,captureLivePreviewFrame=0;
 function isAppleSafariRecorder(){
   const ua=navigator.userAgent||"";
   return /Safari/i.test(ua)&&!/Chrome|CriOS|Edg|EdgiOS|OPR|Android/i.test(ua);
@@ -2226,6 +2226,11 @@ function drawCaptureCover(ctx,source,destinationWidth,destinationHeight){
   ctx.drawImage(source,sx,sy,sw,sh,0,0,destinationWidth,destinationHeight);
 }
 function clearCapturePreviewUrl(){if(capturePreviewUrl){URL.revokeObjectURL(capturePreviewUrl);capturePreviewUrl=null}}
+function closeCapturePhotoReview(){
+  $("capturePhotoReview")?.classList.add("hidden");
+  const image=$("captureReviewImage");if(image)image.removeAttribute("src");
+  if(captureReviewUrl){URL.revokeObjectURL(captureReviewUrl);captureReviewUrl=null}
+}
 function stopCaptureStream(){
   stopCaptureLivePreview();
   stopCaptureProcessedStream();
@@ -2317,16 +2322,19 @@ function setCaptureSendReady(ready){
   $("captureOverlay").classList.toggle("result-ready",Boolean(ready));
 }
 function setCapturePreviewReady(ready){
-  const preview=$("capturePreviewBtn"),show=Boolean(ready&&captureMode==="video");
-  preview.disabled=!show;preview.classList.toggle("hidden",!show);preview.textContent="▶ Preview";capturePreviewPlaying=false;
+  const preview=$("capturePreviewBtn"),show=Boolean(ready&&(captureMode==="video"||captureMode==="photo"));
+  preview.disabled=!show;preview.classList.toggle("hidden",!show);preview.textContent=captureMode==="photo"?"🔍 Preview":"▶ Preview";capturePreviewPlaying=false;
 }
 function setCaptureSaveReady(ready){
   const save=$("captureSaveBtn");if(save)save.classList.toggle("hidden",!(ready&&captureMode==="photo"));
 }
+function setCaptureShareReady(ready){
+  const share=$("captureShareBtn");if(share)share.classList.toggle("hidden",!(ready&&captureMode==="photo"));
+}
 function resetCaptureResult(){
-  clearCapturePreviewUrl();captureBlob=null;captureStopping=false;capturePreviewPlaying=false;capturePhotoScale=1;
+  closeCapturePhotoReview();clearCapturePreviewUrl();captureBlob=null;captureStopping=false;capturePreviewPlaying=false;capturePhotoScale=1;
   const canvas=$("captureCanvas");canvas.style.transform="scale(1)";canvas.classList.add("hidden");
-  $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);setCapturePreviewReady(false);setCaptureSaveReady(false);
+  $("captureRetakeBtn").classList.add("hidden");setCaptureSendReady(false);setCapturePreviewReady(false);setCaptureSaveReady(false);setCaptureShareReady(false);
   $("captureMainBtn").classList.remove("hidden");$("captureMainBtn").disabled=false;
   $("captureMainBtn").setAttribute("aria-label",captureMode==="photo"?"Take photo":"Start recording");
   $("captureSwitchBtn").classList.remove("hidden");
@@ -2418,7 +2426,7 @@ function openCapture(mode){
 }
 function closeCapture(){
   if(captureRecorder?.state==="recording"){try{captureRecorder.stop()}catch{}}
-  captureRecorder=null;captureChunks=[];captureStopping=false;clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;captureReceiverId=null;
+  captureRecorder=null;captureChunks=[];captureStopping=false;closeCapturePhotoReview();clearCapturePreviewUrl();stopCaptureStream();stopCaptureClock();captureBlob=null;captureReceiverId=null;
   $("captureOverlay").classList.add("hidden");$("captureOverlay").classList.remove("recording","result-ready");
 }
 function showCaptureResult(){
@@ -2431,7 +2439,7 @@ function showCaptureResult(){
     v.classList.remove("hidden","front-camera-corrected");v.style.transform="none";v.style.filter="none";v.preload="metadata";v.load();
     try{v.pause();v.currentTime=0}catch{}
   }
-  setCapturePreviewReady(ready);setCaptureSendReady(ready);setCaptureSaveReady(ready);
+  setCapturePreviewReady(ready);setCaptureSendReady(ready);setCaptureSaveReady(ready);setCaptureShareReady(ready);
 }
 async function finalizeCaptureRecording(recorder,mime){
   const actualType=recorder.mimeType||mime||(isAppleSafariRecorder()?"video/mp4":"video/webm");
@@ -2694,8 +2702,42 @@ document.addEventListener("click",event=>{
 $("captureMainBtn").onclick=captureMain;
 $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture(captureMode);
+function capturedPhotoFile(){
+  if(captureMode!=="photo"||!captureBlob||captureBlob.size<1024)return null;
+  return new File([captureBlob],`ConnectChat-selfie-${Date.now()}.jpg`,{type:captureBlob.type||"image/jpeg",lastModified:Date.now()});
+}
+function saveCapturedPhoto(){
+  const file=capturedPhotoFile();if(!file)return;
+  const url=URL.createObjectURL(file),link=document.createElement("a");
+  link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+async function shareCapturedPhoto(){
+  const file=capturedPhotoFile();if(!file)return;
+  try{
+    const payload={files:[file],title:"ConnectChat selfie"};
+    if(navigator.share&&(!navigator.canShare||navigator.canShare(payload))){
+      await navigator.share(payload);
+      return;
+    }
+    saveCapturedPhoto();
+    toast("Sharing is not supported by this browser. The selfie was saved so you can share it manually.");
+  }catch(error){
+    if(error?.name!=="AbortError")toast("The selfie could not be shared on this device.");
+  }
+}
+function openCapturePhotoReview(){
+  if(captureMode!=="photo"||!captureBlob||captureBlob.size<1024)return;
+  closeCapturePhotoReview();
+  captureReviewUrl=URL.createObjectURL(captureBlob);
+  const image=$("captureReviewImage");image.src=captureReviewUrl;
+  $("capturePhotoReview").classList.remove("hidden");
+  $("captureReviewCloseBtn")?.focus();
+}
 $("capturePreviewBtn").onclick=async()=>{
-  if(!captureBlob||captureBlob.size<1024||captureMode!=="video")return;
+  if(!captureBlob||captureBlob.size<1024)return;
+  if(captureMode==="photo"){openCapturePhotoReview();return}
+  if(captureMode!=="video")return;
   const player=$("captureVideo"),btn=$("capturePreviewBtn");
   try{
     if(capturePreviewPlaying&&!player.paused){player.pause();capturePreviewPlaying=false;btn.textContent="▶ Preview";return}
@@ -2704,12 +2746,13 @@ $("capturePreviewBtn").onclick=async()=>{
     player.onpause=()=>{if(!player.ended){capturePreviewPlaying=false;btn.textContent="▶ Preview"}};
   }catch{capturePreviewPlaying=false;btn.textContent="▶ Preview";toast("Preview could not play on this device.")}
 };
-$("captureSaveBtn").onclick=()=>{
-  if(captureMode!=="photo"||!captureBlob)return;
-  const url=URL.createObjectURL(captureBlob),link=document.createElement("a");
-  link.href=url;link.download=`ConnectChat-photo-${Date.now()}.jpg`;document.body.appendChild(link);link.click();link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1500);
-};
+$("captureSaveBtn").onclick=saveCapturedPhoto;
+$("captureShareBtn").onclick=shareCapturedPhoto;
+$("captureReviewCloseBtn").onclick=closeCapturePhotoReview;
+$("captureReviewRetakeBtn").onclick=()=>{closeCapturePhotoReview();prepareCapture("photo")};
+$("captureReviewSaveBtn").onclick=saveCapturedPhoto;
+$("captureReviewShareBtn").onclick=shareCapturedPhoto;
+$("captureReviewSendBtn").onclick=()=>{closeCapturePhotoReview();$("captureSendBtn").click()};
 $("captureSendBtn").onclick=async()=>{
   if(!captureBlob||captureBlob.size<1024||captureSendInFlight||captureStopping)return;
   if(!captureReceiverId)return toast("The selected conversation is no longer available.");
@@ -2740,6 +2783,12 @@ function setCapturePhotoScale(value){
 $("capturePreview").addEventListener("wheel",event=>{
   if(captureMode!=="photo"||!captureBlob)return;event.preventDefault();setCapturePhotoScale(capturePhotoScale+(event.deltaY<0?.2:-.2));
 },{passive:false});
+$("captureCanvas").addEventListener("click",()=>{
+  if(captureMode==="photo"&&captureBlob&&$("captureOverlay").classList.contains("result-ready"))openCapturePhotoReview();
+});
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"&&!$("capturePhotoReview")?.classList.contains("hidden"))closeCapturePhotoReview();
+});
 $("capturePreview").addEventListener("touchstart",event=>{
   if(captureMode!=="photo"||!captureBlob||event.touches.length!==2)return;
   capturePinchStart=Math.hypot(event.touches[0].clientX-event.touches[1].clientX,event.touches[0].clientY-event.touches[1].clientY);capturePinchBase=capturePhotoScale;

@@ -7,8 +7,8 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6846">
-  <link rel="stylesheet" href="style-6846.css?v=6846">
+  <link rel="stylesheet" href="style.css?v=6847">
+  <link rel="stylesheet" href="style-6847.css?v=6847">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -270,7 +270,17 @@
           <option value="soft">Soft</option>
         </select>
       </div>
-      <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button">↻</button></div>
+      <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureShareBtn" class="hidden" type="button">↗ Share</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button">↻</button></div>
+      <div id="capturePhotoReview" class="capture-photo-review hidden" role="dialog" aria-modal="true" aria-label="Review selfie before sharing or sending">
+        <button id="captureReviewCloseBtn" class="capture-review-close" type="button" aria-label="Close preview">×</button>
+        <img id="captureReviewImage" alt="Captured selfie preview">
+        <div class="capture-review-actions">
+          <button id="captureReviewRetakeBtn" type="button">↻ Retake</button>
+          <button id="captureReviewSaveBtn" type="button">⬇ Save</button>
+          <button id="captureReviewShareBtn" type="button">↗ Share</button>
+          <button id="captureReviewSendBtn" class="capture-review-send" type="button">➤ Send</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -449,7 +459,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6846"></script>
-  <script src="app.js?v=6846"></script>
+  <script type="module" src="face-filters.js?v=6847"></script>
+  <script src="app.js?v=6847"></script>
 </body>
 </html>
