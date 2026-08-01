@@ -462,7 +462,7 @@ async function startApp(){
   try{const config=await getIceConfig();callsEnabled=config.enabled!==false}catch{callsEnabled=false}
   renderUsers();connectSocket();
   startNetworkQualityMonitor();
-  if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden")}
+  if(window.matchMedia("(max-width: 800px)").matches){$("chatPanel").classList.add("mobile-hidden")}
 }
 
 function connectSocket(){
@@ -834,7 +834,7 @@ async function selectUser(u){
   $("messages").classList.remove("empty-state");$("messages").innerHTML="";
   // Reveal the selected conversation immediately on phones. Message history
   // may continue loading, but the header and composer should never wait for it.
-  if(window.innerWidth<=760){
+  if(window.matchMedia("(max-width: 800px)").matches){
     $("sidebar").classList.add("mobile-hidden");
     $("chatPanel").classList.remove("mobile-hidden");
   }
@@ -3321,9 +3321,21 @@ document.addEventListener("keydown",event=>{
 window.addEventListener("orientationchange",refreshCaptureOrientation,{passive:true});
 window.addEventListener("resize",refreshCaptureOrientation,{passive:true});
 
-$("backBtn").onclick=()=>{
-  if(window.innerWidth<=760){$("chatPanel").classList.add("mobile-hidden");$("sidebar").classList.remove("mobile-hidden")}
-};
+function closeMobileConversation(event){
+  if(event){event.preventDefault();event.stopPropagation()}
+  if(!window.matchMedia("(max-width: 800px)").matches)return;
+  closeChatAiAssistant(true);
+  $("smartStrip")?.classList.add("hidden");
+  $("conversationMenu")?.classList.add("hidden");
+  document.activeElement?.blur?.();
+  $("chatPanel").classList.add("mobile-hidden");
+  $("sidebar").classList.remove("mobile-hidden");
+}
+const mobileChatBackButton=$("backBtn");
+mobileChatBackButton.addEventListener("click",closeMobileConversation);
+mobileChatBackButton.addEventListener("pointerup",event=>{
+  if(event.pointerType==="touch")closeMobileConversation(event);
+});
 async function logoutAndReturn(){
   if(socket)socket.disconnect();
   await api("/api/logout",{method:"POST"});
