@@ -10,8 +10,8 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6852">
-  <link rel="stylesheet" href="style-6852.css?v=6852">
+  <link rel="stylesheet" href="style.css?v=6855">
+  <link rel="stylesheet" href="style-6855.css?v=6855">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -273,7 +273,17 @@
           <option value="soft">Soft</option>
         </select>
       </div>
-      <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureShareBtn" class="hidden" type="button">↗ Share</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button">↻</button></div>
+      <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureShareBtn" class="hidden" type="button">↗ Share</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button" aria-label="Switch front or rear camera" title="Switch front or rear camera"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="switch-camera-body" d="M8 11h4l2-3h4l2 3h4a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-9a3 3 0 0 1 3-3Z"/><circle class="switch-camera-lens" cx="16" cy="18" r="4"/><path class="switch-camera-arrow" d="M7 8a12 12 0 0 1 18-2m0 0V2m0 4h-4M25 24a12 12 0 0 1-18 2m0 0v4m0-4h4"/></svg></button></div>
+      <div id="captureResultActions" class="capture-result-actions hidden" role="dialog" aria-modal="true" aria-label="Share captured result">
+        <div class="capture-result-actions-card">
+          <div class="capture-result-actions-head"><b>Share result</b><button id="captureResultCancelBtn" type="button" aria-label="Close sharing choices">×</button></div>
+          <button id="captureResultCurrentBtn" class="capture-result-current" type="button">➤ Send to current chat</button>
+          <button id="captureResultUsersBtn" type="button">Share with ConnectChat users</button>
+          <button id="captureResultExternalBtn" type="button">↗ Share to other apps</button>
+          <button id="captureResultSaveBtn" type="button">⬇ Save to device</button>
+          <button id="captureResultBackBtn" type="button">Camera — back to camera</button>
+        </div>
+      </div>
       <div id="capturePhotoReview" class="capture-photo-review hidden" role="dialog" aria-modal="true" aria-label="Review selfie before sharing or sending">
         <button id="captureReviewCloseBtn" class="capture-review-close" type="button" aria-label="Close preview">×</button>
         <img id="captureReviewImage" alt="Captured selfie preview">
@@ -471,7 +481,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6852"></script>
-  <script src="app.js?v=6852"></script>
+  <script type="module" src="face-filters.js?v=6855"></script>
+  <script src="app.js?v=6855"></script>
 </body>
 </html>
