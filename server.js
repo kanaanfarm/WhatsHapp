@@ -26,7 +26,7 @@ const webpush = require("web-push");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6858";
+const APP_BUILD = "6861";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -325,32 +325,89 @@ function callPairKey(firstUserId, secondUserId) {
   return [Number(firstUserId), Number(secondUserId)].sort((a, b) => a - b).join(":");
 }
 
-function openCallPair(firstUserId, secondUserId) {
+function clearCallPairTimers(record) {
+  if (!record) return;
+  if (record.ringTimer) clearTimeout(record.ringTimer);
+  if (record.lifetimeTimer) clearTimeout(record.lifetimeTimer);
+}
+
+async function updateCallRecord(record, status) {
+  if (!record?.callLogId) return;
+  const values = { status };
+  if (["rejected", "missed", "ended"].includes(status)) values.ended_at = new Date().toISOString();
+  const { error } = await supabase.from("call_logs").update(values).eq("id", Number(record.callLogId));
+  if (error) console.error("Could not update call history:", error.message);
+}
+
+function openCallPair(firstUserId, secondUserId, metadata = {}) {
   const key = callPairKey(firstUserId, secondUserId);
   const previous = activeCallPairs.get(key);
-  if (previous) clearTimeout(previous);
-  activeCallPairs.set(key, setTimeout(() => activeCallPairs.delete(key), 4 * 60 * 60 * 1000));
+  clearCallPairTimers(previous);
+  const record = {
+    callerId: Number(metadata.callerId || firstUserId),
+    receiverId: Number(metadata.receiverId || secondUserId),
+    callerName: String(metadata.callerName || "ConnectChat user"),
+    mode: metadata.mode === "audio" ? "audio" : "video",
+    callLogId: Number(metadata.callLogId) || null,
+    startedAt: metadata.startedAt || new Date().toISOString(),
+    answeredAt: null,
+    ringTimer: null,
+    lifetimeTimer: null
+  };
+  record.ringTimer = setTimeout(() => {
+    const current = activeCallPairs.get(key);
+    if (!current || current.answeredAt) return;
+    clearCallPairTimers(current);activeCallPairs.delete(key);
+    updateCallRecord(current, "missed").catch(error => console.error("Call timeout history failed:", error.message));
+    const payload = {
+      callerId: current.callerId,
+      callerName: current.callerName,
+      mode: current.mode,
+      startedAt: current.startedAt
+    };
+    io.to(`user:${current.callerId}`).emit("call:timed-out", { ...payload, role: "caller" });
+    io.to(`user:${current.receiverId}`).emit("call:timed-out", { ...payload, role: "receiver" });
+  }, 45000);
+  record.lifetimeTimer = setTimeout(() => {
+    const current = activeCallPairs.get(key);
+    if (!current) return;
+    clearCallPairTimers(current);activeCallPairs.delete(key);
+    updateCallRecord(current, current.answeredAt ? "ended" : "missed").catch(error => console.error("Call lifetime history failed:", error.message));
+  }, 4 * 60 * 60 * 1000);
+  activeCallPairs.set(key, record);
+  return record;
 }
 
 function closeCallPair(firstUserId, secondUserId) {
   const key = callPairKey(firstUserId, secondUserId);
-  const timer = activeCallPairs.get(key);
-  if (timer) clearTimeout(timer);
+  const record = activeCallPairs.get(key);
+  clearCallPairTimers(record);
   activeCallPairs.delete(key);
+  return record || null;
 }
 
 function closeUserCallPairs(userId) {
   const id = Number(userId);
-  for (const [key, timer] of activeCallPairs) {
+  for (const [key, record] of activeCallPairs) {
     if (key.split(":").map(Number).includes(id)) {
-      clearTimeout(timer);
+      clearCallPairTimers(record);
       activeCallPairs.delete(key);
+      updateCallRecord(record, record?.answeredAt ? "ended" : "missed").catch(error => console.error("Disconnected call history failed:", error.message));
     }
   }
 }
 
 function callPairIsOpen(firstUserId, secondUserId) {
   return activeCallPairs.has(callPairKey(firstUserId, secondUserId));
+}
+
+function markCallPairAnswered(firstUserId, secondUserId) {
+  const record = activeCallPairs.get(callPairKey(firstUserId, secondUserId));
+  if (!record) return null;
+  if (record.ringTimer) clearTimeout(record.ringTimer);
+  record.ringTimer = null;
+  record.answeredAt = record.answeredAt || new Date().toISOString();
+  return record;
 }
 
 function eventAllowed(socket, name, limit, windowMs) {
@@ -2951,18 +3008,37 @@ io.on("connection", async socket => {
         return socket.emit("call:unavailable", { receiverId });
       }
     }
-    openCallPair(userId, receiverId);
-    supabase.from("call_logs").insert({
-      caller_id: userId, receiver_id: receiverId,
-      mode: payload.mode === "audio" ? "audio" : "video", status: "started"
-    }).then(({ error }) => { if (error) console.error("Could not save call history:", error.message); });
+    const mode = payload.mode === "audio" ? "audio" : "video";
+    let callLogId = null;
+    let startedAt = new Date().toISOString();
+    try {
+      const { data: callLog, error } = await supabase.from("call_logs").insert({
+        caller_id: userId, receiver_id: receiverId, mode, status: "started"
+      }).select("id,started_at").single();
+      if (error) throw error;
+      callLogId = Number(callLog?.id) || null;
+      startedAt = callLog?.started_at || startedAt;
+    } catch (error) {
+      console.error("Could not save call history:", error.message);
+    }
+    openCallPair(userId, receiverId, {
+      callerId: userId, receiverId, callerName: username, mode, callLogId, startedAt
+    });
     io.to(`user:${receiverId}`).emit("call:incoming", {
       callerId: userId,
       callerName: username,
-      mode: payload.mode === "audio" ? "audio" : "video",
+      mode,
       offer: payload.offer,
+      startedAt,
       correctFrontOrientation: payload.correctFrontOrientation === true
     });
+    sendPushToUser(receiverId, {
+      type: "call",
+      title: `Incoming ${mode === "video" ? "video" : "voice"} call`,
+      body: `${username} is calling you`,
+      tag: `incoming-call-${userId}`,
+      url: `/?v=6861&callFrom=${userId}&mode=${mode}`
+    }).catch(error => console.error("Incoming call push failed:", error.message));
   });
 
   socket.on("call:notify", async payload => {
@@ -3008,10 +3084,12 @@ io.on("connection", async socket => {
     }
   });
 
-  socket.on("call:answer", payload => {
+  socket.on("call:answer", async payload => {
     if (!CALLS_ENABLED || !eventAllowed(socket, "call", 40, 60 * 1000) || !payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId) && validDescription(payload.answer, "answer")) {
+      const record = markCallPairAnswered(userId, receiverId);
+      await updateCallRecord(record, "answered");
       io.to(`user:${receiverId}`).emit("call:answered", {
         userId,
         answer: payload.answer,
@@ -3050,19 +3128,21 @@ io.on("connection", async socket => {
       });
     }
   });
-  socket.on("call:reject", payload => {
+  socket.on("call:reject", async payload => {
     if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
-      closeCallPair(userId, receiverId);
+      const record = closeCallPair(userId, receiverId);
+      await updateCallRecord(record, "rejected");
       io.to(`user:${receiverId}`).emit("call:rejected", { userId });
     }
   });
-  socket.on("call:end", payload => {
+  socket.on("call:end", async payload => {
     if (!payload || typeof payload !== "object") return;
     const receiverId = Number(payload.receiverId);
     if (Number.isSafeInteger(receiverId) && receiverId > 0 && callPairIsOpen(userId, receiverId)) {
-      closeCallPair(userId, receiverId);
+      const record = closeCallPair(userId, receiverId);
+      await updateCallRecord(record, record?.answeredAt ? "ended" : "missed");
       io.to(`user:${receiverId}`).emit("call:ended", { userId });
     }
   });

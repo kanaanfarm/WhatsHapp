@@ -6,6 +6,9 @@ let videoRecorder=null,videoChunks=[],videoStream=null,videoRecording=false,reco
 let mediaUploadInFlight=false,captureSendInFlight=false;
 let pendingMediaConfirmation=null,pendingMediaObjectUrl=null;
 let peer=null, localStream=null, screenStream=null, cameraVideoTrack=null, callPeerId=null, callMode="video", pendingCall=null, iceConfig=null, pendingIce=[];
+let nativeAnswerRequested=Boolean(window.__connectchatNativeAnswer);
+let callTimerHandle=null,callTimerStartedAt=0,callTimerPhase="idle",callAudioContext=null,callToneLoop=null,callToneStopTimer=null,callVibrationLoop=null;
+let activeCallTone="none";
 let cameraFilter="normal";
 let callProcessedStream=null,callProcessorVideo=null,callProcessorCanvas=null,callProcessorRaf=0,callTrackReader=null,callTrackWriter=null,callProcessorAbort=false;
 let callFilterBakedForPeer=false;
@@ -43,6 +46,13 @@ const PHONE_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 
 const VIDEO_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>';
 const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
 const $=id=>document.getElementById(id);
+
+function notifyNativeCall(event,payload={}){
+  const message={event:String(event||""),payload:{...payload},at:new Date().toISOString()};
+  try{window.ConnectChatNative?.callEvent?.(message.event,message.payload)}catch(error){console.warn("Windows native call bridge failed",error)}
+  try{window.webkit?.messageHandlers?.connectChatCall?.postMessage(message)}catch(error){console.warn("iOS native call bridge failed",error)}
+  try{window.Capacitor?.Plugins?.ConnectChatCall?.callEvent?.(message)}catch(error){console.warn("Android native call bridge failed",error)}
+}
 
 const INTERNAL_SCROLL_SELECTOR=[
   ".rail",".users-list",".quick-contacts",".messages",".workspace-insights",
@@ -562,8 +572,10 @@ function connectSocket(){
     if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
   socket.on("call:incoming",data=>{
+    notifyNativeCall("incoming",{callerId:data.callerId,callerName:data.callerName||"ConnectChat user",mode:data.mode});
     showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`);
     showIncomingCall(data);
+    if(nativeAnswerRequested){nativeAnswerRequested=false;setTimeout(()=>acceptIncomingCall(),0)}
   });
   socket.on("call:answered",async p=>{
     if(!peer||p.userId!==callPeerId)return;
@@ -573,7 +585,7 @@ function connectSocket(){
     await flushPendingIce();
     await configureVideoSenderQuality(peer);
     sendCurrentCallFilter();
-    $("callStatus").textContent="Connected";
+    markCallConnected();
   });
   socket.on("call:ice",async p=>{
     if(p.userId!==callPeerId)return;
@@ -599,6 +611,15 @@ function connectSocket(){
   });
   socket.on("call:rejected",()=>finishCall("Call declined",false));
   socket.on("call:ended",()=>finishCall("Call ended",false));
+  socket.on("call:timed-out",payload=>{
+    const receiver=payload?.role==="receiver";
+    finishCall(receiver?"Missed call":"No answer",false);
+    if(receiver){
+      toast(`Missed ${payload?.mode==="video"?"video":"voice"} call from ${payload?.callerName||"a ConnectChat user"}.`);
+      showMissedCallAlert(payload);
+      if(currentWorkspaceSection==="calls")renderCallsWorkspace();else refreshCallsBadge();
+    }
+  });
   socket.on("call:unavailable",()=>finishCall("User is unavailable",false));
   socket.on("call:queued",payload=>{
     toast(`${payload?.receiverName||"This user"} is offline. A missed-call notification was saved.`);
@@ -1151,6 +1172,97 @@ async function buildCallProcessedStream(rawStream){
   */
 }
 
+function formatCallDuration(totalSeconds){
+  const seconds=Math.max(0,Math.floor(Number(totalSeconds)||0));
+  const hours=Math.floor(seconds/3600);
+  const minutes=Math.floor((seconds%3600)/60);
+  const remainder=seconds%60;
+  return hours
+    ? `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(remainder).padStart(2,"0")}`
+    : `${String(minutes).padStart(2,"0")}:${String(remainder).padStart(2,"0")}`;
+}
+
+function stopCallTimer(reset=true){
+  clearInterval(callTimerHandle);callTimerHandle=null;callTimerStartedAt=0;callTimerPhase="idle";
+  $("callOverlay")?.classList.remove("call-connected");
+  const timer=$("callTimer");
+  if(timer&&reset)timer.textContent="00:00";
+}
+
+function startCallTimer(phase){
+  stopCallTimer(false);
+  callTimerPhase=phase;callTimerStartedAt=Date.now();
+  $("callOverlay")?.classList.toggle("call-connected",phase==="connected");
+  const timer=$("callTimer");
+  const render=()=>{if(timer)timer.textContent=formatCallDuration((Date.now()-callTimerStartedAt)/1000)};
+  render();callTimerHandle=setInterval(render,250);
+}
+
+function unlockCallAudio(){
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass)return null;
+  if(!callAudioContext)callAudioContext=new AudioContextClass();
+  if(callAudioContext.state==="suspended")callAudioContext.resume().catch(()=>{});
+  return callAudioContext;
+}
+
+function playCallToneBurst(type){
+  const context=unlockCallAudio();
+  if(!context||context.state!=="running")return;
+  const incoming=type==="incoming";
+  const frequencies=incoming?[440,480]:[425];
+  const duration=incoming?1.05:.38;
+  const now=context.currentTime;
+  const gain=context.createGain();
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(incoming ? 0.055 : 0.032,now+.025);
+  gain.gain.setValueAtTime(incoming ? 0.055 : 0.032,now+Math.max(.04,duration-.06));
+  gain.gain.exponentialRampToValueAtTime(.0001,now+duration);
+  gain.connect(context.destination);
+  const oscillators=frequencies.map(frequency=>{
+    const oscillator=context.createOscillator();
+    oscillator.type="sine";oscillator.frequency.setValueAtTime(frequency,now);
+    oscillator.connect(gain);oscillator.start(now);oscillator.stop(now+duration+.02);
+    return oscillator;
+  });
+  clearTimeout(callToneStopTimer);
+  callToneStopTimer=setTimeout(()=>{
+    oscillators.forEach(oscillator=>{try{oscillator.disconnect()}catch{}});
+    try{gain.disconnect()}catch{}
+  },(duration+.1)*1000);
+}
+
+function stopCallTone(){
+  clearInterval(callToneLoop);callToneLoop=null;clearTimeout(callToneStopTimer);callToneStopTimer=null;
+  clearInterval(callVibrationLoop);callVibrationLoop=null;activeCallTone="none";
+  if(navigator.vibrate)try{navigator.vibrate(0)}catch{}
+}
+
+function startCallTone(type){
+  stopCallTone();activeCallTone=type;
+  const cycle=type==="incoming"?3000:2400;
+  const play=()=>{if(activeCallTone===type)playCallToneBurst(type)};
+  play();callToneLoop=setInterval(play,cycle);
+  if(type==="incoming"&&navigator.vibrate){
+    const vibrate=()=>{try{navigator.vibrate([420,180,420])}catch{}};
+    vibrate();callVibrationLoop=setInterval(vibrate,cycle);
+  }
+}
+
+function markCallConnected(){
+  stopCallTone();
+  const firstConnection=callTimerPhase!=="connected";
+  if(firstConnection)startCallTimer("connected");
+  const status=$("callStatus");if(status)status.textContent="Connected";
+  $("callOverlay")?.classList.remove("incoming-call","outgoing-call");
+  if(firstConnection)notifyNativeCall("connected",{peerId:callPeerId,mode:callMode});
+}
+
+// Browsers permit audible autoplay only after a user gesture. Unlocking the
+// audio context on normal app interaction makes later incoming ringing reliable.
+document.addEventListener("pointerdown",unlockCallAudio,{passive:true});
+document.addEventListener("keydown",unlockCallAudio,{passive:true});
+
 async function createPeer(peerId){
   const config=await getIceConfig();
   const pc=new RTCPeerConnection({iceServers:config.iceServers});
@@ -1166,7 +1278,7 @@ async function createPeer(peerId){
   };
   pc.onconnectionstatechange=()=>{
     if(pc.connectionState==="connected"){
-      $("callStatus").textContent="Connected";
+      markCallConnected();
       configureVideoSenderQuality(pc).catch(()=>{});
       sendCurrentCallFilter();
     }
@@ -1189,6 +1301,8 @@ function showCallUi(name,status,mode,incoming=false){
   document.body.classList.add("call-active");
   $("callName").textContent=name;$("callStatus").textContent=status;
   $("callOverlay").classList.remove("hidden");
+  $("callOverlay").classList.toggle("incoming-call",incoming);
+  $("callOverlay").classList.toggle("outgoing-call",!incoming&&status==="Calling…");
   $("videoStage").classList.toggle("audio-only",mode==="audio");
   $("videoStage").classList.toggle("waiting-remote",mode==="video");
   $("videoStage").classList.remove("local-camera-off","self-main");
@@ -1222,7 +1336,9 @@ async function startCall(mode){
   }
   try{
     callPeerId=activeUser.id;callMode=mode;
+    stopCallTimer();
     showCallUi(activeUser.username,"Calling…",mode);
+    startCallTone("outgoing");
     localStream=await getMedia(mode);
     const outboundStream=mode==="video"?await buildCallProcessedStream(localStream):localStream;
     $("localVideo").srcObject=(mode==="video"&&callFilterBakedForPeer)?outboundStream:localStream;
@@ -1241,7 +1357,9 @@ function showIncomingCall(data){
   pendingCall=data;callPeerId=data.callerId;callMode=data.mode;
   remoteFrontOrientationCorrection=data?.correctFrontOrientation===true;
   applyRemoteOrientationCorrection();
-  showCallUi(data.callerName,`Incoming ${data.mode} call`,data.mode,true);
+  stopCallTimer();
+  showCallUi(data.callerName,`Incoming ${data.mode==="video"?"video":"voice"} call`,data.mode,true);
+  startCallTone("incoming");
 }
 
 function showMissedCallAlert(payload){
@@ -1273,7 +1391,9 @@ async function acceptIncomingCall(){
   const data=pendingCall;if(!data)return;
   pendingCall=null;
   try{
+    markCallConnected();
     showCallUi(data.callerName,"Connecting…",data.mode);
+    $("callStatus").textContent="Connecting…";
     localStream=await getMedia(data.mode);
     const outboundStream=data.mode==="video"?await buildCallProcessedStream(localStream):localStream;
     $("localVideo").srcObject=(data.mode==="video"&&callFilterBakedForPeer)?outboundStream:localStream;
@@ -1325,6 +1445,8 @@ async function stopScreenShare(){
 }
 
 function finishCall(message="Call ended",notify=true){
+  notifyNativeCall("ended",{peerId:callPeerId,mode:callMode,message});
+  stopCallTone();stopCallTimer(false);
   const remoteFilterVideo=$("remoteVideo");
   if(remoteFilterVideo){
     remoteFilterVideo.style.filter="none";
@@ -1340,7 +1462,8 @@ function finishCall(message="Call ended",notify=true){
   pendingCall=null;callPeerId=null;pendingIce=[];
   remoteFrontOrientationCorrection=false;
   $("callStatus").textContent=message;
-  setTimeout(()=>{$("callOverlay").classList.add("hidden");document.body.classList.remove("call-active")},500);
+  $("callOverlay").classList.remove("incoming-call","outgoing-call","call-connected");
+  setTimeout(()=>{$("callOverlay").classList.add("hidden");document.body.classList.remove("call-active");stopCallTimer()},700);
 }
 
 function closeCallChoice(){
@@ -1372,6 +1495,11 @@ $("chooseVoiceCallBtn").onclick=()=>{closeCallChoice();startCall("audio")};
 $("chooseVideoCallBtn").onclick=()=>{closeCallChoice();startCall("video")};
 $("acceptCallBtn").onclick=acceptIncomingCall;
 $("declineCallBtn").onclick=()=>{if(callPeerId)socket.emit("call:reject",{receiverId:callPeerId});finishCall("Call declined",false)};
+window.addEventListener("connectchat-native-answer",()=>{
+  if(pendingCall){nativeAnswerRequested=false;acceptIncomingCall()}
+  else if(!callPeerId)nativeAnswerRequested=true;
+});
+window.addEventListener("connectchat-native-end",()=>{if(pendingCall||callPeerId)finishCall("Call ended",false)});
 $("endCallBtn").onclick=()=>finishCall();
 $("muteBtn").onclick=()=>{
   const track=localStream?.getAudioTracks()[0];if(!track)return;
