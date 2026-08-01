@@ -10,8 +10,8 @@
   <title>ConnectChat Pro Enterprise v6.7.3</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6861">
-  <link rel="stylesheet" href="style-6861.css?v=6861">
+  <link rel="stylesheet" href="style.css?v=6863">
+  <link rel="stylesheet" href="style-6863.css?v=6863">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -134,6 +134,28 @@
         </div>
         <div id="aiAttachmentTrayList" class="ai-attachment-tray-list"></div>
       </div>
+      <section id="chatAiAssistant" class="chat-ai-assistant hidden" role="dialog" aria-modal="false" aria-labelledby="chatAiAssistantTitle">
+        <div class="chat-ai-assistant-head">
+          <div><span class="chat-ai-mark" aria-hidden="true">✦</span><h3 id="chatAiAssistantTitle">AI assistant</h3></div>
+          <button id="closeChatAiAssistantBtn" type="button" aria-label="Close AI assistant">×</button>
+        </div>
+        <div class="chat-ai-actions" aria-label="AI draft actions">
+          <button type="button" data-ai-draft-action="reply">✦ Suggest reply</button>
+          <button type="button" data-ai-draft-action="rewrite">✎ Rewrite</button>
+          <button type="button" data-ai-draft-action="translate">◎ Translate</button>
+          <button type="button" data-ai-draft-action="summary">▤ Summarize</button>
+        </div>
+        <p id="chatAiAssistantStatus" class="chat-ai-status">Choose an action. AI creates a draft and never sends automatically.</p>
+        <div id="chatAiDraftBox" class="chat-ai-draft-box hidden">
+          <label for="chatAiDraft">AI draft</label>
+          <textarea id="chatAiDraft" rows="5" maxlength="4000" aria-label="Editable AI draft"></textarea>
+          <div class="chat-ai-draft-buttons">
+            <button id="cancelChatAiDraftBtn" type="button">Cancel</button>
+            <button id="insertChatAiDraftBtn" class="primary" type="button">Insert draft</button>
+          </div>
+          <small>✓ Review before sending</small>
+        </div>
+      </section>
 <footer class="composer">
 <div id="voiceRecordPanel" class="voice-record-panel hidden" aria-live="polite">
         <div class="voice-record-live">
@@ -161,6 +183,7 @@
           <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Write a message…" disabled></textarea>
           <small class="composer-hint">Enter to send · Shift+Enter for new line</small>
         </div>
+        <button id="composerAiBtn" class="circle-btn composer-ai-btn hidden" type="button" title="AI reply assistant" aria-label="Open AI reply assistant" disabled><span aria-hidden="true">✦</span><small>AI</small></button>
         <button id="recordBtn" class="circle-btn record-btn apple-control-icon" type="button" title="Record voice" aria-label="Record voice">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5"></rect><path d="M5.5 11.5v.8a6.5 6.5 0 0 0 13 0v-.8M12 18.8v2.7M8.7 21.5h6.6"></path></svg>
         </button>
@@ -500,7 +523,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6861"></script>
-  <script src="app.js?v=6861"></script>
+  <script type="module" src="face-filters.js?v=6863"></script>
+  <script src="app.js?v=6863"></script>
 </body>
 </html>

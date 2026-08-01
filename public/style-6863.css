@@ -1,0 +1,1117 @@
+/* BUILD 6849 — preserves the Build 6844 WhatsApp video layout. */
+#callOverlay.call-overlay.hidden{
+  display:none !important;
+}
+
+/* BUILD 6863 — review-before-send AI assistant inside human chats. */
+.workspace-chat .composer > #composerAiBtn{
+  grid-area:ai !important;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:0;
+  width:44px;
+  height:44px;
+  padding:0;
+  border:1px solid rgba(139,77,232,.65);
+  border-radius:50%;
+  background:linear-gradient(145deg,#7441dc,#a855f7);
+  color:#fff;
+  box-shadow:0 5px 15px rgba(116,65,220,.28);
+  line-height:1;
+}
+.workspace-chat .composer > #composerAiBtn.hidden{display:none !important}
+.workspace-chat .composer > #composerAiBtn:disabled{opacity:.45;cursor:not-allowed}
+.workspace-chat .composer > #composerAiBtn span{font-size:17px;line-height:.85}
+.workspace-chat .composer > #composerAiBtn small{font-size:9px;font-weight:900;line-height:1}
+.workspace-chat .composer{
+  grid-template-columns:auto auto auto minmax(0,1fr) auto auto auto !important;
+  grid-template-areas:
+    "voice voice voice voice voice voice voice"
+    "emoji attach camera entry ai mic send" !important;
+}
+.chat-ai-assistant{
+  position:absolute;
+  left:50%;
+  bottom:88px;
+  z-index:80;
+  width:min(620px,calc(100% - 32px));
+  max-height:min(72dvh,650px);
+  overflow:auto;
+  padding:18px;
+  border:1px solid rgba(139,77,232,.48);
+  border-radius:24px;
+  background:rgba(15,25,43,.98);
+  color:#f8fafc;
+  box-shadow:0 20px 55px rgba(5,12,25,.46);
+  transform:translateX(-50%);
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.chat-ai-assistant.hidden{display:none !important}
+.chat-ai-assistant-head,.chat-ai-assistant-head>div{display:flex;align-items:center;gap:10px}
+.chat-ai-assistant-head{justify-content:space-between}
+.chat-ai-assistant-head h3{margin:0;font-size:23px}
+.chat-ai-mark{display:grid;place-items:center;width:39px;height:39px;border-radius:50%;background:linear-gradient(145deg,#7441dc,#a855f7);font-size:21px}
+.chat-ai-assistant-head>button{width:38px;height:38px;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:#202d42;color:#fff;font-size:25px}
+.chat-ai-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:16px}
+.chat-ai-actions button{min-height:44px;border:1px solid rgba(168,85,247,.55);border-radius:999px;padding:8px 10px;background:#17243a;color:#f2eaff;font-weight:800}
+.chat-ai-actions button:hover,.chat-ai-actions button:focus-visible{background:#2d2052;outline:2px solid #a855f7;outline-offset:1px}
+.chat-ai-actions button:disabled{opacity:.6}
+.chat-ai-status{margin:14px 2px 10px;color:#b7c1d2;font-size:13px}
+.chat-ai-draft-box{display:grid;gap:10px;padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:17px;background:#111c2f}
+.chat-ai-draft-box.hidden{display:none !important}
+.chat-ai-draft-box label{font-size:16px;font-weight:900}
+.chat-ai-draft-box textarea{width:100%;min-height:112px;max-height:250px;resize:vertical;border:1px solid #42506a;border-radius:13px;padding:12px;background:#17243a;color:#fff;font:inherit;line-height:1.45;outline:none;box-sizing:border-box}
+.chat-ai-draft-box textarea:focus{border-color:#a855f7;box-shadow:0 0 0 3px rgba(168,85,247,.18)}
+.chat-ai-draft-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chat-ai-draft-buttons button{min-height:46px;border:1px solid rgba(255,255,255,.18);border-radius:13px;background:#26344a;color:#fff;font-weight:900}
+.chat-ai-draft-buttons button.primary{border-color:#43ad8c;background:#43ad8c}
+.chat-ai-draft-box>small{text-align:center;color:#aeb8c8}
+@media(max-width:760px){
+  .workspace-chat .composer{
+    grid-template-columns:auto auto auto minmax(0,1fr) auto auto !important;
+    grid-template-areas:
+      "voice voice voice voice voice voice"
+      "emoji attach camera entry ai mic" !important;
+  }
+  .workspace-chat .composer > #composerAiBtn{width:40px;height:40px}
+  .chat-ai-assistant{position:absolute;left:8px;right:8px;bottom:76px;width:auto;max-height:calc(100dvh - 150px);padding:14px;border-radius:21px;transform:none}
+  .chat-ai-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chat-ai-assistant-head h3{font-size:20px}
+}
+@media(max-width:390px){
+  .workspace-chat .composer > #composerAiBtn{width:36px;height:36px}
+  .chat-ai-draft-buttons{grid-template-columns:1fr}
+}
+
+/* BUILD 6859 — telephone-style incoming calls, tones, and call timers.
+   Connected video geometry, camera filters, and capture controls are unchanged. */
+#callOverlay .call-status-line{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  color:#bdc7d8;
+}
+#callOverlay #callTimer{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  min-width:58px;
+  padding:3px 9px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+  color:#fff;
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.04em;
+}
+#callOverlay.call-connected #callTimer{display:inline-flex}
+html body #callOverlay.call-overlay.audio-call #videoStage.video-stage{
+  background:radial-gradient(circle at 50% 42%,#26344a 0,#172238 44%,#101827 100%) !important;
+}
+html body #callOverlay.call-overlay.audio-call #videoStage.video-stage #remoteVideo,
+html body #callOverlay.call-overlay.audio-call #videoStage.video-stage #localVideo{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+html body #callOverlay.call-overlay.audio-call #videoStage.video-stage::before{
+  content:"☎" !important;
+  position:absolute !important;
+  inset:auto !important;
+  display:grid !important;
+  place-items:center !important;
+  width:150px !important;
+  height:150px !important;
+  border:2px solid rgba(255,255,255,.72) !important;
+  border-radius:50% !important;
+  background:rgba(36,50,75,.95) !important;
+  color:#fff !important;
+  box-shadow:0 0 0 18px rgba(255,255,255,.06),0 20px 55px rgba(0,0,0,.42) !important;
+  font-size:70px !important;
+  line-height:1 !important;
+  z-index:3 !important;
+  animation:none !important;
+}
+html body #callOverlay.call-overlay.audio-call.incoming-call #videoStage.video-stage::before,
+html body #callOverlay.call-overlay.audio-call.outgoing-call #videoStage.video-stage::before{
+  animation:connectchat-call-ring 1.5s ease-in-out infinite !important;
+}
+html body #callOverlay.call-overlay.video-call #videoStage.video-stage #remoteVideo,
+html body #callOverlay.call-overlay.video-call #videoStage.video-stage #localVideo{
+  display:block !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+#callOverlay.incoming-call .call-controls{
+  grid-template-columns:repeat(2,minmax(130px,190px)) !important;
+}
+#callOverlay.incoming-call .accept-call,
+#callOverlay.incoming-call .decline-call{
+  display:block !important;
+  min-height:52px !important;
+  font-size:16px !important;
+}
+@keyframes connectchat-call-ring{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.06)}
+}
+@media(max-width:800px){
+  html body #callOverlay.call-overlay.audio-call #videoStage.video-stage::before{
+    width:128px !important;
+    height:128px !important;
+    font-size:60px !important;
+  }
+  #callOverlay .call-status-line{gap:7px}
+  #callOverlay #callTimer{min-width:54px;padding:3px 7px;font-size:12px}
+}
+#callOverlay .call-filter-native{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 12px;
+  border:2px solid #8b4de8;
+  border-radius:999px;
+  background:linear-gradient(135deg,#793de1,#df3ca5);
+  color:#fff;
+  box-shadow:0 6px 18px rgba(130,55,200,.28);
+}
+#callOverlay .call-filter-native.hidden{display:none !important}
+#callOverlay .call-filter-native select{
+  max-width:170px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+#callOverlay .call-filter-native select option{color:#111;background:#fff}
+@media(max-width:600px){
+  #callOverlay .call-filter-native{min-height:44px;padding:4px 9px}
+  #callOverlay .call-filter-native select{max-width:145px;font-size:14px}
+}
+
+/* BUILD 6854 — clean full-screen result and one explicit share arrow.
+   The approved shutter and front/rear-switch anchors stay unchanged. */
+#captureSwitchBtn svg{display:block;width:27px;height:27px;overflow:visible}
+#captureSwitchBtn .switch-camera-body,
+#captureSwitchBtn .switch-camera-lens,
+#captureSwitchBtn .switch-camera-arrow{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.capture-result-share{
+  position:absolute;
+  right:18px;
+  bottom:18px;
+  z-index:72;
+  display:grid;
+  place-items:center;
+  width:62px;
+  height:62px;
+  padding:0 0 1px 3px;
+  border:2px solid rgba(255,255,255,.9);
+  border-radius:50%;
+  background:#43ad8c;
+  color:#fff;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
+  font-size:29px;
+  line-height:1;
+}
+.capture-result-share.hidden{display:none !important}
+.capture-result-actions{
+  position:absolute;
+  inset:0;
+  z-index:100;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding:18px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+  background:rgba(0,0,0,.62);
+  -webkit-backdrop-filter:blur(8px);
+  backdrop-filter:blur(8px);
+}
+.capture-result-actions.hidden{display:none !important}
+.capture-result-actions-card{
+  width:min(100%,480px);
+  display:grid;
+  gap:9px;
+  padding:15px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:22px;
+  background:#151515;
+  color:#fff;
+  box-shadow:0 20px 55px rgba(0,0,0,.55);
+}
+.capture-result-actions-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 4px 7px;font-size:18px}
+.capture-result-actions-head button{width:38px;height:38px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:26px}
+.capture-result-actions-card>button{
+  min-height:50px;
+  border:0;
+  border-radius:999px;
+  padding:10px 16px;
+  background:#292929;
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+}
+.capture-result-actions-card>.capture-result-current{background:#43ad8c}
+
+/* The legacy review/action surfaces are intentionally retired in Build 6854. */
+#captureOverlay.result-ready .capture-actions,
+#captureOverlay .capture-photo-review{display:none !important}
+
+@media (pointer:coarse) and (max-width:1024px){
+  #captureOverlay.photo-mode:not(.result-ready) .capture-actions #captureSwitchBtn{
+    position:absolute !important;
+    left:auto !important;
+    right:max(27px,env(safe-area-inset-right)) !important;
+    top:auto !important;
+    bottom:max(27px,env(safe-area-inset-bottom)) !important;
+    z-index:2 !important;
+    display:grid !important;
+    place-items:center !important;
+    width:52px !important;
+    min-width:52px !important;
+    height:52px !important;
+    min-height:52px !important;
+    margin:0 !important;
+    padding:0 !important;
+    border:1px solid rgba(255,255,255,.3) !important;
+    border-radius:50% !important;
+    background:rgba(25,25,25,.82) !important;
+    color:#fff !important;
+    box-shadow:0 6px 18px rgba(0,0,0,.32) !important;
+    pointer-events:auto !important;
+  }
+  #captureOverlay.photo-mode.capture-landscape:not(.result-ready) .capture-actions #captureSwitchBtn{
+    right:max(27px,env(safe-area-inset-right)) !important;
+    top:calc(50% + 58px) !important;
+    bottom:auto !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-shell{
+    position:relative !important;
+    display:block !important;
+    width:100vw !important;
+    height:100dvh !important;
+    max-width:none !important;
+    max-height:100dvh !important;
+    overflow:hidden !important;
+    background:#000 !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-preview{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    min-width:0 !important;
+    min-height:0 !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-preview video,
+  #captureOverlay.photo-mode.result-ready .capture-preview canvas{
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    object-fit:cover !important;
+    border-radius:0 !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-preview .hidden{display:none !important}
+  #captureOverlay.photo-mode.result-ready .capture-top,
+  #captureOverlay.photo-mode.result-ready .capture-tabs,
+  #captureOverlay.photo-mode.result-ready .capture-filter-control,
+  #captureOverlay.photo-mode.result-ready .capture-actions,
+  #captureOverlay.photo-mode.result-ready #captureSwitchBtn{display:none !important}
+  #captureOverlay.photo-mode.result-ready .capture-result-share{
+    right:max(18px,env(safe-area-inset-right)) !important;
+    bottom:max(18px,env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* BUILD 6848 — mobile orientation-aware selfie layout. */
+#captureOverlay.capture-landscape .capture-shell{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(260px,34vw) !important;
+  grid-template-rows:auto auto 1fr auto !important;
+  width:100% !important;
+  max-width:none !important;
+}
+#captureOverlay.capture-landscape .capture-top{grid-column:1/-1;grid-row:1;padding:6px 12px !important}
+#captureOverlay.capture-landscape .capture-preview{grid-column:1;grid-row:2/5;min-width:0;min-height:0}
+#captureOverlay.capture-landscape .capture-tabs{grid-column:2;grid-row:2;padding:5px 8px !important}
+#captureOverlay.capture-landscape .capture-filter-control{grid-column:2;grid-row:3;width:100% !important;margin:4px 0 !important;align-self:start}
+#captureOverlay.capture-landscape .capture-actions{grid-column:2;grid-row:4;width:100% !important;min-height:72px !important;padding:8px 10px max(8px,env(safe-area-inset-bottom)) !important}
+#captureOverlay.capture-landscape.result-ready:not(.video-mode) .capture-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  grid-template-areas:"retake preview" "save share" "send send" !important;
+}
+#captureOverlay.capture-landscape .capture-photo-review,
+#captureOverlay.capture-landscape .capture-recipient-picker{grid-column:1/-1;grid-row:1/-1}
+
+/* Build 6848 — approved-user picker for internal ConnectChat sharing. */
+.capture-recipient-picker{
+  position:absolute;
+  inset:0;
+  z-index:95;
+  display:grid;
+  place-items:center;
+  padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(0,0,0,.76);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+.capture-recipient-picker.hidden{display:none !important}
+.capture-recipient-card{
+  width:min(92vw,520px);
+  max-height:min(84dvh,680px);
+  display:grid;
+  grid-template-rows:auto auto minmax(120px,1fr) auto auto;
+  gap:10px;
+  padding:16px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:22px;
+  background:#151515;
+  color:#fff;
+  box-shadow:0 22px 60px rgba(0,0,0,.5);
+}
+.capture-recipient-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.capture-recipient-head div{display:grid;gap:3px}.capture-recipient-head small{color:#aaa}
+.capture-recipient-head button{width:38px;height:38px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:25px}
+#captureRecipientSearch{width:100%;min-height:44px;border:1px solid #444;border-radius:12px;padding:8px 12px;background:#222;color:#fff;font:inherit}
+.capture-recipient-list{min-height:120px;overflow:auto;display:grid;align-content:start;gap:5px;padding-right:2px}
+.capture-recipient-row{display:grid;grid-template-columns:auto 42px 1fr;align-items:center;gap:10px;padding:8px;border-radius:13px;background:#202020}
+.capture-recipient-row input{width:20px;height:20px;accent-color:#43ad8c}
+.capture-recipient-row .avatar{width:40px;height:40px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#344054}
+.capture-recipient-row .avatar img{width:100%;height:100%;object-fit:cover}
+.capture-recipient-row>span:last-child{display:grid;gap:2px}.capture-recipient-row small{color:#aaa}
+.capture-recipient-empty{padding:25px 10px;text-align:center;color:#aaa}
+.capture-recipient-summary{font-size:13px;color:#bbb}
+.capture-recipient-actions{display:grid;grid-template-columns:1fr 1.25fr;gap:9px}
+.capture-recipient-actions button{min-height:48px;border:0;border-radius:999px;padding:8px 12px;background:#292929;color:#fff;font-weight:800}
+#captureRecipientSendBtn{background:#43ad8c}.capture-recipient-actions button:disabled{opacity:.45}
+
+@media(max-height:520px) and (orientation:landscape){
+  .capture-recipient-card{max-height:94dvh;grid-template-rows:auto auto minmax(80px,1fr) auto auto;padding:10px}
+  .capture-recipient-row{padding:5px}.capture-recipient-row .avatar{width:34px;height:34px}
+}
+
+/* BUILD 6857 — mobile result must show only X and direct-send arrow.
+   Higher specificity intentionally defeats the legacy result-button rules. */
+@media (pointer:coarse) and (max-width:1024px){
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureSaveBtn,
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureShareBtn,
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureRetakeBtn,
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #capturePreviewBtn,
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureMainBtn,
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureSwitchBtn{
+    display:none !important;
+    visibility:hidden !important;
+  }
+  html body #captureOverlay.capture-overlay.result-ready .capture-actions #captureSendBtn{
+    position:absolute !important;
+    right:max(18px,env(safe-area-inset-right)) !important;
+    bottom:max(18px,env(safe-area-inset-bottom)) !important;
+    display:grid !important;
+    visibility:visible !important;
+  }
+}
+
+/* BUILD 6853 — unified filtered photo/video shutter.
+   Tap takes a photo; hold records video; location remains orientation-anchored. */
+@media (pointer:coarse) and (max-width:1024px){
+  #captureOverlay.photo-mode:not(.result-ready) .capture-shell{
+    position:relative !important;
+    display:block !important;
+    width:100vw !important;
+    height:100dvh !important;
+    max-width:none !important;
+    max-height:100dvh !important;
+  }
+  #captureOverlay.photo-mode:not(.result-ready) .capture-preview{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+  }
+  #captureOverlay.photo-mode:not(.result-ready) .capture-preview video,
+  #captureOverlay.photo-mode:not(.result-ready) .capture-preview canvas{
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    object-fit:cover !important;
+  }
+  #captureOverlay.photo-mode:not(.result-ready) .capture-top,
+  #captureOverlay.photo-mode:not(.result-ready) .capture-tabs,
+  #captureOverlay.photo-mode:not(.result-ready) .capture-filter-control,
+  #captureOverlay.photo-mode:not(.result-ready) #captureSaveBtn,
+  #captureOverlay.photo-mode:not(.result-ready) #captureShareBtn,
+  #captureOverlay.photo-mode:not(.result-ready) #captureRetakeBtn,
+  #captureOverlay.photo-mode:not(.result-ready) #capturePreviewBtn,
+  #captureOverlay.photo-mode:not(.result-ready) #captureSendBtn{
+    display:none !important;
+  }
+  #captureOverlay.photo-mode:not(.result-ready) .capture-actions{
+    position:absolute !important;
+    left:0 !important;
+    right:0 !important;
+    top:0 !important;
+    bottom:0 !important;
+    z-index:8 !important;
+    width:100% !important;
+    min-height:0 !important;
+    padding:0 !important;
+    background:transparent !important;
+    pointer-events:none !important;
+  }
+  #captureOverlay.photo-mode:not(.result-ready) .capture-actions #captureMainBtn{
+    position:absolute !important;
+    left:50% !important;
+    right:auto !important;
+    top:auto !important;
+    bottom:max(14px,env(safe-area-inset-bottom)) !important;
+    display:block !important;
+    width:78px !important;
+    height:78px !important;
+    margin:0 !important;
+    transform:translateX(-50%) !important;
+    pointer-events:auto !important;
+    touch-action:none !important;
+    user-select:none !important;
+    -webkit-user-select:none !important;
+    -webkit-touch-callout:none !important;
+  }
+  #captureOverlay.photo-mode.capture-landscape:not(.result-ready) .capture-actions #captureMainBtn{
+    left:auto !important;
+    right:max(14px,env(safe-area-inset-right)) !important;
+    top:50% !important;
+    bottom:auto !important;
+    transform:translateY(-50%) !important;
+  }
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-top{
+    position:absolute !important;
+    inset:0 0 auto 0 !important;
+    z-index:10 !important;
+    display:block !important;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 0 !important;
+    pointer-events:none !important;
+  }
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-top #captureCloseBtn{
+    display:block !important;
+    pointer-events:auto !important;
+  }
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-top #captureTitle,
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-top #captureTimer{
+    display:none !important;
+  }
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-filter-control{
+    position:absolute !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:calc(108px + env(safe-area-inset-bottom)) !important;
+    z-index:10 !important;
+    display:flex !important;
+    width:min(76vw,420px) !important;
+    margin:0 !important;
+    transform:translateX(-50%) !important;
+    pointer-events:auto !important;
+  }
+  #captureOverlay.photo-mode.show-capture-exit:not(.result-ready) .capture-filter-control label{display:none !important}
+  #captureOverlay.photo-mode.capture-landscape.show-capture-exit:not(.result-ready) .capture-filter-control{
+    left:auto !important;
+    right:calc(108px + env(safe-area-inset-right)) !important;
+    top:50% !important;
+    bottom:auto !important;
+    width:min(38vw,360px) !important;
+    transform:translateY(-50%) !important;
+  }
+  #captureOverlay.photo-mode.recording:not(.result-ready) .capture-actions #captureMainBtn{
+    border-radius:50% !important;
+    background:#ef1745 !important;
+    border-color:#fff !important;
+    transform:translateX(-50%) scale(.88) !important;
+  }
+  #captureOverlay.photo-mode.capture-landscape.recording:not(.result-ready) .capture-actions #captureMainBtn{
+    transform:translateY(-50%) scale(.88) !important;
+  }
+}
+
+/* BUILD 6847 — selfie review before upload, save and native share. */
+#captureOverlay.result-ready:not(.video-mode) .capture-actions{
+  display:grid !important;
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+  grid-template-areas:"retake preview save share send" !important;
+  gap:8px !important;
+}
+#captureOverlay.result-ready:not(.video-mode) #captureRetakeBtn{grid-area:retake !important}
+#captureOverlay.result-ready:not(.video-mode) #capturePreviewBtn{grid-area:preview !important}
+#captureOverlay.result-ready:not(.video-mode) #captureSaveBtn{grid-area:save !important}
+#captureOverlay.result-ready:not(.video-mode) #captureShareBtn{grid-area:share !important}
+#captureOverlay.result-ready:not(.video-mode) #captureSendBtn{grid-area:send !important}
+#captureOverlay.result-ready:not(.video-mode) #captureRetakeBtn,
+#captureOverlay.result-ready:not(.video-mode) #capturePreviewBtn,
+#captureOverlay.result-ready:not(.video-mode) #captureSaveBtn,
+#captureOverlay.result-ready:not(.video-mode) #captureShareBtn,
+#captureOverlay.result-ready:not(.video-mode) #captureSendBtn{
+  display:block !important;
+  width:100% !important;
+  min-width:0 !important;
+  min-height:48px !important;
+  height:auto !important;
+  padding:9px 8px !important;
+  border-radius:999px !important;
+  font-size:14px !important;
+  white-space:nowrap !important;
+}
+#captureOverlay.result-ready:not(.video-mode) #captureCanvas{cursor:zoom-in}
+
+.capture-photo-review{
+  position:absolute;
+  inset:0;
+  z-index:80;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:calc(62px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:#000;
+}
+.capture-photo-review.hidden{display:none !important}
+.capture-photo-review img{
+  display:block;
+  flex:1 1 auto;
+  width:100%;
+  height:auto;
+  min-height:0;
+  object-fit:contain;
+  border-radius:12px;
+}
+.capture-review-close{
+  position:absolute;
+  top:calc(10px + env(safe-area-inset-top));
+  left:14px;
+  z-index:2;
+  width:44px;
+  height:44px;
+  border:0;
+  border-radius:50%;
+  background:#242424;
+  color:#fff;
+  font-size:30px;
+}
+.capture-review-actions{
+  flex:0 0 auto;
+  width:min(100%,760px);
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+}
+.capture-review-actions button{
+  min-height:50px;
+  border:0;
+  border-radius:999px;
+  padding:9px 10px;
+  background:#292929;
+  color:#fff;
+  font-weight:800;
+}
+.capture-review-actions .capture-review-send{background:#43ad8c}
+
+@media(max-width:600px){
+  #captureOverlay.result-ready:not(.video-mode) .capture-actions{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    grid-template-areas:"retake preview save" "share share send" !important;
+  }
+  .capture-review-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* BUILD 6844 — one WhatsApp-style video layout on laptop and mobile. */
+#callOverlay #videoStage{
+  position:relative !important;
+  display:block !important;
+  overflow:hidden !important;
+  width:min(960px,calc(100vw - 32px),calc((100vh - 220px) * 16 / 9)) !important;
+  height:auto !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  max-width:960px !important;
+  max-height:calc(100vh - 220px) !important;
+  aspect-ratio:16/9 !important;
+  margin:0 auto !important;
+  border-radius:20px !important;
+  background:#070b12 !important;
+  isolation:isolate !important;
+}
+
+#callOverlay #videoStage:not(.self-main) #remoteVideo,
+#callOverlay #videoStage.self-main #localVideo{
+  position:absolute !important;
+  inset:0 !important;
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  max-width:none !important;
+  max-height:none !important;
+  aspect-ratio:auto !important;
+  object-fit:cover !important;
+  object-position:center center !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#070b12 !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  z-index:1 !important;
+  cursor:pointer !important;
+  touch-action:manipulation !important;
+}
+
+#callOverlay #videoStage:not(.self-main) #localVideo,
+#callOverlay #videoStage.self-main #remoteVideo{
+  position:absolute !important;
+  inset:auto 14px 14px auto !important;
+  display:block !important;
+  width:clamp(132px,20%,190px) !important;
+  height:auto !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  max-width:190px !important;
+  max-height:none !important;
+  aspect-ratio:16/9 !important;
+  object-fit:cover !important;
+  object-position:center center !important;
+  border:2px solid rgba(255,255,255,.9) !important;
+  border-radius:14px !important;
+  background:#263246 !important;
+  box-shadow:0 8px 26px rgba(0,0,0,.48) !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  z-index:10 !important;
+  cursor:pointer !important;
+  touch-action:manipulation !important;
+}
+
+#callOverlay #videoStage video:focus-visible{
+  outline:3px solid #7dd3fc !important;
+  outline-offset:-4px !important;
+}
+
+#callOverlay #videoStage.screen-sharing:not(.self-main) #remoteVideo,
+#callOverlay #videoStage.screen-sharing.self-main #localVideo{
+  object-fit:contain !important;
+}
+
+@media(max-width:600px){
+  #callOverlay #videoStage{
+    width:calc(100vw - 28px) !important;
+    max-width:none !important;
+    max-height:none !important;
+    aspect-ratio:16/9 !important;
+    border-radius:16px !important;
+  }
+
+  #callOverlay #videoStage:not(.self-main) #localVideo,
+  #callOverlay #videoStage.self-main #remoteVideo{
+    inset:auto 10px 10px auto !important;
+    width:clamp(112px,29vw,150px) !important;
+    max-width:150px !important;
+    border-radius:12px !important;
+  }
+}
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(360px,calc(100vw - 36px)) !important;
+  max-width:360px !important;
+  max-height:min(54vh,410px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:10px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:24px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:44px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:7px 10px 7px 42px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:18px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:12px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:21px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(52vh,420px) !important;
+    padding:9px !important;
+    border-radius:23px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:43px !important;
+    padding-left:40px !important;
+    font-size:17px !important;
+  }
+}
+
+/* Build 6854 final precedence: no legacy result panel. */
+#captureOverlay.result-ready .capture-actions,
+#captureOverlay.result-ready:not(.video-mode) .capture-actions,
+#captureOverlay.capture-landscape.result-ready:not(.video-mode) .capture-actions{
+  display:none !important;
+}
+@media (pointer:coarse) and (max-width:1024px){
+  #captureOverlay.photo-mode.result-ready .capture-shell{
+    position:relative !important;
+    display:block !important;
+    width:100vw !important;
+    height:100dvh !important;
+    max-width:none !important;
+    max-height:100dvh !important;
+    overflow:hidden !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-preview{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-preview video,
+  #captureOverlay.photo-mode.result-ready .capture-preview canvas{
+    width:100% !important;
+    height:100% !important;
+    max-width:none !important;
+    max-height:none !important;
+    object-fit:cover !important;
+    border-radius:0 !important;
+  }
+  #captureOverlay.photo-mode.result-ready .capture-top,
+  #captureOverlay.photo-mode.result-ready .capture-tabs,
+  #captureOverlay.photo-mode.result-ready .capture-filter-control,
+  #captureOverlay.photo-mode.result-ready #captureSwitchBtn{display:none !important}
+}
+
+/* BUILD 6855 — clean tappable result with photo zoom and pan. */
+#captureOverlay.result-ready #captureCanvas{
+  cursor:grab !important;
+  touch-action:none !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+  transition:transform .16s ease-out;
+}
+#captureOverlay.result-ready #captureCanvas:active{cursor:grabbing !important;transition:none}
+#captureOverlay.result-ready .capture-result-share{display:none !important}
+
+/* BUILD 6856 — direct capture delivery and full chat media viewer. */
+#captureOverlay .capture-tabs{display:none !important}
+#captureOverlay.result-ready .capture-actions,
+#captureOverlay.result-ready:not(.video-mode) .capture-actions,
+#captureOverlay.capture-landscape.result-ready:not(.video-mode) .capture-actions{
+  position:absolute !important;
+  inset:0 !important;
+  z-index:18 !important;
+  display:block !important;
+  width:100% !important;
+  min-height:0 !important;
+  padding:0 !important;
+  background:transparent !important;
+  pointer-events:none !important;
+}
+#captureOverlay.result-ready .capture-actions>button{display:none !important}
+#captureOverlay.result-ready .capture-actions #captureSendBtn{
+  position:absolute !important;
+  right:max(18px,env(safe-area-inset-right)) !important;
+  bottom:max(18px,env(safe-area-inset-bottom)) !important;
+  z-index:2 !important;
+  display:grid !important;
+  place-items:center !important;
+  width:62px !important;
+  min-width:62px !important;
+  height:62px !important;
+  min-height:62px !important;
+  padding:0 0 1px 3px !important;
+  border:2px solid rgba(255,255,255,.92) !important;
+  border-radius:50% !important;
+  background:#20bf63 !important;
+  color:#fff !important;
+  box-shadow:0 9px 28px rgba(0,0,0,.38) !important;
+  font-size:30px !important;
+  pointer-events:auto !important;
+}
+#captureOverlay.result-ready .capture-top{
+  position:absolute !important;
+  inset:0 0 auto 0 !important;
+  z-index:20 !important;
+  display:block !important;
+  padding:calc(10px + env(safe-area-inset-top)) 12px 0 !important;
+  background:transparent !important;
+  pointer-events:none !important;
+}
+#captureOverlay.result-ready .capture-top #captureCloseBtn{
+  display:grid !important;
+  place-items:center !important;
+  width:52px !important;
+  height:52px !important;
+  padding:0 !important;
+  border-radius:50% !important;
+  background:rgba(24,24,24,.82) !important;
+  pointer-events:auto !important;
+}
+#captureOverlay.result-ready .capture-top #captureTitle,
+#captureOverlay.result-ready .capture-top #captureTimer,
+#captureOverlay.result-ready .capture-filter-control{display:none !important}
+#captureOverlay.result-ready #captureCanvas{cursor:default !important;touch-action:auto !important;transition:none !important}
+
+.chat-media-viewer.hidden{display:none !important}
+.chat-media-viewer{
+  position:fixed;
+  inset:0;
+  z-index:3600;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  width:100vw;
+  height:100dvh;
+  overflow:hidden;
+  background:#000;
+  color:#fff;
+}
+.chat-media-viewer-head{
+  position:relative;
+  z-index:4;
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr) 52px;
+  align-items:center;
+  gap:10px;
+  padding:calc(10px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));
+  background:rgba(10,10,10,.88);
+}
+.chat-media-viewer-head>button{
+  width:46px;
+  height:46px;
+  border:0;
+  border-radius:50%;
+  background:#292929;
+  color:#fff;
+  font-size:28px;
+}
+.chat-media-viewer-head>div{min-width:0;display:grid;gap:2px;text-align:center}
+.chat-media-viewer-head small{color:#aaa;font-size:10px;font-weight:900;letter-spacing:.1em}
+.chat-media-viewer-head b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-media-viewer-stage{
+  position:relative;
+  min-width:0;
+  min-height:0;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  touch-action:none;
+  cursor:grab;
+}
+.chat-media-viewer-stage.dragging{cursor:grabbing}
+.chat-media-viewer-stage img,
+.chat-media-viewer-stage video{
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:none;
+  max-height:none;
+  object-fit:contain;
+  transform-origin:center center;
+  user-select:none;
+  -webkit-user-select:none;
+  will-change:transform;
+}
+.chat-media-viewer-stage .hidden{display:none !important}
+.chat-media-actions{
+  position:absolute;
+  top:calc(72px + env(safe-area-inset-top));
+  right:max(12px,env(safe-area-inset-right));
+  z-index:8;
+  width:min(330px,calc(100vw - 24px));
+  display:grid;
+  gap:6px;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:17px;
+  background:#171717;
+  box-shadow:0 18px 46px rgba(0,0,0,.58);
+}
+.chat-media-actions.hidden{display:none !important}
+.chat-media-actions button{
+  min-height:48px;
+  border:0;
+  border-radius:12px;
+  padding:10px 14px;
+  background:#292929;
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  text-align:left;
+}
+.chat-media-recipient-picker{
+  position:absolute;
+  inset:0;
+  z-index:12;
+  display:grid;
+  place-items:center;
+  padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(0,0,0,.78);
+  -webkit-backdrop-filter:blur(9px);
+  backdrop-filter:blur(9px);
+}
+.chat-media-recipient-picker.hidden{display:none !important}
+.chat-media-recipient-card{
+  width:min(92vw,520px);
+  max-height:min(86dvh,690px);
+  display:grid;
+  grid-template-rows:auto auto minmax(120px,1fr) auto auto;
+  gap:10px;
+  padding:16px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:22px;
+  background:#151515;
+}
+.chat-media-recipient-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.chat-media-recipient-head>div{display:grid;gap:3px}.chat-media-recipient-head small{color:#aaa}
+.chat-media-recipient-head button{width:38px;height:38px;border:0;border-radius:50%;background:#292929;color:#fff;font-size:25px}
+#chatMediaRecipientSearch{width:100%;min-height:44px;border:1px solid #444;border-radius:12px;padding:8px 12px;background:#222;color:#fff;font:inherit}
+.chat-media-recipient-list{min-height:120px;overflow:auto;display:grid;align-content:start;gap:5px}
+.chat-media-recipient-row{display:grid;grid-template-columns:auto 42px 1fr;align-items:center;gap:10px;padding:8px;border-radius:13px;background:#202020}
+.chat-media-recipient-row input{width:20px;height:20px;accent-color:#43ad8c}
+.chat-media-recipient-row .avatar{width:40px;height:40px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#344054}
+.chat-media-recipient-row .avatar img{width:100%;height:100%;object-fit:cover}
+.chat-media-recipient-row>span:last-child{display:grid;gap:2px}.chat-media-recipient-row small{color:#aaa}
+.chat-media-recipient-empty{padding:25px 10px;text-align:center;color:#aaa}
+.chat-media-recipient-summary{color:#bbb;font-size:13px}
+#chatMediaRecipientSendBtn{min-height:50px;border:0;border-radius:999px;background:#43ad8c;color:#fff;font-weight:900}
+#chatMediaRecipientSendBtn:disabled{opacity:.45}
+@media(max-height:520px) and (orientation:landscape){
+  .chat-media-viewer-head{position:absolute;inset:0 0 auto 0;background:linear-gradient(rgba(0,0,0,.72),transparent)}
+  .chat-media-viewer-stage{grid-row:1/-1}
+  .chat-media-recipient-card{max-height:94dvh;grid-template-rows:auto auto minmax(70px,1fr) auto auto;padding:10px}
+}
+
+/* BUILD 6858 — elapsed video timer and guaranteed result escape. */
+@media (pointer:coarse) and (max-width:1024px){
+  html body #captureOverlay.capture-overlay.photo-mode.recording:not(.result-ready) .capture-top{
+    position:absolute !important;
+    inset:0 0 auto 0 !important;
+    z-index:22 !important;
+    display:block !important;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 0 !important;
+    background:transparent !important;
+    pointer-events:none !important;
+  }
+  html body #captureOverlay.capture-overlay.photo-mode.recording:not(.result-ready) .capture-top #captureCloseBtn,
+  html body #captureOverlay.capture-overlay.photo-mode.recording:not(.result-ready) .capture-top #captureTitle{
+    display:none !important;
+  }
+  html body #captureOverlay.capture-overlay.photo-mode.recording:not(.result-ready) .capture-top #captureTimer{
+    position:absolute !important;
+    left:50% !important;
+    top:calc(12px + env(safe-area-inset-top)) !important;
+    display:block !important;
+    min-width:78px !important;
+    padding:8px 13px !important;
+    border-radius:999px !important;
+    background:rgba(12,12,12,.82) !important;
+    color:#fff !important;
+    box-shadow:0 4px 16px rgba(0,0,0,.35) !important;
+    font-size:17px !important;
+    font-weight:900 !important;
+    text-align:center !important;
+    transform:translateX(-50%) !important;
+  }
+  html body #captureOverlay.capture-overlay.photo-mode.result-ready .capture-top{
+    position:absolute !important;
+    inset:0 0 auto 0 !important;
+    z-index:22 !important;
+    display:block !important;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 0 !important;
+    background:transparent !important;
+    pointer-events:none !important;
+  }
+  html body #captureOverlay.capture-overlay.photo-mode.result-ready .capture-top #captureCloseBtn{
+    display:grid !important;
+    visibility:visible !important;
+    place-items:center !important;
+    pointer-events:auto !important;
+  }
+  html body #captureOverlay.capture-overlay.photo-mode.result-ready .capture-top #captureTitle,
+  html body #captureOverlay.capture-overlay.photo-mode.result-ready .capture-top #captureTimer{
+    display:none !important;
+  }
+}
