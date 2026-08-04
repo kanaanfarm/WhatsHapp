@@ -3278,15 +3278,14 @@ async function start() {
     });
     if (error) throw error;
   }
-await cleanupExpiredStatuses();
-
-server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
-
 // Connect Telegram bot to AI function
 if (telegramBot) {
   telegramBot.setAIFunction(generateAIResponse);
   console.log('✅ Telegram bot connected to AI function');
 }
+
+await cleanupExpiredStatuses();
+server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
 }
 function shutdown(signal) {
   console.log(`${signal} received. Closing server...`);
