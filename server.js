@@ -3283,10 +3283,14 @@ async function start() {
 if (telegramBot) {
   telegramBot.setAIFunction(generateAIResponse);
   console.log('✅ Telegram bot connected to AI function');
-}
-  server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
-}
+}server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
 
+// Connect Telegram bot to AI function
+if (telegramBot) {
+  telegramBot.setAIFunction(generateAIResponse);
+  console.log('✅ Telegram bot connected to AI function');
+}
+}
 function shutdown(signal) {
   console.log(`${signal} received. Closing server...`);
   server.close(() => process.exit(0));
