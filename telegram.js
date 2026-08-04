@@ -4,7 +4,6 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {polling: true});
 
 console.log('🤖 Telegram Bot Started!');
 
-// Store reference to AI function (will be set from server.js)
 let aiFunction = null;
 
 bot.setAIFunction = (func) => {
