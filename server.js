@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const telegramBot = require("./telegram");
 const http = require("http");
 const path = require("path");
 const os = require("os");
