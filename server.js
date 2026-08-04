@@ -1,7 +1,14 @@
 require("dotenv").config();
 
 const express = require("express");
-const telegramBot = require("./telegram");
+let telegramBot = null;
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  try {
+    telegramBot = require("./telegram");
+  } catch (error) {
+    console.error('Telegram bot initialization error:', error);
+  }
+}
 const http = require("http");
 const path = require("path");
 const os = require("os");
