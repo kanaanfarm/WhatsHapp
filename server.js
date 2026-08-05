@@ -71,6 +71,8 @@ const DEEPSEEK_MODEL = String(process.env.DEEPSEEK_MODEL || "deepseek-v4-flash")
 const DEEPSEEK_BASE_URL = String(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/$/, "");
 const OLLAMA_URL = String(process.env.OLLAMA_URL || (AI_PROVIDER === "ollama" ? "http://127.0.0.1:11434" : "")).trim().replace(/\/$/, "");
 const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
+const OLLAMA_AUTH_USER = String(process.env.OLLAMA_AUTH_USER || "").trim();
+const OLLAMA_AUTH_PASSWORD = String(process.env.OLLAMA_AUTH_PASSWORD || "");
 const AI_DEFAULT_PROVIDER_RAW = String(process.env.AI_DEFAULT_PROVIDER || "ollama").trim().toLowerCase();
 const AI_DEFAULT_PROVIDER = ["openai", "deepseek", "ollama"].includes(AI_DEFAULT_PROVIDER_RAW) ? AI_DEFAULT_PROVIDER_RAW : "ollama";
 const AI_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(process.env.AI_REQUEST_TIMEOUT_MS) || 60000, 10000), 180000);
@@ -1259,9 +1261,14 @@ async function requestOpenAI(message, history, signal) {
 }
 
 async function requestOllama(message, history, signal) {
+  const headers = { "Content-Type": "application/json" };
+  if (OLLAMA_AUTH_USER && OLLAMA_AUTH_PASSWORD) {
+    const credentials = Buffer.from(`${OLLAMA_AUTH_USER}:${OLLAMA_AUTH_PASSWORD}`, "utf8").toString("base64");
+    headers.Authorization = `Basic ${credentials}`;
+  }
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       stream: false,
