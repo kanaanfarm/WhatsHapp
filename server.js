@@ -23,17 +23,17 @@ const { createClient } = require("@supabase/supabase-js");
 const { Server } = require("socket.io");
 const webpush = require("web-push");
 
-// Telegram is optional. A missing token or Telegram module must never stop
+// telegram is optional. A missing token or telegram module must never stop
 // ConnectChat itself from starting.
 let telegramBot = null;
-if (String(process.env.TELEGRAM_BOT_TOKEN || "").trim()) {
+if (String(process.env.telegram_BOT_TOKEN || "").trim()) {
   try {
-    telegramBot = require("./Telegram");
+    telegramBot = require("./telegram");
   } catch (error) {
-    console.error("Telegram bot could not be started:", error.message || error);
+    console.error("telegram bot could not be started:", error.message || error);
   }
 } else {
-  console.log("Telegram bot disabled: TELEGRAM_BOT_TOKEN is not configured.");
+  console.log("telegram bot disabled: telegram_BOT_TOKEN is not configured.");
 }
 
 const app = express();
@@ -1311,7 +1311,7 @@ async function requestDeepSeek(message, history, signal) {
   }
   return String(data?.choices?.[0]?.message?.content || "").trim();
 }
-// Connect Telegram to the same AI provider functions used by ConnectChat.
+// Connect telegram to the same AI provider functions used by ConnectChat.
 if (telegramBot) {
   telegramBot.setAIProviders({
     requestOpenAI: OPENAI_CONFIGURED ? requestOpenAI : null,
@@ -1319,7 +1319,7 @@ if (telegramBot) {
     requestDeepSeek: DEEPSEEK_CONFIGURED ? requestDeepSeek : null,
     preferredProvider: AI_DEFAULT_PROVIDER
   });
-  console.log("Telegram connected to ConnectChat AI providers.");
+  console.log("telegram connected to ConnectChat AI providers.");
 }
 
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
@@ -3304,7 +3304,7 @@ async function start() {
 function shutdown(signal) {
   console.log(`${signal} received. Closing server...`);
   if (telegramBot && typeof telegramBot.stopPolling === "function") {
-    telegramBot.stopPolling().catch(error => console.error("Telegram polling shutdown failed:", error.message || error));
+    telegramBot.stopPolling().catch(error => console.error("telegram polling shutdown failed:", error.message || error));
   }
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10 * 1000).unref();
