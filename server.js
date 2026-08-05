@@ -26,14 +26,14 @@ const webpush = require("web-push");
 // telegram is optional. A missing token or telegram module must never stop
 // ConnectChat itself from starting.
 let telegramBot = null;
-if (String(process.env.telegram_BOT_TOKEN || "").trim()) {
+if (String(process.env.TELEGRAM_BOT_TOKEN || "").trim()) {
   try {
     telegramBot = require("./telegram");
   } catch (error) {
-    console.error("telegram bot could not be started:", error.message || error);
+    console.error("Telegram bot could not be started:", error.message || error);
   }
 } else {
-  console.log("telegram bot disabled: telegram_BOT_TOKEN is not configured.");
+  console.log("Telegram bot disabled: TELEGRAM_BOT_TOKEN is not configured.");
 }
 
 const app = express();
