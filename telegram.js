@@ -4,11 +4,11 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {polling: true});
 
 console.log('🤖 Telegram Bot Started!');
 
-// Store the AI function
-let aiFunction = null;
+// Store AI functions
+let aiProviders = null;
 
-bot.setAIFunction = (func) => {
-  aiFunction = func;
+bot.setAIProviders = (providers) => {
+  aiProviders = providers;
 };
 
 bot.on('message', async (msg) => {
@@ -18,22 +18,23 @@ bot.on('message', async (msg) => {
   if (!userMessage) return;
   
   try {
-    // Show typing indicator
     await bot.sendChatAction(chatId, 'typing');
     
-    // Call generateResponse function
-    const aiResponse = await aiFunction(userMessage);
+    // Use hybrid: try OpenAI, fallback to Ollama
+    let aiResponse;
+    if (aiProviders.requestOpenAI) {
+      aiResponse = await aiProviders.requestOpenAI(userMessage, []);
+    } else if (aiProviders.requestOllama) {
+      aiResponse = await aiProviders.requestOllama(userMessage, []);
+    }
     
-    // Send response back to Telegram
     await bot.sendMessage(chatId, aiResponse);
   } catch (error) {
-    console.error('Telegram bot error:', error);
-    await bot.sendMessage(chatId, '❌ Sorry, something went wrong. Please try again.');
+    console.error('Telegram error:', error);
+    await bot.sendMessage(chatId, '❌ Error processing message');
   }
 });
 
-bot.on('polling_error', (error) => {
-  console.error('❌ Polling Error:', error);
-});
+bot.on('polling_error', (error) => console.error('Polling Error:', error));
 
 module.exports = bot;
