@@ -4,6 +4,7 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {polling: true});
 
 console.log('🤖 Telegram Bot Started!');
 
+// Store the AI function
 let aiFunction = null;
 
 bot.setAIFunction = (func) => {
@@ -13,23 +14,20 @@ bot.setAIFunction = (func) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const userMessage = msg.text;
-  const userName = msg.from.first_name || 'User';
-
-  console.log(`📨 Message from ${userName}: ${userMessage}`);
-
-  await bot.sendChatAction(chatId, 'typing');
-
+  
+  if (!userMessage) return;
+  
   try {
-    if (!aiFunction) {
-      await bot.sendMessage(chatId, '⚠️ AI function not ready yet. Please try again.');
-      return;
-    }
+    // Show typing indicator
+    await bot.sendChatAction(chatId, 'typing');
     
-    const aiResponse = await aiFunction(userMessage, []);
+    // Call generateResponse function
+    const aiResponse = await aiFunction(userMessage);
+    
+    // Send response back to Telegram
     await bot.sendMessage(chatId, aiResponse);
-    console.log(`✅ Response sent to ${userName}`);
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('Telegram bot error:', error);
     await bot.sendMessage(chatId, '❌ Sorry, something went wrong. Please try again.');
   }
 });
