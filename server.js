@@ -1299,14 +1299,7 @@ async function requestDeepSeek(message, history, signal) {
   return String(data?.choices?.[0]?.message?.content || "").trim();
 }
 // Connect Telegram bot to AI providers
-if (telegramBot) {
-  telegramBot.setAIProviders({
-    requestOpenAI,
-    requestOllama,
-    requestDeepSeek
-  });
-  console.log('✅ Telegram connected to AI providers');
-}
+
 app.get("/api/ai/status", auth, (req, res) => res.json(aiPublicStatus()));
 
 
