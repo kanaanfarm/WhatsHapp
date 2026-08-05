@@ -1,14 +1,6 @@
 require("dotenv").config();
 
 const express = require("express");
-let telegramBot = null;
-if (process.env.TELEGRAM_BOT_TOKEN) {
-  try {
-    telegramBot = require("./telegram");
-  } catch (error) {
-    console.error('Telegram bot initialization error:', error);
-  }
-}
 const http = require("http");
 const path = require("path");
 const os = require("os");
@@ -60,9 +52,9 @@ if (PUSH_ENABLED) {
 
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
-const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
 const DEEPSEEK_API_KEY = String(process.env.DEEPSEEK_API_KEY || "").trim();
-const DEEPSEEK_MODEL = String(process.env.DEEPSEEK_MODEL || "deepseek-chat").trim();
+const DEEPSEEK_MODEL = String(process.env.DEEPSEEK_MODEL || "deepseek-v4-flash").trim();
 const DEEPSEEK_BASE_URL = String(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/$/, "");
 const OLLAMA_URL = String(process.env.OLLAMA_URL || (AI_PROVIDER === "ollama" ? "http://127.0.0.1:11434" : "")).trim().replace(/\/$/, "");
 const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "qwen2.5:7b").trim();
@@ -1191,7 +1183,15 @@ app.delete("/api/account", auth, async (req, res) => {
 });
 
 function extractOpenAIText(data) {
-  return String(data?.choices?.[0]?.message?.content || "").trim();
+  if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const parts = [];
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (content?.type === "output_text" && typeof content.text === "string") parts.push(content.text);
+      else if (typeof content?.text === "string") parts.push(content.text);
+    }
+  }
+  return parts.join("\n").trim();
 }
 
 function aiPublicStatus() {
@@ -1222,7 +1222,7 @@ function aiFailureText(provider, error) {
 }
 
 async function requestOpenAI(message, history, signal) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -1230,13 +1230,9 @@ async function requestOpenAI(message, history, signal) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      messages: [
-        { role: "system", content: AI_SYSTEM_PROMPT },
-        ...history,
-        { role: "user", content: message }
-      ],
-      max_tokens: 1600,
-      temperature: 0.3
+      instructions: AI_SYSTEM_PROMPT,
+      input: [...history, { role: "user", content: message }],
+      max_output_tokens: 1600
     }),
     signal
   });
@@ -3278,15 +3274,10 @@ async function start() {
     });
     if (error) throw error;
   }
-// Connect Telegram bot to AI function
-if (telegramBot) {
-  telegramBot.setAIFunction(generateAIResponse);
-  console.log('✅ Telegram bot connected to AI function');
+  await cleanupExpiredStatuses();
+  server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
 }
 
-await cleanupExpiredStatuses();
-server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
-}
 function shutdown(signal) {
   console.log(`${signal} received. Closing server...`);
   server.close(() => process.exit(0));
