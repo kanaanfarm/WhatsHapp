@@ -1,0 +1,132 @@
+/* BUILD 6843 — native live-call selector plus call visibility fix. */
+#callOverlay.call-overlay.hidden{
+  display:none !important;
+}
+#callOverlay .call-filter-native{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 12px;
+  border:2px solid #8b4de8;
+  border-radius:999px;
+  background:linear-gradient(135deg,#793de1,#df3ca5);
+  color:#fff;
+  box-shadow:0 6px 18px rgba(130,55,200,.28);
+}
+#callOverlay .call-filter-native.hidden{display:none !important}
+#callOverlay .call-filter-native select{
+  max-width:170px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+#callOverlay .call-filter-native select option{color:#111;background:#fff}
+@media(max-width:600px){
+  #callOverlay .call-filter-native{min-height:44px;padding:4px 9px}
+  #callOverlay .call-filter-native select{max-width:145px;font-size:14px}
+}
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(360px,calc(100vw - 36px)) !important;
+  max-width:360px !important;
+  max-height:min(54vh,410px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:10px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:24px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:44px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:7px 10px 7px 42px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:18px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:12px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:21px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(52vh,420px) !important;
+    padding:9px !important;
+    border-radius:23px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:43px !important;
+    padding-left:40px !important;
+    font-size:17px !important;
+  }
+}

@@ -1,17 +1,4 @@
-{
-  "name": "connectchat-pro-android",
-  "version": "1.4.0",
-  "private": true,
-  "scripts": {
-    "android:add": "cap add android",
-    "android:sync": "cap sync android",
-    "android:open": "cap open android"
-  },
-  "dependencies": {
-    "@capacitor/android": "^7.4.2",
-    "@capacitor/core": "^7.4.2"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^7.4.2"
-  }
+chat.example.com {
+  reverse_proxy app:3000
+  encode zstd gzip
 }

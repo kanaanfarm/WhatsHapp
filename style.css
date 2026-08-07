@@ -1,16 +1,3315 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ConnectChat Pro logo">
-  <defs>
-    <linearGradient id="g" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5b6cff"/>
-      <stop offset="1" stop-color="#7f56d9"/>
-    </linearGradient>
-    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#2633a8" flood-opacity=".28"/>
-    </filter>
-  </defs>
-  <rect x="40" y="40" width="432" height="432" rx="132" fill="url(#g)" filter="url(#s)"/>
-  <path d="M151 154h210c39 0 71 31 71 70v74c0 39-32 70-71 70H247l-76 57c-14 10-34 0-34-18v-48c-29-11-49-38-49-70v-65c0-39 29-70 63-70Z" fill="#fff"/>
-  <circle cx="204" cy="263" r="22" fill="#6670ee"/>
-  <circle cx="288" cy="263" r="22" fill="#6670ee"/>
-  <circle cx="372" cy="263" r="22" fill="#6670ee"/>
-</svg>
+*{box-sizing:border-box}
+:root{
+  --bg:#eef2f7;--panel:#fff;--soft:#f6f8fb;--text:#182033;--muted:#7b8799;
+  --border:#e2e8f0;--accent:#5b6cff;--accent2:#7f56d9;--success:#22b573;
+  --danger:#df4b56;--dark:#182132
+}
+
+/* BUILD 6837 FINAL OVERRIDE — must remain last so earlier call-layout builds
+   cannot move the desktop stage or PiP. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
+  }
+}
+
+/* BUILD 6838 LAST RULE — vertical live video-call filter menu. */
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(430px,calc(100vw - 36px)) !important;
+  max-width:430px !important;
+  max-height:min(62vh,520px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:15px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:30px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:52px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:10px 12px 10px 48px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:21px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:24px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(58vh,470px) !important;
+    padding:12px !important;
+    border-radius:27px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:48px !important;
+    padding-left:44px !important;
+    font-size:19px !important;
+  }
+}
+
+/* BUILD 6838 — the approved vertical filter selector is now used during
+   live video calls on laptop and mobile. */
+#callOverlay .call-controls{
+  position:relative !important;
+  overflow:visible !important;
+}
+#callOverlay #callFilterTray,
+#callOverlay .call-filter-tray{
+  position:absolute !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(100% + 8px) !important;
+  transform:translateX(-50%) !important;
+  z-index:30 !important;
+  width:min(430px,calc(100vw - 36px)) !important;
+  max-width:430px !important;
+  max-height:min(62vh,520px) !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:stretch !important;
+  gap:2px !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  margin:0 !important;
+  padding:15px !important;
+  border:1px solid rgba(255,255,255,.72) !important;
+  border-radius:30px !important;
+  background:rgba(235,235,235,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(135%) !important;
+  backdrop-filter:blur(24px) saturate(135%) !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.38) !important;
+  cursor:default !important;
+  scroll-snap-type:none !important;
+}
+#callOverlay #callFilterTray.hidden,
+#callOverlay .call-filter-tray.hidden{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter],
+#callOverlay .call-filter-tray [data-call-filter]{
+  position:relative !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:52px !important;
+  flex:0 0 auto !important;
+  display:block !important;
+  border:0 !important;
+  border-radius:14px !important;
+  padding:10px 12px 10px 48px !important;
+  background:transparent !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:21px !important;
+  font-weight:500 !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  scroll-snap-align:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter]:hover,
+#callOverlay #callFilterTray [data-call-filter]:focus-visible,
+#callOverlay .call-filter-tray [data-call-filter]:hover,
+#callOverlay .call-filter-tray [data-call-filter]:focus-visible{
+  background:rgba(255,255,255,.45) !important;
+  outline:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter].active:before,
+#callOverlay .call-filter-tray [data-call-filter].active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:24px;
+  font-weight:800;
+}
+#callOverlay #callFilterTray .filter-swatch,
+#callOverlay .call-filter-tray .filter-swatch{
+  display:none !important;
+}
+#callOverlay #callFilterTray [data-call-filter] b,
+#callOverlay .call-filter-tray [data-call-filter] b{
+  font:inherit !important;
+}
+@media(max-width:600px){
+  #callOverlay #callFilterTray,
+  #callOverlay .call-filter-tray{
+    bottom:calc(100% + 5px) !important;
+    width:calc(100vw - 28px) !important;
+    max-height:min(58vh,470px) !important;
+    padding:12px !important;
+    border-radius:27px !important;
+  }
+  #callOverlay #callFilterTray [data-call-filter],
+  #callOverlay .call-filter-tray [data-call-filter]{
+    min-height:48px !important;
+    padding-left:44px !important;
+    font-size:19px !important;
+  }
+}
+html,body{height:100%}
+body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+button,input{font:inherit}.hidden{display:none!important}
+.auth-view{min-height:100%;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at top left,rgba(91,108,255,.18),transparent 35%),radial-gradient(circle at bottom right,rgba(127,86,217,.15),transparent 30%),var(--bg)}
+.auth-card{width:min(440px,100%);background:var(--panel);padding:34px;border:1px solid rgba(255,255,255,.7);border-radius:26px;box-shadow:0 25px 60px rgba(24,32,51,.14)}
+.brand-logo{display:block;width:68px;height:68px;object-fit:contain}.brand-logo.small{width:44px;height:44px;flex:0 0 44px}
+.auth-card h1{margin:18px 0 6px}.auth-card p{margin:0 0 22px;color:var(--muted)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--soft);border-radius:13px;padding:4px;margin-bottom:16px}
+.tabs button{border:0;background:transparent;padding:10px;border-radius:10px;cursor:pointer}.tabs button.active{background:var(--panel);font-weight:700;box-shadow:0 4px 12px rgba(24,32,51,.07)}
+.auth-card input,.search-box input,.composer input{width:100%;border:1px solid var(--border);background:var(--soft);padding:13px 14px;border-radius:13px;outline:none}
+.auth-card input{margin-bottom:12px}.auth-card input:focus,.search-box input:focus,.composer input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.1)}
+.trial-license-mark{margin-top:18px;padding-top:14px;border-top:1px solid var(--border);display:grid;gap:3px;text-align:center;color:var(--muted)}.trial-license-mark b{color:var(--accent);font-size:13px;letter-spacing:.06em;text-transform:uppercase}.trial-license-mark span{font-weight:800;color:var(--text);font-size:12px}.trial-license-mark small{font-size:10px}
+.auth-label{display:block;font-size:12px;font-weight:700;margin:0 0 6px;color:#4a5568}.password-field{position:relative}.password-field input{padding-right:65px}.password-field button{position:absolute;right:7px;top:7px;border:0;background:transparent;color:var(--accent);font-weight:700;font-size:12px;padding:7px;cursor:pointer}
+.primary,.send-btn{border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:13px;padding:13px 18px;cursor:pointer}
+.primary{width:100%;margin-top:4px}.primary:disabled{opacity:.65;cursor:wait}.error{color:var(--danger);font-size:13px;min-height:20px;margin-top:10px;text-align:center}
+.text-btn{display:block;margin:12px auto 0;border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:13px}
+.app{height:100%;display:grid;grid-template-columns:320px minmax(0,1fr)}
+.sidebar{background:var(--dark);color:#fff;display:flex;flex-direction:column;min-height:0}
+.sidebar-head{display:flex;gap:12px;align-items:center;padding:20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sidebar-head span{display:block;color:#aeb7c7;font-size:12px;margin-top:4px}
+.search-box{padding:16px}.search-box input{background:#232f43;border-color:#344056;color:#fff}
+.section-label{padding:0 18px 10px;color:#9eabba;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.users-list{overflow:auto;flex:1;padding:0 10px 10px}
+.user-item{display:flex;align-items:center;gap:11px;padding:11px;border-radius:13px;cursor:pointer}
+.user-item:hover,.user-item.active{background:rgba(255,255,255,.08)}
+.avatar,.active-avatar{display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#ff855d,#ff4e87);color:#fff;font-weight:700}
+.saved-avatar{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.avatar{width:42px;height:42px}.active-avatar{width:44px;height:44px}
+.user-info{min-width:0;flex:1}.user-info strong{display:block}.user-info span{display:block;color:#aeb7c7;font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:9px;height:9px;border-radius:50%;background:#5e6a7d}.dot.online{background:var(--success)}
+.sidebar-actions{padding:12px 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sidebar-actions button{border:1px solid rgba(255,255,255,.15);background:transparent;color:#fff;padding:10px;border-radius:12px;cursor:pointer}
+.install-btn{background:rgba(91,108,255,.2)!important}
+.status-btn{grid-column:1/-1;background:rgba(127,86,217,.25)!important;border-color:rgba(168,139,250,.45)!important;font-weight:700}
+.admin-btn{grid-column:1/-1;background:rgba(34,181,115,.2)!important;border-color:rgba(34,181,115,.45)!important;font-weight:700}
+.chat{display:grid;grid-template-rows:auto 1fr auto auto auto;background:var(--soft);min-width:0}
+.chat-head{height:78px;padding:0 22px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.chat-head h2{margin:0;font-size:18px}.chat-head span{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.call-actions{margin-left:auto;display:flex;gap:8px}.header-btn{width:42px;height:42px;border:1px solid var(--border);border-radius:50%;background:var(--soft);cursor:pointer}.header-btn:disabled{opacity:.4;cursor:not-allowed}
+.call-symbol{display:grid;place-items:center;color:var(--text)}
+.call-symbol svg{width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+#callMenuBtn{width:34px;height:34px}
+.back-btn{display:none;border:0;background:transparent;font-size:24px;cursor:pointer}
+.messages{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.empty-state{display:grid;place-items:center;text-align:center;color:var(--muted)}
+.msg{max-width:72%;display:flex;flex-direction:column}.msg.own{align-self:flex-end}.msg.other{align-self:flex-start}
+.meta{font-size:11px;color:var(--muted);margin:0 4px 4px;display:flex;align-items:center;gap:8px}.msg.own .meta{justify-content:flex-end;text-align:right}
+.message-delete{border:0;background:transparent;color:var(--danger);padding:1px 3px;cursor:pointer;font-size:11px;font-weight:700}.message-delete:hover{text-decoration:underline}.message-delete:disabled{opacity:.45;cursor:wait}
+.receipt{font-weight:700}.receipt.read{color:#4fc3f7}
+.bubble{background:var(--panel);padding:10px 12px;border-radius:17px;box-shadow:0 5px 16px rgba(18,28,51,.06);word-wrap:break-word;overflow:hidden}
+.msg.own .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:5px}.msg.other .bubble{border-bottom-left-radius:5px}
+.chat-image{display:block;max-width:320px;width:100%;border-radius:12px;cursor:pointer}
+.voice-note{width:min(320px,65vw);display:block}
+.file-link{color:inherit;font-weight:700;text-decoration:none}
+.caption{margin-top:7px;line-height:1.4}
+.typing,.upload-status{min-height:24px;padding:0 22px 6px;color:var(--muted);font-size:12px}
+.composer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:8px;background:var(--panel);border-top:1px solid var(--border);padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
+.composer input{margin:0}.composer button:disabled,.composer input:disabled{opacity:.55;cursor:not-allowed}
+.circle-btn{width:44px;height:44px;border:1px solid var(--border);background:var(--soft);border-radius:50%;cursor:pointer}
+.record-btn.recording,.camera-recording{
+  background:var(--soft)!important;
+  color:var(--text)!important;
+  animation:neutralRecordPulse 1s ease-in-out infinite;
+}
+@keyframes neutralRecordPulse{50%{transform:scale(.92);box-shadow:0 0 0 5px rgba(100,110,120,.13)}}
+.apple-control-icon{color:var(--text)}
+.apple-control-icon svg{
+  width:23px;
+  height:23px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  pointer-events:none;
+}
+#recordBtn,#cameraBtn{touch-action:none;-webkit-user-select:none;user-select:none}
+.chat-video{display:block;width:min(360px,65vw);max-height:420px;border-radius:12px;background:#111}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:11px 16px;border-radius:12px;z-index:30;box-shadow:0 12px 30px rgba(0,0,0,.2)}
+.call-overlay{position:fixed;inset:0;background:#111827;z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden}
+.call-card{width:min(980px,calc(100vw - 36px));height:min(720px,calc(100vh - 36px));min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;color:#fff;overflow:hidden}
+.call-title{text-align:center;padding:10px}.call-title h2{margin:0 0 5px}.call-title span{color:#bdc7d8}
+.video-stage{position:relative;min-width:0;min-height:0;border-radius:24px;overflow:hidden;background:#111827;display:grid;place-items:center}
+.video-stage.waiting-remote:before{content:"Waiting for the other camera…";position:absolute;inset:0;display:grid;place-items:center;color:#aeb8c8;font-size:14px;font-weight:700;z-index:0}
+#remoteVideo{display:block;width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;background:#111827}
+#localVideo{position:absolute;right:18px;bottom:18px;width:min(220px,28%);aspect-ratio:4/3;object-fit:cover;border-radius:15px;border:2px solid rgba(255,255,255,.7);background:#263246;z-index:2}
+.video-stage:not(.self-main) #localVideo,.video-stage.self-main #remoteVideo{cursor:pointer;touch-action:manipulation}
+.video-stage.self-main #localVideo{position:relative;inset:auto;width:100%;height:100%;aspect-ratio:auto;object-fit:contain;border:0;border-radius:0;background:#111827;z-index:1}
+.video-stage.self-main #remoteVideo{position:absolute;right:18px;bottom:18px;width:min(220px,28%);height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:15px;border:2px solid rgba(255,255,255,.7);background:#263246;z-index:2}
+.video-stage.local-camera-off #localVideo{opacity:.18}
+.video-stage.local-camera-off:after{content:"Camera off";position:absolute;right:18px;bottom:18px;width:min(220px,28%);aspect-ratio:4/3;display:grid;place-items:center;border-radius:15px;color:#fff;background:rgba(15,23,42,.72);font-size:12px;font-weight:800;z-index:3}
+.video-stage.audio-only:before{content:'☎';font-size:90px;position:absolute;z-index:1}.video-stage.audio-only video{opacity:0}
+.call-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px}.call-controls button{border:0;border-radius:999px;padding:13px 20px;color:#fff;font-weight:700;cursor:pointer}
+.accept-call{background:var(--success)}.decline-call,.end-call{background:var(--danger)}.call-control{background:#364258}
+.dialog-overlay{position:fixed;inset:0;background:rgba(7,12,24,.72);z-index:50;display:grid;place-items:center;padding:18px;overflow:auto}
+.dialog-card{position:relative;width:min(480px,100%);background:var(--panel);color:var(--text);padding:30px;border-radius:24px;box-shadow:0 25px 70px rgba(0,0,0,.3)}
+.dialog-card h2{margin:0 38px 6px 0}.dialog-intro{color:var(--muted);line-height:1.45}.dialog-close{position:absolute;top:15px;right:16px;width:36px;height:36px;border:0;border-radius:50%;font-size:25px;background:var(--soft);cursor:pointer}
+.dialog-card label{display:block;font-size:13px;font-weight:700;margin:14px 0 6px}.dialog-card input{width:100%;border:1px solid var(--border);background:var(--soft);padding:13px 14px;border-radius:13px;outline:none}.dialog-card input:focus{border-color:var(--accent)}
+.recovery-code{font-family:Consolas,monospace;font-weight:800;font-size:18px;letter-spacing:.04em;text-align:center;background:var(--soft);border:1px dashed var(--accent);padding:16px 10px;border-radius:13px;margin:12px 0;overflow-wrap:anywhere}
+.recovery-actions{display:flex;gap:8px}.secondary-btn{width:100%;border:1px solid var(--border);background:var(--soft);color:var(--text);font-weight:700;border-radius:13px;padding:12px;cursor:pointer}.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:18px 0 0}.divider:before,.divider:after{content:"";height:1px;background:var(--border);flex:1}.dialog-result{min-height:22px;margin-top:12px;font-weight:700;color:var(--accent);line-height:1.4}
+.admin-dialog{width:min(760px,100%);max-height:min(760px,calc(100vh - 36px));display:flex;flex-direction:column}
+.admin-title-row{display:flex;align-items:flex-start;gap:18px;padding-right:38px}.admin-title-row>div{flex:1}.admin-title-row h2{margin-right:0}
+.admin-refresh{width:auto;white-space:nowrap;padding:9px 14px}.admin-users{min-height:110px;overflow:auto;display:flex;flex-direction:column;gap:9px;margin-top:14px;padding-right:3px}
+.admin-loading{padding:30px;text-align:center;color:var(--muted)}.admin-user{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:15px;padding:12px;background:var(--soft)}
+.admin-user-main{display:flex;align-items:center;gap:11px;min-width:0;flex:1}.admin-user-main>div:last-child{min-width:0}.admin-user-main strong{display:block}.admin-user-main span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.admin-tag{display:inline!important;background:rgba(91,108,255,.12);color:var(--accent)!important;border-radius:999px;padding:3px 7px;margin:0 0 0 4px!important;font-size:10px!important}
+.status-pill{font-style:normal;font-weight:700}.status-approved{color:var(--success)}.status-pending{color:#c88719}.status-blocked{color:var(--danger)}
+.admin-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.admin-actions button{border:1px solid var(--border);background:var(--panel);padding:8px 10px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700}.admin-actions button:disabled{opacity:.45;cursor:not-allowed}.admin-actions .warn{color:#a96c00}.admin-actions .danger{color:var(--danger)}.protected-account{color:var(--muted);font-size:12px}
+.status-dialog{width:min(820px,100%);max-height:min(850px,calc(100vh - 36px));display:flex;flex-direction:column}.status-title-row{display:flex;align-items:flex-start;gap:18px;padding-right:38px}.status-title-row>div{flex:1}.status-title-row h2{margin-right:0}.status-refresh{width:auto;white-space:nowrap;padding:9px 14px}.status-create{border:1px solid var(--border);background:var(--soft);border-radius:16px;padding:12px;margin:14px 0}.status-create textarea{width:100%;min-height:82px;resize:vertical;border:1px solid var(--border);background:var(--panel);color:var(--text);padding:12px;border-radius:12px;font:inherit;outline:none}.status-create textarea:focus{border-color:var(--accent)}.status-create-actions{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:9px}.status-create-actions input[type=file]{min-width:0;max-width:100%;font-size:12px}.status-file-label{display:inline-block!important;margin:0!important;border:1px solid var(--border);background:var(--panel);padding:10px 12px;border-radius:10px;cursor:pointer;white-space:nowrap}.status-create-actions .primary{width:auto;margin:0}.statuses-list{overflow:auto;display:flex;flex-direction:column;gap:11px;min-height:140px}.status-card{border:1px solid var(--border);background:var(--soft);border-radius:16px;padding:12px}.status-card.viewed{opacity:.78}.status-card-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}.status-card-head>div:nth-child(2){min-width:0;flex:1}.status-card-head strong{display:block}.status-card-head span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.status-delete{border:0;background:transparent;color:var(--danger);font-weight:700;cursor:pointer}.status-text{font-size:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;background:linear-gradient(135deg,rgba(91,108,255,.14),rgba(127,86,217,.14));padding:18px;border-radius:13px}.status-media{display:block;width:100%;max-height:430px;object-fit:contain;background:#111827;border-radius:13px}.status-caption{margin:9px 3px 0;white-space:pre-wrap;overflow-wrap:anywhere}.status-empty{text-align:center;color:var(--muted);padding:32px}
+@media(max-width:760px){
+  .auth-view{padding:14px}.auth-card{padding:26px 22px;border-radius:22px}.brand-logo{width:60px;height:60px}
+  .app{grid-template-columns:1fr}
+  .sidebar{position:absolute;inset:0;z-index:5}
+  .sidebar.mobile-hidden{display:none}
+  .chat{position:absolute;inset:0;z-index:4}
+  .chat.mobile-hidden{display:none}
+  .back-btn{display:block}
+  .chat-head{padding:0 12px}.call-actions{gap:4px}.header-btn{width:38px;height:38px}
+  .workspace-chat #callMenuBtn{width:32px;height:32px}
+  .workspace-chat .call-symbol svg{width:17px;height:17px}
+  .messages{padding:14px}
+  .msg{max-width:88%}
+  .composer{grid-template-columns:auto auto minmax(0,1fr) auto}
+  .send-btn{grid-column:4}
+  .record-btn{grid-column:4;grid-row:1}
+  .send-btn{display:none}
+  .composer.has-text .record-btn{display:none}
+  .composer.has-text .send-btn{display:block}
+  .call-overlay{padding:10px}.call-card{width:calc(100vw - 20px);height:calc(100vh - 20px)}.video-stage{border-radius:18px}#localVideo{width:32%;right:10px;bottom:10px}
+  .admin-title-row{display:block}.admin-refresh{margin-top:8px}.admin-user{align-items:flex-start;flex-direction:column}.admin-actions{width:100%;justify-content:flex-start}.admin-actions button{flex:1}.protected-account{padding:4px 0}
+  .status-title-row{display:block}.status-refresh{margin-top:8px}.status-create-actions{grid-template-columns:1fr}.status-create-actions .primary{width:100%}.status-file-label{text-align:center}
+}
+.ai-avatar{background:linear-gradient(135deg,#5b6cff,#7f56d9)!important;color:#fff!important;font-size:12px;font-weight:900;letter-spacing:.03em}
+
+
+/* ConnectChat Pro v4 enterprise visual system */
+:root{--accent-rgb:91,108,255;--shadow:0 18px 50px rgba(18,28,51,.10);--rail:#151d2c}
+html[data-accent="emerald"]{--accent:#13a779;--accent2:#21c58b;--accent-rgb:19,167,121}
+html[data-accent="blue"]{--accent:#2775ea;--accent2:#5b9cff;--accent-rgb:39,117,234}
+html[data-accent="rose"]{--accent:#e64b7a;--accent2:#ff7a9f;--accent-rgb:230,75,122}
+html[data-theme="dark"]{--bg:#0f1420;--panel:#171e2c;--soft:#111824;--text:#eef3fb;--muted:#98a5b8;--border:#2b3547;--dark:#101722;--rail:#0d131e}
+body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%,var(--accent) 12%));letter-spacing:.005em}
+.app{grid-template-columns:315px minmax(0,1fr) 310px;background:var(--bg)}
+.sidebar{background:linear-gradient(180deg,var(--rail),color-mix(in srgb,var(--rail) 87%,var(--accent) 13%));box-shadow:10px 0 35px rgba(11,18,32,.12);z-index:2}
+.sidebar-head{padding:18px 20px}.sidebar-head strong{font-size:15px}.version-pill{display:inline-block;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.12);font-size:9px;vertical-align:2px;margin-left:4px}
+.workspace-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:12px 12px 6px}.workspace-tab{border:0;border-radius:11px;padding:9px 4px;background:transparent;color:#aeb7c7;font-size:11px;cursor:pointer}.workspace-tab.active{background:rgba(var(--accent-rgb),.24);color:#fff;font-weight:800}.workspace-tab:hover{background:rgba(255,255,255,.08);color:#fff}
+.section-label{display:flex;align-items:center;gap:7px}.section-label span{flex:1}.mini-icon{width:29px;height:29px;border:1px solid var(--border);border-radius:9px;background:var(--soft);color:var(--text);cursor:pointer}.sidebar .mini-icon{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff}
+.user-item{position:relative;transition:.18s ease}.user-item:hover{transform:translateX(2px)}.user-item.active:before{content:"";position:absolute;left:-10px;width:3px;height:28px;border-radius:4px;background:var(--accent)}
+.chat{background:radial-gradient(circle at 50% 0,rgba(var(--accent-rgb),.07),transparent 35%),var(--soft);box-shadow:var(--shadow);z-index:1}.chat-head{height:74px;padding:0 20px}.chat-head:after{content:"Encrypted conversation";margin-left:8px;color:var(--muted);font-size:10px;border:1px solid var(--border);padding:4px 7px;border-radius:999px}
+.smart-strip{min-height:42px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:7px 18px;overflow:auto}.smart-strip span{font-weight:800;color:var(--accent);font-size:12px;margin-right:auto;white-space:nowrap}.smart-strip button{border:1px solid var(--border);background:var(--soft);color:var(--text);border-radius:999px;padding:6px 10px;font-size:11px;cursor:pointer;white-space:nowrap}.smart-strip button:hover{border-color:var(--accent);color:var(--accent)}
+.messages{background-image:radial-gradient(circle at 1px 1px,rgba(123,135,153,.10) 1px,transparent 0);background-size:24px 24px}.bubble{border:1px solid color-mix(in srgb,var(--border) 80%,transparent);box-shadow:0 7px 20px rgba(18,28,51,.055)}.msg.own .bubble{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;box-shadow:0 9px 24px rgba(var(--accent-rgb),.24)}
+.composer{margin:0 16px 16px;border:1px solid var(--border);border-radius:18px;box-shadow:0 12px 35px rgba(18,28,51,.09);padding:10px 12px}.composer input{background:transparent;border:0}.composer input:focus{box-shadow:none}.send-btn{background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 8px 18px rgba(var(--accent-rgb),.22)}
+.insights-panel{background:var(--panel);border-left:1px solid var(--border);padding:18px;overflow:auto}.insights-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.insights-head small{color:var(--muted);font-size:10px;letter-spacing:.11em}.insights-head h3{margin:4px 0 0}
+.premium-card{padding:18px;border-radius:18px;color:#fff;background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:0 16px 35px rgba(var(--accent-rgb),.25)}.premium-card>span{font-size:22px}.premium-card h3{margin:9px 0 5px}.premium-card p{font-size:12px;line-height:1.5;opacity:.88}.premium-card button{border:0;border-radius:10px;padding:9px 11px;background:#fff;color:#222;font-weight:800;cursor:pointer}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.tool-grid button{min-height:82px;text-align:left;border:1px solid var(--border);border-radius:14px;background:var(--soft);color:var(--text);padding:12px;cursor:pointer}.tool-grid b,.tool-grid small{display:block}.tool-grid b{font-size:12px}.tool-grid small{color:var(--muted);margin-top:7px;font-size:10px}
+.ad-card,.security-card{border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:12px}.ad-card>small{font-size:9px;letter-spacing:.12em;color:var(--muted)}.ad-placeholder{height:90px;display:grid;place-items:center;margin:10px 0;border-radius:12px;background:linear-gradient(135deg,var(--soft),rgba(var(--accent-rgb),.10));color:var(--muted);font-weight:700}.ad-card h4{margin:9px 0 5px}.ad-card p,.security-card p{font-size:11px;color:var(--muted);line-height:1.5;margin:0}.security-card b{display:block;margin-bottom:6px;font-size:12px}
+.auth-card{position:relative;overflow:hidden}.auth-card:before{content:"PRO v6.7.3";position:absolute;right:-30px;top:18px;transform:rotate(35deg);background:var(--accent);color:#fff;padding:6px 42px;font-size:10px;font-weight:900}.auth-card:after{content:"Secure real-time workspace";display:block;text-align:center;color:var(--muted);font-size:10px;margin-top:14px}
+.ai-provider-control{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:var(--muted);font-size:11px;font-weight:700;pointer-events:auto}.ai-provider-control select{border:0;background:transparent;color:var(--text);font:inherit;outline:0}.ai-provider-control.hidden{display:none}
+@media(max-width:1180px){.app{grid-template-columns:300px minmax(0,1fr)}.insights-panel{display:none}}
+@media(max-width:760px){.app{grid-template-columns:1fr}.smart-strip{padding-inline:10px}.chat-head:after{display:none}.composer{margin:0;border-width:1px 0 0;border-radius:0}.workspace-nav{padding-top:8px}}
+
+/* ConnectChat Pro v4.2 real workspace */
+:root{--rail:#151a2d;--panel:#fff;--canvas:#f7f8fc;--line:#e5e9f2;--text:#111827;--muted:#75809a;--accent:#5b63f6;--accent2:#7c4dff}
+.app-v4{display:grid;grid-template-columns:94px 310px minmax(440px,1fr) 288px;height:100dvh;background:var(--canvas);overflow:hidden}.app-v4.hidden{display:none}
+.rail{background:var(--rail);color:#d9def0;display:flex;flex-direction:column;align-items:center;padding:14px 8px;gap:8px;z-index:4}.rail-brand{border:0;background:none;width:54px;height:54px;margin-bottom:8px}.rail-brand img{width:48px;height:48px}.rail-item{position:relative;width:70px;min-height:58px;border:0;border-radius:14px;background:transparent;color:#c7cee3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}.rail-item span{font-size:21px}.rail-item small{font-size:11px}.rail-item:hover,.rail-item.active{background:#2a3047;color:#fff}.rail-item.active:before{content:"";position:absolute;left:-8px;width:3px;height:30px;border-radius:3px;background:#6d74ff}.rail-spacer{flex:1}.rail-profile{width:50px;height:50px;border-radius:16px;border:8px solid #292f47;background:linear-gradient(135deg,#6d72ff,#9a5cff);color:#fff;font-weight:800}.rail-badge{position:absolute;right:6px;top:4px;background:#f04464;color:white;border-radius:999px;min-width:18px;height:18px;font-size:10px;display:grid;place-items:center}.workspace-sidebar{position:relative;width:auto;min-width:0;background:#fff;color:var(--text);border-right:1px solid var(--line);padding:20px 12px 145px}.workspace-title{display:flex;justify-content:space-between;align-items:center;padding:0 6px 12px}.workspace-title small{color:#626cff;font-weight:700}.workspace-title h1{font-size:25px;margin:2px 0}.new-btn{border:0;border-radius:11px;background:linear-gradient(135deg,#6658f6,#3488ed);color:#fff;font-weight:700;padding:11px 15px}.workspace-sidebar .search-box{height:44px;background:#f6f7fb;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;padding:0 12px;margin:0 4px}.workspace-sidebar .search-box input{background:transparent;color:#222;border:0;width:100%;font-size:14px;outline:0}.filter-row{display:flex;gap:7px;padding:12px 4px}.chat-filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;color:#6f7890;font-weight:700;font-size:12px}.chat-filter.active{background:#397ef3;color:#fff;border-color:#397ef3}.quick-contacts{display:flex;gap:14px;padding:6px 7px 15px;min-height:66px;overflow:hidden}.quick-contact{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:43px;color:#68738c;font-size:10px}.quick-contact .avatar{width:39px;height:39px;border-radius:12px}.plain-icon{border:0;background:none;color:#7d879b;cursor:pointer}.workspace-sidebar .section-label{padding:8px 6px;border-top:1px solid var(--line);color:#8d95a8;font-size:10px}.workspace-sidebar .users-list{padding:0;overflow:auto}.workspace-sidebar .user{border-radius:13px;margin:3px 0;padding:10px 9px}.workspace-sidebar .user.active{background:#f0f2fb}.workspace-sidebar .user .avatar{border-radius:13px}.compact-actions{position:absolute;left:12px;right:12px;bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px}.compact-actions button{min-height:36px}.compact-actions .admin-btn,.compact-actions .status-btn{grid-column:1/-1}.workspace-chat{min-width:0;background:#fafbff;border-right:1px solid var(--line);position:relative}.workspace-chat .chat-head{height:82px;background:#fff;border-bottom:1px solid var(--line);padding:0 18px}.chat-identity{min-width:0}.chat-identity h2{font-size:18px}.workspace-chat .messages{padding:48px 72px 145px;background:radial-gradient(circle at 70% 60%,rgba(60,200,205,.08),transparent 22%),radial-gradient(circle at 28% 25%,rgba(112,92,255,.07),transparent 24%),#fafbff}.date-chip{position:absolute;top:100px;left:50%;transform:translateX(-50%);z-index:2;padding:5px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;color:#7c8497;font-size:11px}.workspace-chat .msg{max-width:72%}.workspace-chat .bubble{border-radius:14px;box-shadow:0 8px 24px rgba(34,42,78,.06)}.workspace-chat .own .bubble{background:linear-gradient(135deg,#6655f6,#5c65f6)}.workspace-chat .smart-strip{position:absolute;left:18px;right:18px;bottom:82px;border:0;background:transparent;pointer-events:none}.workspace-chat .smart-strip div{pointer-events:auto;display:flex;gap:8px;margin-left:auto}.workspace-chat .smart-strip button{background:#fff;border:1px solid var(--line);border-radius:999px}.workspace-chat .composer{position:absolute;left:16px;right:16px;bottom:14px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 7px 25px rgba(30,39,76,.06)}.workspace-chat .send-btn{width:46px;border-radius:13px;font-size:21px}.workspace-insights{width:auto;position:relative;background:#fff;padding:18px;border-left:0;overflow:auto}.insight-tabs{display:flex;background:#f2f4f8;border:1px solid var(--line);border-radius:10px;padding:3px;margin:12px 0}.insight-tabs button{flex:1;border:0;background:transparent;border-radius:8px;padding:7px;font-size:11px}.insight-tabs button.active{background:#fff;box-shadow:0 1px 4px #d8dce6}.workspace-insights .premium-card{background:linear-gradient(145deg,#49308d,#7252dc)}
+.call-controls{flex-wrap:wrap}.call-control{min-width:110px}.video-stage.screen-sharing #remoteVideo{object-fit:contain;background:#0b0d12}.share-active{background:#f0a23b!important;color:#111!important}
+@media(max-width:1200px){.app-v4{grid-template-columns:82px 290px minmax(400px,1fr)}.workspace-insights{display:none}}
+@media(max-width:800px){.app-v4{grid-template-columns:70px minmax(0,1fr)}.workspace-sidebar{grid-column:2}.workspace-chat{position:fixed;left:70px;right:0;top:0;bottom:0;z-index:5}.workspace-chat.mobile-hidden{display:none}.rail{padding-left:4px;padding-right:4px}.rail-item{width:60px}.quick-contacts{display:none}}
+
+.quick-contact{position:relative}.quick-status{position:absolute;right:1px;top:29px;width:9px;height:9px;border-radius:50%;background:#9aa3b6;border:2px solid #fff}.quick-status.online{background:#20bf79}
+
+/* v4 enterprise polish */
+.auth-view input,.auth-view .password-field input{background:#eef4ff;color:#172033;border:1px solid #cbd6e8}
+.auth-view input::placeholder{color:#7c879c}
+.quick-contacts{gap:10px;overflow-x:auto;overflow-y:hidden;padding-bottom:12px}
+.quick-contact{min-width:58px;border:0;background:transparent;cursor:pointer;padding:3px;border-radius:12px}
+.quick-contact:hover{background:#f1f4fb}
+.quick-contact .avatar{width:46px;height:46px;border-radius:50%;font-size:14px;box-shadow:0 4px 12px rgba(40,52,90,.12)}
+.quick-contact small{max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-status{top:36px;right:6px;width:10px;height:10px}
+.workspace-profile-card{display:flex;gap:12px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#f8f9ff,#eef4ff);margin:12px 0}
+.workspace-profile-avatar{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;color:#fff;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 22px rgba(var(--accent-rgb),.2)}
+.workspace-profile-card small,.workspace-profile-card span{color:var(--muted);font-size:11px}.workspace-profile-card h3{margin:2px 0;font-size:17px}
+.workspace-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+.workspace-stat-grid>div{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff;display:flex;flex-direction:column;gap:4px}
+.workspace-stat-grid b{font-size:20px;color:var(--text)}.workspace-stat-grid small{font-size:11px;color:var(--muted)}
+.workspace-help-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;background:#fbfcff}.workspace-help-card p{font-size:12px;line-height:1.5;color:var(--muted);margin:7px 0 0}
+[data-theme="dark"] .workspace-profile-card,[data-theme="dark"] .workspace-stat-grid>div,[data-theme="dark"] .workspace-help-card{background:#1c2435}
+
+/* v4.1 persistent account controls and professional composer */
+.workspace-sidebar{padding-bottom:238px}
+.compact-actions{bottom:112px}
+.account-dock{position:absolute;left:12px;right:12px;bottom:10px;z-index:6;background:#fff;border:1px solid var(--line);border-radius:15px;padding:8px;box-shadow:0 10px 28px rgba(28,39,73,.10)}
+.account-summary{width:100%;display:flex;align-items:center;gap:9px;border:0;background:transparent;padding:4px;border-radius:10px;cursor:pointer;text-align:left;color:var(--text)}
+.account-summary:hover{background:#f5f7fb}.account-avatar{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:grid;place-items:center;font-weight:800;flex:0 0 auto}.account-copy{display:flex;flex-direction:column;min-width:0;flex:1}.account-copy b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.account-copy small{font-size:10px;color:var(--muted)}.account-chevron{color:var(--muted)}
+.account-menu{display:grid;gap:3px;padding:5px 0;border-top:1px solid var(--line);margin-top:5px}.account-menu button{border:0;background:transparent;text-align:left;padding:8px 9px;border-radius:8px;cursor:pointer;color:var(--text)}.account-menu button:hover{background:#f3f5fa}
+.persistent-logout{width:100%;margin-top:5px;min-height:36px;border-radius:10px;background:#fff5f6;color:#c9344f;border:1px solid #ffd6dd;font-weight:800;cursor:pointer}.persistent-logout:hover{background:#ffe9ed}
+.workspace-chat .composer{grid-template-columns:auto auto auto minmax(0,1fr) auto auto;align-items:end}
+.composer textarea{width:100%;min-height:24px;max-height:120px;resize:none;border:0;background:transparent;color:var(--text);font:inherit;line-height:1.45;outline:0;padding:5px 2px 2px;overflow-y:auto}
+.message-entry{position:relative;min-width:0;padding:0 4px}.composer-hint{display:block;color:var(--muted);font-size:9px;line-height:1.2;margin-top:2px}.emoji-picker{position:absolute;left:-112px;bottom:58px;width:250px;max-height:180px;overflow:auto;display:grid;grid-template-columns:repeat(7,1fr);gap:3px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;box-shadow:0 16px 36px rgba(23,33,64,.18);z-index:20}.emoji-picker button{border:0;background:transparent;border-radius:7px;font-size:20px;padding:5px;cursor:pointer}.emoji-picker button:hover{background:#f0f3f9}
+@media(max-width:760px){.workspace-sidebar{padding-bottom:230px}.workspace-chat .composer{grid-template-columns:auto auto minmax(0,1fr) auto auto}.workspace-chat .composer #cameraBtn{display:none}.composer-hint{display:none}.emoji-picker{left:-75px;width:230px}}
+
+/* v4.5 profile page and real profile photos */
+.profile-page{position:fixed;inset:0;z-index:1200;background:var(--bg,#f4f6fb);color:var(--text,#172033);overflow:auto}
+.profile-page-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:18px;padding:18px 28px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#e5e7eb)}
+.profile-page-head h1{margin:2px 0 0}.profile-page-head small{letter-spacing:.08em;font-weight:800;opacity:.65}
+.profile-back{border:1px solid var(--line,#dbe1ea);background:var(--panel,#fff);border-radius:12px;padding:10px 14px;cursor:pointer}
+.profile-page-body{max-width:900px;margin:36px auto;padding:0 22px;display:grid;gap:22px}
+.profile-photo-card,.profile-details-card{background:var(--panel,#fff);border:1px solid var(--line,#e5e7eb);border-radius:22px;padding:28px;box-shadow:0 16px 40px rgba(15,23,42,.08)}
+.profile-photo-card{display:flex;align-items:center;gap:28px}.profile-photo-preview{width:150px;height:150px;flex:0 0 150px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,#7c3aed,#2563eb);color:white;font-size:42px;font-weight:800;border:5px solid rgba(255,255,255,.9);box-shadow:0 8px 28px rgba(37,99,235,.25)}
+.profile-photo-preview img,.avatar img,.account-avatar img,.workspace-profile-avatar img,.active-avatar img,.rail-profile img{width:100%;height:100%;object-fit:cover;display:block}
+.profile-photo-copy h2{margin:0 0 4px;font-size:28px}.profile-photo-copy p{margin:0 0 18px;opacity:.72}.profile-photo-copy small{display:block;margin-top:10px;opacity:.65}.profile-photo-actions{display:flex;gap:10px;flex-wrap:wrap}.profile-upload-label{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:10px 16px;border-radius:10px}
+.profile-details-card h3{margin-top:0}.profile-detail-row{display:flex;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--line,#e5e7eb)}.profile-details-card p{opacity:.72;margin-bottom:0}
+.avatar,.account-avatar,.workspace-profile-avatar,.active-avatar,.rail-profile span{overflow:hidden}
+@media(max-width:640px){.profile-photo-card{flex-direction:column;text-align:center}.profile-page-body{margin:18px auto}.profile-photo-actions{justify-content:center}}
+
+/* v4.6 profile privacy and navigation */
+.user-item .avatar,.active-avatar,.chat-identity h2{cursor:pointer}
+.profile-photo-actions.hidden{display:none!important}
+
+
+/* v4.8 active workspace pages */
+.section-page{
+  min-width:0;
+  overflow:auto;
+  background:var(--panel,#fff);
+  padding:28px;
+}
+.section-page-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:24px;
+  padding-bottom:22px;
+  border-bottom:1px solid var(--line,#e6eaf2);
+}
+.section-page-head small{font-weight:800;letter-spacing:.12em;color:var(--accent,#5b61ff)}
+.section-page-head h1{margin:6px 0 4px;font-size:30px}
+.section-page-head p{margin:0;color:var(--muted,#74809a)}
+.section-page-content{padding-top:24px}
+.workspace-toolbar{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:18px}
+.workspace-toolbar h2,.workspace-subtitle{margin:0 0 6px}
+.workspace-toolbar p{margin:0;color:var(--muted,#74809a)}
+.workspace-info-note{
+  padding:12px 14px;border-radius:12px;background:rgba(91,97,255,.08);
+  color:var(--muted,#65708a);margin-bottom:18px;font-size:13px
+}
+.workspace-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.workspace-person-card,.workspace-list article,.file-workspace-list article,.settings-workspace-grid section{
+  border:1px solid var(--line,#e3e8f1);border-radius:16px;background:var(--surface,#fff);
+  padding:16px;box-shadow:0 8px 24px rgba(23,35,68,.05)
+}
+.workspace-person-card{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:center}
+.workspace-person-card .avatar{width:48px;height:48px}
+.workspace-person-card h3,.workspace-list h3,.file-workspace-list h3{margin:0 0 4px}
+.workspace-person-card p,.workspace-list p,.file-workspace-list p{margin:0;color:var(--muted,#74809a);font-size:13px}
+.workspace-person-card button{grid-column:1/-1}
+.workspace-list,.file-workspace-list{display:grid;gap:12px}
+.workspace-list article,.file-workspace-list article{display:grid;grid-template-columns:46px 1fr auto auto;gap:12px;align-items:center}
+.workspace-list-icon{font-size:28px;text-align:center}
+.workspace-empty{text-align:center;padding:60px 24px;border:1px dashed var(--line,#d8deea);border-radius:18px}
+.workspace-empty-icon{font-size:48px;margin-bottom:12px}
+.workspace-empty h2{margin:0 0 8px}.workspace-empty p{margin:0;color:var(--muted,#74809a)}
+.workspace-loading{padding:50px;text-align:center;color:var(--muted,#74809a)}
+.settings-workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.license-information-card{padding:18px!important}.license-information-head{display:flex;align-items:center;gap:12px}.license-information-head>span{font-size:28px}.license-information-head h2{margin:0;font-size:18px}.license-information-head p{margin:3px 0 0!important}.license-information-card dl{margin:15px 0 10px}.license-information-card dl>div{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}.license-information-card dt{color:var(--muted);font-size:12px}.license-information-card dd{margin:0;font-weight:800;font-size:12px;text-align:right}.license-information-card .license-active{color:#008069}.license-information-card>small{color:var(--muted);font-size:10px}
+.settings-workspace-grid section h2{margin-top:0}
+.settings-workspace-grid section p{color:var(--muted,#74809a)}
+.settings-button-row{display:flex;flex-wrap:wrap;gap:8px}
+.danger-link{color:#d43b4f!important}
+@media(max-width:900px){
+  .section-page{padding:18px}
+  .section-page-head{flex-direction:column}
+  .workspace-list article,.file-workspace-list article{grid-template-columns:42px 1fr}
+  .workspace-list article button,.file-workspace-list article a{grid-column:2}
+}
+
+.workspace-chat-feed{display:flex;flex-direction:column;gap:12px;min-height:360px;max-height:58vh;overflow:auto;padding:6px}
+.workspace-chat-message{max-width:760px;border:1px solid var(--line,#e3e8f1);background:var(--surface,#fff);border-radius:15px;padding:12px 14px}
+.workspace-chat-message p{white-space:pre-wrap;margin:6px 0}
+.workspace-chat-message small{color:var(--muted,#74809a)}
+.workspace-chat-message.announcement{border-left:4px solid var(--accent,#5b61ff)}
+.workspace-composer{display:flex;align-items:center;gap:10px;position:sticky;bottom:0;background:var(--panel,#fff);padding:14px 0 4px}
+.workspace-composer input[type="text"],.workspace-composer>input:not([type]){flex:1;min-width:0;padding:13px 14px;border:1px solid var(--line,#dce2ec);border-radius:12px}
+.workspace-composer label{display:flex;align-items:center;gap:6px;font-size:13px}
+
+/* v5.3 user-controlled professional sizing */
+:root{--cc-rail-width:76px;--cc-sidebar-width:270px;--cc-insights-width:250px}
+.app-v4{grid-template-columns:var(--cc-rail-width) var(--cc-sidebar-width) minmax(420px,1fr) var(--cc-insights-width)}
+.rail{padding:10px 6px;gap:5px}.rail-brand{width:46px;height:46px;margin-bottom:4px}.rail-brand img{width:40px;height:40px}
+.rail-item{width:58px;min-height:49px;border-radius:12px}.rail-item span{font-size:18px}.rail-item small{font-size:9px}
+.rail-profile{width:42px;height:42px;border-width:6px;border-radius:13px}
+.workspace-sidebar{padding-top:15px}.workspace-title h1{font-size:21px}.new-btn{padding:9px 12px}
+.user-item{gap:9px;padding:8px}.avatar{width:36px;height:36px;font-size:13px}.active-avatar{width:38px;height:38px;font-size:13px}
+.user-info strong{font-size:14px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.user-info span{font-size:11px}
+.quick-contact{min-width:48px}.quick-contact .avatar{width:38px;height:38px;font-size:12px}.quick-contact small{max-width:48px}.quick-status{top:31px;right:5px}
+.workspace-chat .chat-head{height:70px}.chat-identity h2{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-profile-avatar{width:42px;height:42px}.workspace-profile-card h3{font-size:14px;overflow-wrap:anywhere}
+.workspace-stat-grid b{font-size:17px}.workspace-insights{padding:14px}.insights-head h3{font-size:16px}
+.account-avatar{width:32px;height:32px}.account-copy b{font-size:12px}
+.ai-error .bubble{border:1px solid #f2b6bf;background:#fff4f5;color:#9b2438;white-space:pre-wrap}.ai-error .meta{color:#b33b50}
+.appearance-settings{grid-column:span 2}.appearance-settings>label{display:grid;grid-template-columns:minmax(130px,1fr) minmax(140px,1fr);align-items:center;gap:12px;margin:10px 0;font-size:13px;font-weight:700}.appearance-settings select{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);padding:9px 10px}
+.hidden-utility-actions{display:none!important}
+.workspace-sidebar{padding-bottom:112px}
+.workspace-chat .smart-strip{left:16px;right:16px;bottom:92px;min-height:38px;padding:5px 8px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 18px rgba(30,39,76,.07);z-index:10;overflow-x:auto;pointer-events:auto}
+.workspace-chat .smart-strip>span{font-size:10px}.workspace-chat .smart-strip div{margin-left:auto;flex-wrap:nowrap}.workspace-chat .smart-strip button{padding:5px 9px}
+.workspace-chat .composer{z-index:11}
+html[data-composer="essential"] .workspace-chat .composer{grid-template-columns:minmax(0,1fr) auto}
+html[data-composer="essential"] #emojiBtn,
+html[data-composer="essential"] #cameraBtn,
+html[data-composer="essential"] #recordBtn{display:none}
+html[data-composer="essential"] .workspace-chat .composer{grid-template-columns:auto minmax(0,1fr) auto}
+html[data-composer="essential"] #attachBtn{display:grid}
+.profile-photo-preview img,.avatar img,.account-avatar img,.workspace-profile-avatar img,.active-avatar img,.rail-profile img{border-radius:inherit;object-position:center center}
+html[data-avatar-fit="contain"] .profile-photo-preview img,
+html[data-avatar-fit="contain"] .avatar img,
+html[data-avatar-fit="contain"] .account-avatar img,
+html[data-avatar-fit="contain"] .workspace-profile-avatar img,
+html[data-avatar-fit="contain"] .active-avatar img,
+html[data-avatar-fit="contain"] .rail-profile img{object-fit:contain;background:#fff}
+.ai-message .bubble{white-space:pre-wrap}
+.ai-export-actions{display:flex;gap:5px;margin-top:5px}.ai-export-actions button{border:1px solid var(--line);background:#fff;color:#56617a;border-radius:8px;padding:4px 7px;font-size:9px;font-weight:800;cursor:pointer}.ai-export-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.calculation-upload-card{display:grid;gap:10px;border:1px solid var(--line);border-radius:16px;padding:16px;background:#f9faff;margin-bottom:18px}.calculation-upload-card>div{display:grid;grid-template-columns:1fr 1fr;gap:12px}.calculation-upload-card label{display:grid;gap:6px;font-size:12px;font-weight:800}.calculation-upload-card input{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px}.calculation-upload-card .primary{align-self:end;margin:0}.calculation-upload-card small,.calculation-upload-card p{margin:0;color:var(--muted)}
+.calculation-permissions{display:block!important;border-top:1px solid var(--line);padding-top:12px}.calculation-permissions select{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px}.calculation-selected-users{display:flex!important;flex-wrap:wrap;gap:8px;margin-top:10px}.calculation-selected-users.hidden{display:none!important}.calculation-selected-users label{display:flex;grid-template-columns:none;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;background:#fff;font-weight:600}.calculation-selected-users input{width:auto;margin:0;padding:0}
+.calculation-sheet-grid{display:grid;gap:10px}.calculation-sheet-grid article{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff}.calculation-sheet-grid h3{margin:0 0 4px;font-size:15px}.calculation-sheet-grid p{margin:0 0 5px;color:var(--muted)}.calculation-sheet-grid small{color:var(--muted)}.calculation-file-icon{width:44px;height:44px;border-radius:11px;background:#eef1ff;color:var(--accent);display:grid;place-items:center;font-size:11px;font-weight:900}.calculation-actions{display:flex;gap:6px}.calculation-actions button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;cursor:pointer}
+
+@media(max-width:1100px){
+  :root{--cc-rail-width:66px;--cc-sidebar-width:245px}
+  .rail-item{width:52px}.rail-item small{font-size:8px}
+  .workspace-chat .messages{padding-left:32px;padding-right:32px}
+}
+@media(max-width:900px){
+  :root{--cc-sidebar-width:225px}
+  .quick-contacts{display:none}
+  .filter-row{overflow-x:auto}
+  .workspace-chat .messages{padding-left:20px;padding-right:20px}
+}
+@media(max-width:700px){
+  .calculation-upload-card>div{grid-template-columns:1fr}
+  .calculation-sheet-grid article{grid-template-columns:42px minmax(0,1fr)}
+  .calculation-actions{grid-column:2}
+}
+@media(max-height:700px) and (min-width:801px){
+  .rail{gap:2px}.rail-item{min-height:42px}.rail-item span{font-size:16px}
+}
+
+/* v6.2 authenticated calculation preview */
+.calculation-sheet-grid article{cursor:default}.calculation-sheet-grid article:hover{border-color:#c8cffd;box-shadow:0 8px 20px rgba(60,72,150,.08)}
+.calculation-preview-overlay{z-index:1500;padding:22px}.calculation-preview-dialog{width:min(1200px,96vw);height:min(820px,92vh);display:grid;grid-template-rows:auto auto minmax(0,1fr);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 28px 80px rgba(10,18,40,.28)}.calculation-preview-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:16px 20px;border-bottom:1px solid var(--line)}.calculation-preview-dialog header>div:last-child{display:flex;gap:8px;align-items:center}.calculation-preview-dialog h2{margin:3px 0}.calculation-preview-dialog header small,.calculation-preview-dialog header p{color:var(--muted);margin:0}.calculation-preview-dialog header button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 11px;cursor:pointer}.calculation-preview-dialog .dialog-close{position:static;font-size:20px;padding:4px 10px}.calculation-preview-tabs{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--line);overflow-x:auto}.calculation-preview-tabs:empty{display:none}.calculation-preview-tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;white-space:nowrap;cursor:pointer}.calculation-preview-tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff}.calculation-preview-content{min-height:0;overflow:auto;background:#f7f8fc;padding:14px}.calculation-table-wrap{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:10px}.calculation-table-wrap table{border-collapse:collapse;min-width:100%;font-size:12px}.calculation-table-wrap th,.calculation-table-wrap td{border:1px solid #e3e7ef;padding:7px 9px;text-align:left;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}.calculation-table-wrap th{position:sticky;top:0;background:#eef1ff;color:#29325a;z-index:1}.calculation-table-wrap tr:nth-child(even) td{background:#fafbfe}.calculation-pdf-preview{width:100%;height:100%;min-height:620px;border:0;background:#fff}.preview-warning{color:#a35c00;background:#fff7e6;border:1px solid #ffe0a3;border-radius:9px;padding:9px 11px}
+
+html[data-text-size="small"] body{font-size:13px}
+html[data-text-size="large"] body{font-size:16px}
+html[data-icon-size="standard"]{--cc-rail-width:88px}
+html[data-icon-size="standard"] .rail-item{width:68px;min-height:57px}
+html[data-icon-size="standard"] .rail-item span{font-size:22px}
+html[data-sidebar-size="standard"]{--cc-sidebar-width:310px}
+html[data-density="comfortable"] .user-item{padding:11px}
+html[data-density="comfortable"] .avatar{width:42px;height:42px}
+html[data-density="comfortable"] .workspace-chat .messages{gap:14px}
+html[data-insights="hide"] .app-v4{grid-template-columns:var(--cc-rail-width) var(--cc-sidebar-width) minmax(420px,1fr)}
+html[data-insights="hide"] .workspace-insights{display:none}
+
+@media(max-width:1200px){
+  .app-v4{grid-template-columns:var(--cc-rail-width) var(--cc-sidebar-width) minmax(400px,1fr)}
+  .workspace-insights{display:none}
+}
+@media(max-width:800px){
+  .app-v4{grid-template-columns:64px minmax(0,1fr)}
+  .workspace-chat{left:64px}
+  .rail-item{width:52px}
+  .appearance-settings{grid-column:auto}
+}
+
+/* v6.2.2 fixed application frame and independent panel sliders */
+html,body{width:100%;height:100%;max-width:100%;max-height:100%;overscroll-behavior:none}
+body{position:fixed;inset:0;overflow:hidden}
+.app-v4{width:100vw;height:100vh;height:100dvh;max-width:100vw;max-height:100vh;max-height:100dvh;min-height:0;overflow:hidden;overscroll-behavior:none}
+.app-v4>*{min-width:0;min-height:0;max-height:100%}
+.rail{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+.workspace-sidebar{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+.workspace-sidebar .workspace-title,
+.workspace-sidebar .search-box,
+.workspace-sidebar .filter-row,
+.workspace-sidebar .quick-contacts,
+.workspace-sidebar .section-label{flex:0 0 auto}
+.workspace-sidebar .users-list{flex:1 1 auto;min-height:0;max-height:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.workspace-chat{height:100%;min-height:0;overflow:hidden}
+.workspace-chat .messages{min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.workspace-insights,.section-page,.profile-page,.dialog-overlay,.statuses-list,.admin-users,.calculation-preview-content{overscroll-behavior:contain;scrollbar-gutter:stable}
+.section-page{height:100%;min-height:0;overflow-x:hidden;overflow-y:auto}
+.workspace-insights{height:100%;min-height:0;overflow-x:hidden;overflow-y:auto}
+.calculation-table-wrap{max-width:100%;max-height:100%;overscroll-behavior:contain;scrollbar-gutter:stable}
+.quick-contacts,.filter-row,.smart-strip,.calculation-preview-tabs{overscroll-behavior-x:contain}
+.rail,.users-list,.messages,.workspace-insights,.section-page,.profile-page,.dialog-overlay,.statuses-list,.admin-users,.calculation-preview-content,.calculation-table-wrap,.quick-contacts,.filter-row,.smart-strip,.calculation-preview-tabs{
+  scrollbar-width:thin;
+  scrollbar-color:#9aa5bd transparent;
+}
+.rail::-webkit-scrollbar,.users-list::-webkit-scrollbar,.messages::-webkit-scrollbar,.workspace-insights::-webkit-scrollbar,.section-page::-webkit-scrollbar,.profile-page::-webkit-scrollbar,.dialog-overlay::-webkit-scrollbar,.statuses-list::-webkit-scrollbar,.admin-users::-webkit-scrollbar,.calculation-preview-content::-webkit-scrollbar,.calculation-table-wrap::-webkit-scrollbar,.quick-contacts::-webkit-scrollbar,.filter-row::-webkit-scrollbar,.smart-strip::-webkit-scrollbar,.calculation-preview-tabs::-webkit-scrollbar{width:9px;height:9px}
+.rail::-webkit-scrollbar-thumb,.users-list::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.workspace-insights::-webkit-scrollbar-thumb,.section-page::-webkit-scrollbar-thumb,.profile-page::-webkit-scrollbar-thumb,.dialog-overlay::-webkit-scrollbar-thumb,.statuses-list::-webkit-scrollbar-thumb,.admin-users::-webkit-scrollbar-thumb,.calculation-preview-content::-webkit-scrollbar-thumb,.calculation-table-wrap::-webkit-scrollbar-thumb,.quick-contacts::-webkit-scrollbar-thumb,.filter-row::-webkit-scrollbar-thumb,.smart-strip::-webkit-scrollbar-thumb,.calculation-preview-tabs::-webkit-scrollbar-thumb{background:#9aa5bd;border:2px solid transparent;border-radius:999px;background-clip:padding-box}
+.rail::-webkit-scrollbar-thumb:hover,.users-list::-webkit-scrollbar-thumb:hover,.messages::-webkit-scrollbar-thumb:hover,.workspace-insights::-webkit-scrollbar-thumb:hover,.section-page::-webkit-scrollbar-thumb:hover,.profile-page::-webkit-scrollbar-thumb:hover,.dialog-overlay::-webkit-scrollbar-thumb:hover,.statuses-list::-webkit-scrollbar-thumb:hover,.admin-users::-webkit-scrollbar-thumb:hover,.calculation-preview-content::-webkit-scrollbar-thumb:hover,.calculation-table-wrap::-webkit-scrollbar-thumb:hover{background:#74809a;background-clip:padding-box}
+
+/* v6.3 compact conversation controls and working overview */
+.workspace-chat .messages{padding-bottom:92px}
+.workspace-chat .composer{bottom:10px;min-height:50px;padding:7px 9px;gap:6px}
+.workspace-chat .composer textarea{max-height:72px;padding-top:3px}
+.workspace-chat .composer-hint{display:none}
+.workspace-chat .send-btn{width:40px;height:40px}
+.workspace-chat .circle-btn{width:36px;height:36px}
+.workspace-chat .smart-strip.smart-popup{position:absolute;left:auto;right:18px;top:66px;bottom:auto;width:min(470px,calc(100% - 36px));min-height:0;padding:10px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 16px 40px rgba(25,35,70,.16);z-index:30}
+.smart-popup>span{margin-right:8px}.smart-popup>div{margin-left:0!important;flex:1;justify-content:flex-end}
+.conversation-menu{position:absolute;right:18px;top:66px;z-index:31;width:210px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(25,35,70,.16)}
+.conversation-menu button{display:block;width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:10px;border-radius:8px;cursor:pointer}
+.conversation-menu button:hover{background:#f3f5fa}.conversation-menu button:disabled{opacity:.45;cursor:not-allowed}
+.user-ai-tool{width:28px;height:28px;flex:0 0 28px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--accent);cursor:pointer;opacity:0;transition:opacity .15s}
+.user-item:hover .user-ai-tool,.user-item.active .user-ai-tool{opacity:1}
+.insight-panel-content{min-height:0}.insight-file-list{display:grid;gap:7px}.insight-file-list a{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--line);border-radius:10px;color:var(--text);text-decoration:none;background:#fbfcff}.insight-file-list a:hover{border-color:var(--accent)}.insight-file-list b{font-size:20px}.insight-file-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.insight-file-list small{display:block;color:var(--muted);margin-top:3px}.insight-empty{padding:28px 8px;text-align:center;color:var(--muted)}
+.preview-only-badge{display:inline-flex;align-items:center;padding:7px 9px;border:1px solid #cfd6e6;border-radius:9px;background:#f3f5f9;color:#68738c;font-size:11px;font-weight:800}
+@media(max-width:700px){.workspace-chat .smart-strip.smart-popup{right:8px;width:calc(100% - 16px);flex-wrap:wrap}.smart-popup>div{overflow-x:auto}.conversation-menu{right:8px}}
+
+/* v6.4 profile photo crop and zoom */
+.avatar-crop-overlay{z-index:1700}
+.avatar-crop-dialog{width:min(560px,calc(100vw - 28px));max-height:calc(100vh - 28px);overflow:auto}
+.avatar-crop-dialog h2{margin:0 0 6px}
+.avatar-crop-stage{width:min(410px,100%);aspect-ratio:1;margin:18px auto;border-radius:50%;overflow:hidden;border:5px solid #fff;outline:2px solid var(--accent);background:#111827;box-shadow:0 14px 35px rgba(23,33,64,.2);touch-action:none;cursor:grab}
+.avatar-crop-stage:active{cursor:grabbing}
+.avatar-crop-stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.avatar-zoom-control{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin:16px 0;color:var(--muted);font-size:11px;font-weight:800}
+.avatar-zoom-control input{width:100%;accent-color:var(--accent)}
+.avatar-crop-actions{display:flex;justify-content:flex-end;gap:8px}
+.avatar-crop-actions button{width:auto;margin:0}
+@media(max-height:700px){.avatar-crop-dialog{width:min(470px,calc(100vw - 20px))}.avatar-crop-stage{width:min(300px,100%);margin:10px auto}.avatar-zoom-control{margin:10px 0}}
+
+/* v6.4.1 visible chat attachments */
+.attach-btn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--line));background:color-mix(in srgb,var(--accent) 7%,#fff)}
+.attach-btn:hover{background:color-mix(in srgb,var(--accent) 13%,#fff)}
+.attach-btn:disabled{opacity:.4;cursor:not-allowed}
+.workspace-chat.file-drop-active:after{content:"Drop photos or documents to send";position:absolute;inset:84px 22px 82px;z-index:40;display:grid;place-items:center;border:3px dashed var(--accent);border-radius:20px;background:rgba(247,249,255,.94);color:var(--accent);font-size:18px;font-weight:900;pointer-events:none}
+.upload-status{z-index:45}
+
+/* v6.4.2 large profile photo viewer */
+.profile-photo-preview{cursor:zoom-in;transition:transform .18s ease,box-shadow .18s ease}
+.profile-photo-preview:hover,.profile-photo-preview:focus-visible{transform:scale(1.035);box-shadow:0 12px 34px rgba(37,99,235,.34);outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:3px}
+.profile-photo-viewer.hidden{display:none}
+.profile-photo-viewer{position:fixed;inset:0;z-index:1800;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:rgba(7,12,24,.94);color:#fff;backdrop-filter:blur(12px)}
+.profile-photo-viewer-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;background:rgba(10,17,32,.72);border-bottom:1px solid rgba(255,255,255,.13)}
+.profile-photo-viewer-head small{display:block;color:#aeb9d2;font-size:10px;font-weight:900;letter-spacing:.12em}.profile-photo-viewer-head h2{margin:3px 0 0;font-size:20px}
+.profile-photo-viewer-head button{width:42px;height:42px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:26px;cursor:pointer}
+.profile-photo-viewer-stage{min-height:0;display:grid;place-items:center;overflow:auto;padding:22px;overscroll-behavior:contain}
+.profile-photo-viewer-stage img{display:block;max-width:min(88vw,1100px);max-height:74vh;width:auto;height:auto;object-fit:contain;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.55);transform-origin:center;transition:transform .14s ease;user-select:none}
+.profile-photo-viewer-controls{display:flex;justify-content:center;gap:10px;padding:14px 20px 22px;background:rgba(10,17,32,.72);border-top:1px solid rgba(255,255,255,.13)}
+.profile-photo-viewer-controls button{min-width:50px;height:42px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:18px;font-weight:800;cursor:pointer}
+.profile-photo-viewer-controls #profilePhotoZoomReset{min-width:82px;font-size:13px}
+@media(max-width:640px){.profile-photo-viewer-head{padding:13px 15px}.profile-photo-viewer-stage{padding:12px}.profile-photo-viewer-stage img{max-width:94vw;max-height:72vh;border-radius:13px}.profile-photo-viewer-controls{padding:11px 12px 16px}}
+
+/* v6.7 WhatsApp-inspired mobile experience */
+@media(max-width:800px){
+  :root{--mobile-nav-height:68px}
+  html[data-icon-size="standard"]{--cc-rail-width:0}
+  .app-v4,
+  html[data-insights="hide"] .app-v4{
+    display:block;
+    width:100vw;
+    height:100dvh;
+    padding:0;
+    background:#fff;
+  }
+  .app-v4.hidden{display:none}
+
+  /* Phone conversation list */
+  .workspace-sidebar{
+    position:fixed;
+    inset:0 0 calc(var(--mobile-nav-height) + env(safe-area-inset-bottom)) 0;
+    width:100%;
+    height:auto;
+    padding:18px 14px 8px;
+    border:0;
+    background:#fff;
+    z-index:20;
+  }
+  .workspace-sidebar.mobile-hidden{display:none}
+  .workspace-title{padding:4px 4px 14px}
+  .workspace-title small{display:none}
+  .workspace-title h1{font-size:34px;line-height:1;margin:0;color:#111}
+  .new-btn{
+    width:46px;
+    height:46px;
+    padding:0;
+    overflow:hidden;
+    font-size:0;
+    border-radius:50%;
+    background:#00a884;
+    box-shadow:none;
+  }
+  .new-btn:after{content:"＋";font-size:30px;font-weight:400}
+  .workspace-sidebar .search-box{
+    height:50px;
+    margin:0 2px 10px;
+    padding:0 15px;
+    border:0;
+    border-radius:25px;
+    background:#f0f2f5;
+  }
+  .workspace-sidebar .search-box span{font-size:22px;color:#68727a;margin-right:8px}
+  .workspace-sidebar .search-box input{font-size:16px}
+  .filter-row{padding:5px 2px 10px;overflow-x:auto}
+  .chat-filter{padding:7px 14px;font-size:12px}
+  .chat-filter.active{background:#e7fce9;border-color:#d3f6d8;color:#008069}
+  .quick-contacts{display:none}
+  .workspace-sidebar .section-label{padding:8px 5px}
+  .workspace-sidebar .users-list{padding:0 2px}
+  .workspace-sidebar .user{
+    margin:0;
+    padding:12px 5px;
+    border-radius:0;
+    border-bottom:1px solid #edf0f2;
+    background:#fff;
+  }
+  .workspace-sidebar .user.active{background:#f5f6f6}
+  .workspace-sidebar .user .avatar{width:52px;height:52px;border-radius:50%}
+  .workspace-sidebar .user-info strong{font-size:16px;color:#111}
+  .workspace-sidebar .user-info span{font-size:13px;color:#667811}
+  .account-dock{display:none}
+
+  /* Bottom navigation is shown on lists and workspace pages. */
+  .rail{
+    position:fixed;
+    inset:auto 0 0 0;
+    width:100%;
+    height:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    padding:4px 6px env(safe-area-inset-bottom);
+    display:flex;
+    flex-direction:row;
+    align-items:flex-start;
+    gap:0;
+    overflow:visible;
+    border-top:1px solid #dfe3e6;
+    background:rgba(255,255,255,.98);
+    color:#111;
+    z-index:40;
+  }
+  .rail-brand,.rail-spacer,.rail-profile,
+  .rail-item[data-section="files"],
+  .rail-item[data-section="calculations"]{display:none}
+  .rail-item,
+  html[data-icon-size="standard"] .rail-item{
+    flex:1;
+    width:auto;
+    min-width:0;
+    min-height:58px;
+    padding:4px 2px;
+    gap:1px;
+    border-radius:13px;
+    background:transparent;
+    color:#263238;
+  }
+  .rail-item[data-section="chats"]{order:1}
+  .rail-item[data-section="calls"]{order:2}
+  .rail-item[data-section="groups"]{order:3}
+  .rail-item[data-section="ai"]{order:4}
+  .rail-item[data-section="settings"]{order:5}
+  .rail-item span,
+  html[data-icon-size="standard"] .rail-item span{font-size:23px}
+  .rail-item small,
+  html[data-icon-size="standard"] .rail-item small{font-size:10px;font-weight:700;color:inherit}
+  .rail-item:hover,.rail-item.active{background:#eef1f2;color:#111}
+  .rail-item.active:before{
+    left:50%;
+    top:1px;
+    width:28px;
+    height:3px;
+    transform:translateX(-50%);
+    background:#00a884;
+  }
+  .rail-badge{right:15%;top:1px}
+
+  /* Full-screen mobile conversation. */
+  .workspace-chat{
+    position:fixed;
+    inset:0;
+    left:0!important;
+    right:0;
+    width:100%;
+    height:100dvh;
+    z-index:60;
+    border:0;
+    background:#efeae2;
+  }
+  .workspace-chat.mobile-hidden{display:none}
+  .workspace-chat .chat-head{
+    height:64px;
+    padding:0 7px;
+    gap:7px;
+    border:0;
+    background:#fff;
+    box-shadow:0 1px 2px rgba(11,20,26,.12);
+  }
+  .back-btn{display:grid;width:38px;height:38px;place-items:center;font-size:25px;color:#008069}
+  .active-avatar{width:40px;height:40px;flex:0 0 40px;border-radius:50%}
+  .chat-identity{flex:1}
+  .chat-identity h2{font-size:16px;line-height:1.2}
+  .chat-identity span{display:block;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+  .call-actions{gap:1px}
+  .workspace-chat .header-btn{
+    width:36px;
+    height:36px;
+    border:0;
+    background:transparent;
+    font-size:18px;
+    color:#008069;
+  }
+  .workspace-chat #searchChatBtn,
+  .workspace-chat #chatAiBtn{display:none}
+  .workspace-chat #moreChatBtn{font-size:24px}
+  .date-chip{top:76px;padding:5px 12px;background:rgba(255,255,255,.92)}
+  .workspace-chat .messages{
+    padding:48px 9px calc(76px + env(safe-area-inset-bottom));
+    gap:8px;
+    background-color:#efeae2;
+    background-image:radial-gradient(circle at 10px 10px,rgba(11,20,26,.035) 1px,transparent 1.5px);
+    background-size:24px 24px;
+    scrollbar-width:none;
+  }
+  .workspace-chat .messages::-webkit-scrollbar{display:none}
+  .workspace-chat .msg{max-width:86%}
+  .workspace-chat .bubble{
+    position:relative;
+    padding:8px 10px;
+    border-radius:9px;
+    box-shadow:0 1px 1px rgba(11,20,26,.13);
+    font-size:15px;
+  }
+  .workspace-chat .own .bubble{background:#d9fdd3;color:#111}
+  .workspace-chat .other .bubble{background:#fff;color:#111}
+  .workspace-chat .own .bubble:after{
+    content:"";
+    position:absolute;
+    right:-7px;
+    top:0;
+    border:7px solid transparent;
+    border-top-color:#d9fdd3;
+  }
+  .workspace-chat .other .bubble:after{
+    content:"";
+    position:absolute;
+    left:-7px;
+    top:0;
+    border:7px solid transparent;
+    border-top-color:#fff;
+  }
+  .workspace-chat .meta{font-size:10px}
+
+  /* WhatsApp-style camera, attachment, microphone and send arrow. */
+  .workspace-chat .composer,
+  html[data-composer="essential"] .workspace-chat .composer{
+    left:7px;
+    right:7px;
+    bottom:calc(7px + env(safe-area-inset-bottom));
+    min-height:52px;
+    margin:0;
+    padding:4px;
+    display:grid;
+    grid-template-columns:auto auto minmax(0,1fr) auto;
+    align-items:center;
+    gap:2px;
+    border:0;
+    border-radius:28px;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(11,20,26,.18);
+  }
+  .workspace-chat #emojiBtn{display:none!important}
+  .workspace-chat #attachBtn,
+  .workspace-chat #cameraBtn,
+  html[data-composer="essential"] #attachBtn,
+  html[data-composer="essential"] #cameraBtn{
+    display:grid!important;
+    place-items:center;
+    width:40px;
+    height:40px;
+    border:0;
+    background:transparent;
+    color:#54656f;
+    font-size:20px;
+  }
+  .workspace-chat .message-entry{padding:0 4px}
+  .workspace-chat .composer textarea{min-height:28px;max-height:92px;padding:5px 0;font-size:16px;line-height:1.25}
+  .workspace-chat .composer textarea::placeholder{color:#8696a0}
+  .workspace-chat .composer:not(.has-text) #recordBtn,
+  html[data-composer="essential"] .workspace-chat .composer:not(.has-text) #recordBtn{
+    display:grid!important;
+  }
+  .workspace-chat .composer:not(.has-text) #sendBtn{display:none!important}
+  .workspace-chat .composer.has-text #recordBtn{display:none!important}
+  .workspace-chat .composer.has-text #sendBtn{display:grid!important}
+  .workspace-chat #recordBtn,
+  .workspace-chat #sendBtn{
+    place-items:center;
+    width:44px;
+    height:44px;
+    border:0;
+    border-radius:50%;
+    background:#00a884;
+    color:#fff;
+    font-size:19px;
+    box-shadow:none;
+  }
+  .workspace-chat #sendBtn{transform:none}
+  .workspace-chat #sendBtn{
+    padding:0!important;
+    line-height:1;
+    align-items:center;
+    justify-items:center;
+  }
+  .workspace-chat #sendBtn svg{
+    display:block;
+    width:21px;
+    height:21px;
+    margin:0;
+    fill:currentColor;
+  }
+  .workspace-chat .smart-strip.smart-popup{top:60px}
+  .workspace-chat.file-drop-active:after{inset:70px 8px 68px}
+
+  /* Other workspaces use the full phone width above bottom navigation. */
+  .section-page{
+    position:fixed;
+    inset:0 0 calc(var(--mobile-nav-height) + env(safe-area-inset-bottom)) 0;
+    left:0;
+    width:100%;
+    height:auto;
+    padding:18px 14px;
+    z-index:25;
+  }
+  .section-page-head{gap:12px}
+  .section-page-head h1{font-size:26px}
+}
+
+@media(max-width:390px){
+  .workspace-chat .chat-identity span{max-width:100px}
+  .workspace-chat .header-btn{width:32px}
+  .workspace-chat .composer,
+  html[data-composer="essential"] .workspace-chat .composer{
+    grid-template-columns:36px 36px minmax(0,1fr) 42px;
+  }
+  .workspace-chat #attachBtn,
+  .workspace-chat #cameraBtn,
+  html[data-composer="essential"] #attachBtn,
+  html[data-composer="essential"] #cameraBtn{width:36px}
+}
+
+/* v6.4.3: keep workspace pages in the main content area.
+   Narrow windows previously placed Settings below the rail and squeezed its
+   text into one tiny column. */
+.section-page{
+  grid-column:3 / -1;
+  grid-row:1;
+  width:100%;
+  max-width:100%;
+}
+@media(max-width:800px){
+  .section-page{
+    position:fixed;
+    left:64px;
+    right:0;
+    top:0;
+    bottom:0;
+    z-index:5;
+    width:auto;
+    max-width:none;
+  }
+  .call-overlay{
+    padding:0;
+    background:#111827;
+  }
+  .call-card{
+    width:100vw;
+    height:100dvh;
+    max-width:none;
+    display:grid;
+    grid-template-rows:64px minmax(0,1fr) auto;
+    padding:max(env(safe-area-inset-top),8px) 10px max(env(safe-area-inset-bottom),10px);
+    background:#111827;
+  }
+  .call-title{display:grid;place-items:center;padding:4px 8px}
+  .call-title h2{font-size:19px}
+  .call-title span{font-size:12px}
+  .video-stage{width:100%;border-radius:18px}
+  #remoteVideo{object-fit:cover;background:transparent}
+  #localVideo{
+    right:10px;
+    bottom:10px;
+    width:min(132px,34%);
+    border-radius:14px;
+  }
+  .video-stage.self-main #localVideo{
+    position:relative;
+    inset:auto;
+    width:100%;
+    height:100%;
+    max-width:none;
+    border:0;
+    border-radius:0;
+    object-fit:cover;
+  }
+  .video-stage.self-main #remoteVideo{
+    position:absolute;
+    right:10px;
+    bottom:10px;
+    width:min(132px,34%);
+    height:auto;
+    aspect-ratio:4/3;
+    border-radius:14px;
+    object-fit:cover;
+    z-index:2;
+  }
+  .video-stage.local-camera-off:after{
+    right:10px;
+    bottom:10px;
+    width:min(132px,34%);
+    border-radius:14px;
+  }
+  .call-controls{
+    width:min(430px,100%);
+    margin:0 auto;
+    padding:12px 4px 2px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .call-controls button,
+  .call-control{
+    min-width:0;
+    min-height:48px;
+    padding:10px 8px;
+    font-size:14px;
+  }
+  .call-controls .accept-call,
+  .call-controls .decline-call{grid-column:auto}
+  .call-controls .end-call{background:#e84d5b}
+  .section-page-content,
+  .settings-workspace-grid,
+  .settings-workspace-grid section{
+    min-width:0;
+    max-width:100%;
+  }
+  .settings-workspace-grid{
+    grid-template-columns:1fr;
+  }
+  .appearance-settings{
+    grid-column:auto;
+  }
+}
+
+
+/* BUILD 6837 — center laptop calls at compact browser widths and keep both
+   camera videos visible. Mobile phones remain on the <=600px layout. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
+  }
+}
+
+/* v6.7.2 lightweight WhatsApp-inspired mobile account page */
+@media(max-width:800px){
+  .app-v4 *,
+  .section-page *,
+  .profile-page *{
+    -webkit-tap-highlight-color:transparent;
+  }
+  .rail{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .workspace-sidebar .user,
+  .settings-mobile-row{contain:layout paint style}
+  .workspace-chat .messages{
+    background-image:none;
+    background-color:#efeae2;
+  }
+  .workspace-chat .bubble,
+  .workspace-chat .composer,
+  .workspace-sidebar .user,
+  .section-page .settings-mobile-card,
+  .section-page .settings-mobile-identity{box-shadow:none}
+  .workspace-chat .own .bubble{background:#d9fdd3}
+  .new-btn,.workspace-chat #recordBtn,.workspace-chat #sendBtn{background:#00a884}
+  .profile-photo-preview,
+  .profile-photo-preview:hover,
+  .profile-photo-preview:focus-visible{transform:none;box-shadow:none}
+
+  .rail-item[data-section="settings"] small{font-size:0!important}
+  .rail-item[data-section="settings"] small:after{content:"You";font-size:10px}
+
+  #sectionPage[data-section="settings"]{
+    padding:0 12px 28px;
+    background:#f3f3f3;
+  }
+  #sectionPage[data-section="settings"] .section-page-head{display:none}
+  #sectionPage[data-section="settings"] .section-page-content{padding-top:18px}
+  .settings-whatsapp{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px;
+    max-width:620px;
+    margin:0 auto;
+  }
+  .settings-whatsapp>section{
+    min-width:0;
+    margin:0;
+    border:0;
+    border-radius:22px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .settings-mobile-identity{display:block!important;padding:0!important}
+  .settings-identity-button{
+    width:100%;
+    min-height:178px;
+    display:grid;
+    grid-template-columns:1fr;
+    place-items:center;
+    gap:8px;
+    padding:18px;
+    border:0;
+    background:#fff;
+    color:#111;
+    cursor:pointer;
+    text-align:center;
+  }
+  .settings-profile-avatar{
+    width:94px;
+    height:94px;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    border-radius:50%;
+    background:linear-gradient(135deg,#6658f6,#3488ed);
+    color:#fff;
+    font-size:25px;
+    font-weight:900;
+  }
+  .settings-profile-avatar img{width:100%;height:100%;object-fit:cover}
+  .settings-identity-button>span:nth-child(2){display:grid;gap:3px}
+  .settings-identity-button b{font-size:23px;line-height:1.15}
+  .settings-identity-button small{font-size:15px;color:#6a6a6a}
+  .settings-identity-button em{font-size:11px;color:#888;font-style:normal}
+  .settings-identity-button>i{display:none}
+
+  .settings-mobile-card{display:block!important;padding:0!important}
+  .settings-mobile-row{
+    width:100%;
+    min-height:64px;
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) 22px;
+    align-items:center;
+    gap:10px;
+    padding:10px 15px;
+    border:0;
+    border-bottom:1px solid #e6e6e6;
+    background:#fff;
+    color:#111;
+    text-align:left;
+    cursor:pointer;
+  }
+  .settings-mobile-row:last-child{border-bottom:0}
+  .settings-mobile-row>span:first-child{
+    display:grid;
+    place-items:center;
+    font-size:21px;
+  }
+  .settings-mobile-row>span:nth-child(2){min-width:0;display:grid;gap:2px}
+  .settings-mobile-row b{font-size:16px;font-weight:600}
+  .settings-mobile-row small{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:#7a7a7a;
+    font-size:11px;
+  }
+  .settings-mobile-row i{color:#8b8b8b;font-size:27px;font-style:normal}
+  .settings-logout-row b,.settings-logout-row>span:first-child{color:#d93045}
+
+  .settings-whatsapp .appearance-settings{
+    display:grid;
+    gap:0;
+    padding:18px!important;
+  }
+  .settings-whatsapp .appearance-settings h2{margin:0 0 4px;font-size:19px}
+  .settings-whatsapp .appearance-settings>p{margin:0 0 10px;color:#777;font-size:12px}
+  .settings-whatsapp .appearance-settings>label{
+    grid-template-columns:minmax(0,1fr) minmax(125px,44%);
+    padding:9px 0;
+    margin:0;
+    border-bottom:1px solid #ececec;
+    font-size:13px;
+  }
+  .settings-whatsapp .appearance-settings select{padding:8px;font-size:12px}
+  .settings-whatsapp .settings-button-row{margin-top:12px}
+  .settings-whatsapp .settings-button-row button{min-height:40px}
+}
+
+@media(max-width:800px) and (prefers-reduced-motion:reduce){
+  .app-v4 *{animation:none!important;transition:none!important}
+}
+
+/* v6.7.3 restored mobile emoji, group creation, and optional sign-in options */
+@media(max-width:800px){
+  .workspace-chat .composer,
+  html[data-composer="essential"] .workspace-chat .composer{
+    grid-template-columns:auto auto auto minmax(0,1fr) auto;
+  }
+  .workspace-chat #emojiBtn,
+  html[data-composer="essential"] .workspace-chat #emojiBtn{
+    display:grid!important;
+    place-items:center;
+    width:38px;
+    height:40px;
+    border:0;
+    background:transparent;
+    color:#54656f;
+    font-size:20px;
+  }
+  .workspace-chat .emoji-picker{
+    position:fixed;
+    left:8px;
+    right:8px;
+    bottom:calc(66px + env(safe-area-inset-bottom));
+    width:auto;
+    max-height:210px;
+    grid-template-columns:repeat(8,1fr);
+    z-index:90;
+  }
+
+  #sectionPage[data-section="groups"] .workspace-toolbar{
+    position:sticky;
+    top:-18px;
+    z-index:4;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:10px;
+    padding:12px 0;
+    background:var(--panel,#fff);
+  }
+  #sectionPage[data-section="groups"] #createGroupBtn{
+    width:auto;
+    min-width:126px;
+    margin:0;
+    padding:11px 13px;
+    border-radius:999px;
+    background:#00a884;
+  }
+  #sectionPage[data-section="groups"] .group-create-panel{
+    padding:14px;
+    border-radius:14px;
+    background:#fff;
+  }
+  #sectionPage[data-section="groups"] .group-member-picker{
+    max-height:220px;
+    overflow:auto;
+  }
+
+  .settings-signin-panel{padding:18px!important}
+  .settings-signin-panel h2{margin:0 0 5px;font-size:19px}
+  .settings-signin-panel>p{margin:0 0 14px;color:#777;font-size:12px;line-height:1.4}
+  .settings-signin-panel form{display:grid;gap:12px}
+  .settings-signin-panel label{display:grid;gap:6px;font-size:12px;font-weight:700}
+  .settings-signin-panel input{
+    width:100%;
+    min-height:44px;
+    padding:10px 12px;
+    border:1px solid #d9dde2;
+    border-radius:11px;
+    background:#fff;
+    color:#111;
+    font-size:15px;
+    outline:0;
+  }
+  .settings-signin-panel input:focus{border-color:#00a884}
+  .settings-signin-panel .primary{margin:0;background:#00a884}
+  #settingsSignInResult{min-height:18px;color:#536070;line-height:1.35}
+}
+
+@media(max-width:390px){
+  .workspace-chat .composer,
+  html[data-composer="essential"] .workspace-chat .composer{
+    grid-template-columns:34px 34px 34px minmax(0,1fr) 42px;
+  }
+  .workspace-chat #emojiBtn,
+  .workspace-chat #attachBtn,
+  .workspace-chat #cameraBtn,
+  html[data-composer="essential"] #emojiBtn,
+  html[data-composer="essential"] #attachBtn,
+  html[data-composer="essential"] #cameraBtn{width:34px}
+  .workspace-chat .emoji-picker{grid-template-columns:repeat(7,1fr)}
+}
+
+/* v6.7.3 group invitations and owner/admin member management */
+.group-invitations{display:grid;gap:8px;margin:0 0 16px;padding:14px;border:1px solid #bde7d8;border-radius:15px;background:#f0fbf7}
+.group-invitations h3{margin:0 0 3px;color:#08775d}
+.group-invitations-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.group-invitations-head>div{display:grid;gap:2px}.group-invitations-head small{color:#60756e}.group-invitations-head>button{border:1px solid #9fd8c5;border-radius:9px;background:#fff;color:#08775d;padding:7px 10px;cursor:pointer}.group-invitations.no-invitations{border-color:#e0e5e8;background:#f8f9fa}.group-invitations.no-invitations h3{color:#52606a}.group-invitations.no-invitations .group-invitations-head small{color:#7b858c}.group-invitations .accept-invitation{border-color:#00a884;background:#00a884;color:#fff;font-weight:800}
+.group-invitations article{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px;border-radius:11px;background:#fff}
+.group-invitations article>div{display:grid;gap:3px}.group-invitations small{color:#6c7882}
+.group-invitations button{border:1px solid #cfd8dc;border-radius:9px;background:#fff;padding:8px 11px;cursor:pointer}.group-invitations button:first-of-type{border-color:#00a884;background:#00a884;color:#fff}
+.group-chat-shell.member-panel-open{grid-template-rows:auto minmax(150px,auto) auto minmax(180px,1fr) auto}
+.group-member-panel{max-height:42vh;overflow:auto;padding:12px;background:#f7f9fa;border-bottom:1px solid #d7dee3}
+.group-member-panel-head{position:sticky;top:-12px;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:7px 3px 10px;background:#f7f9fa}.group-member-panel-head>div{display:grid;gap:2px}.group-member-panel-head small{color:#71808a;font-size:10px}.group-member-panel-head button{width:34px;height:34px;border:0;border-radius:50%;background:#e6ebee;font-size:22px;cursor:pointer}
+.group-member-list,.group-add-members{display:grid;gap:6px}.group-add-members{margin-top:12px;padding-top:12px;border-top:1px solid #d9dfe3}.group-add-members h3{margin:0 0 3px;font-size:14px}
+.group-member-list article,.group-add-members article{display:grid;grid-template-columns:38px minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:8px;border:1px solid #e0e5e8;border-radius:10px;background:#fff}.group-member-list .avatar,.group-add-members .avatar{width:36px;height:36px}.group-member-list article>span:nth-child(2),.group-add-members article>span:nth-child(2){display:grid;gap:2px}.group-member-list small,.group-add-members small{color:#71808a;font-size:10px}.group-member-list em{padding:5px 8px;border-radius:999px;background:#edf1f3;color:#66727b;font-size:10px;font-style:normal}.group-member-list select{padding:6px;border:1px solid #ccd4d9;border-radius:8px;background:#fff}.group-member-list button,.group-add-members button{border:1px solid #ccd4d9;border-radius:8px;background:#fff;padding:7px 9px;cursor:pointer}.group-add-members button:last-child{border-color:#00a884;color:#007d65}.group-member-error{padding:15px;color:#a32b3d;background:#fff3f5;border-radius:10px}
+
+@media(max-width:800px){
+  .group-invitations-head{align-items:flex-start}.group-invitations-head>button{white-space:nowrap}
+  .group-invitations article{grid-template-columns:minmax(0,1fr) auto auto}
+  .group-invitations button{padding:7px 9px}
+  .group-chat-shell.member-panel-open{grid-template-rows:auto minmax(180px,42vh) auto minmax(120px,1fr) auto}
+  .group-member-panel{max-height:42vh;padding:10px}
+  .group-member-list article,.group-add-members article{grid-template-columns:36px minmax(0,1fr) auto}
+  .group-member-list article select,.group-member-list article em{grid-column:3}
+  .group-member-list article button{grid-column:2 / 4;width:100%}
+  .group-add-members article button{padding:7px}
+}
+
+/* v6.5 WhatsApp-style group chat and small-group conference */
+.group-create-panel{display:grid;gap:14px;padding:16px;margin-bottom:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface,#fff)}
+.group-create-panel>label{display:grid;gap:6px;font-weight:800;font-size:12px}.group-create-panel input[type="text"],.group-create-panel>label input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.group-member-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.group-member-picker label{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer}.group-member-picker .avatar{width:28px;height:28px;font-size:10px}.group-member-picker input{accent-color:var(--accent)}
+.group-chat-shell{height:calc(100dvh - 145px);min-height:480px;display:grid;grid-template-rows:auto auto minmax(180px,1fr) auto;overflow:hidden;border:1px solid #d9e0e6;border-radius:18px;background:#efeae2;box-shadow:0 12px 32px rgba(27,39,63,.10)}
+.group-chat-head{display:flex;align-items:center;gap:12px;padding:11px 15px;background:#f7f8fa;border-bottom:1px solid #dce2e7}.group-chat-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#d9e1e7;font-size:21px}.group-chat-head>div:nth-child(2){min-width:0;flex:1}.group-chat-head h2{margin:0;font-size:16px}.group-chat-head p{margin:3px 0 0;color:#66717d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.group-call-actions{display:flex;gap:7px}.group-call-actions button{width:39px;height:39px;border:0;border-radius:50%;background:#fff;color:#54606b;font-size:18px;cursor:pointer}
+.group-call-panel{padding:10px;background:#18212b;color:#fff}.group-call-title{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}.group-call-title span{font-size:11px;color:#bac5d0}.group-video-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;max-height:300px;overflow:auto}.group-video-tile{position:relative;min-height:120px;border-radius:12px;overflow:hidden;background:#0d141b}.group-video-tile video{display:block;width:100%;height:100%;min-height:120px;object-fit:cover}.group-video-tile span{position:absolute;left:7px;bottom:7px;padding:4px 7px;border-radius:8px;background:rgba(0,0,0,.58);font-size:10px}.group-call-controls{display:flex;justify-content:center;gap:8px;margin-top:8px}.group-call-controls button{border:1px solid #45515e;border-radius:999px;background:#2c3742;color:#fff;padding:7px 11px;cursor:pointer}.group-call-controls .danger-link{background:#b6293c!important;color:#fff!important}
+.whatsapp-group-feed{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:18px;background-color:#efeae2;background-image:radial-gradient(circle at 1px 1px,rgba(70,79,85,.07) 1px,transparent 0);background-size:22px 22px}.group-chat-empty{margin:auto;color:#66717d;background:rgba(255,255,255,.72);border-radius:10px;padding:9px 12px;font-size:12px}
+.group-message-bubble{width:max-content;max-width:min(76%,620px);padding:7px 9px 5px;border-radius:9px;box-shadow:0 1px 2px rgba(28,39,49,.14);overflow-wrap:anywhere}.group-message-bubble.other{align-self:flex-start;background:#fff;border-top-left-radius:3px}.group-message-bubble.own{align-self:flex-end;background:#d9fdd3;border-top-right-radius:3px}.group-message-bubble strong{display:block;margin-bottom:2px;color:#536dfe;font-size:11px}.group-message-bubble p{margin:0;white-space:pre-wrap;line-height:1.38;font-size:14px}.group-message-bubble small{display:block;text-align:right;margin-top:2px;color:#71808a;font-size:9px}
+.group-message-content{white-space:pre-wrap;line-height:1.38;font-size:14px}.group-message-content .chat-image{max-width:min(320px,62vw)}.group-message-content .voice-note{max-width:min(320px,62vw)}
+.whatsapp-group-composer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:6px;padding:9px;background:#f0f2f5;border-top:1px solid #d8dee3}.whatsapp-group-composer>button{width:39px;height:39px;border:0;border-radius:50%;background:transparent;color:#596670;font-size:20px;cursor:pointer}.whatsapp-group-composer input{min-width:0;width:100%;height:42px;border:0;border-radius:999px;background:#fff;padding:0 16px;outline:none}.whatsapp-group-composer .group-send-arrow{background:#00a884;color:#fff;font-size:19px;transform:rotate(-8deg)}
+.group-message-entry{position:relative;min-width:0}.group-message-entry>input{display:block}.group-emoji-picker{left:0;bottom:50px}
+.group-chat-shell{position:relative}.group-chat-shell.file-drop-active:after{content:"Drop files here to send to the group";position:absolute;inset:72px 14px 64px;z-index:60;display:grid;place-items:center;border:3px dashed #00a884;border-radius:18px;background:rgba(239,250,247,.94);color:#007c63;font-size:18px;font-weight:900;pointer-events:none}
+@media(max-width:800px){.group-chat-shell{height:calc(100dvh - 125px);border-radius:12px}.whatsapp-group-feed{padding:12px}.group-message-bubble{max-width:88%}.group-call-panel{padding:8px}.group-video-grid{grid-template-columns:1fr 1fr}.whatsapp-group-composer{grid-template-columns:auto auto minmax(0,1fr) auto}.whatsapp-group-composer #groupAttachBtn{display:grid}.group-emoji-picker{position:fixed;left:8px;right:8px;bottom:calc(66px + env(safe-area-inset-bottom));width:auto;max-height:210px;grid-template-columns:repeat(8,1fr);z-index:90}}
+
+@media(max-width:800px){
+  button,.rail-item,.settings-mobile-row{touch-action:manipulation}
+  .section-page-content{content-visibility:auto}
+}
+
+/* Keep the v6.7 phone workspace flush to both screen edges. */
+@media(max-width:800px){
+  .section-page{
+    position:fixed;
+    inset:0 0 calc(var(--mobile-nav-height) + env(safe-area-inset-bottom)) 0;
+    left:0;
+    width:100%;
+    height:auto;
+    /* Workspace pages must sit above the conversation list. Previously the
+       list used z-index:20 while this page inherited z-index:5, so Settings
+       appeared only after selecting a conversation hid the list. */
+    z-index:30;
+  }
+}
+
+/* v6.7.3 build 6737: one reliable private-chat composer on phone and desktop. */
+.workspace-chat .composer,
+html[data-composer="essential"] .workspace-chat .composer{
+  display:flex;
+  grid-template-columns:none;
+  align-items:center;
+  gap:4px;
+}
+.workspace-chat .message-entry{
+  flex:1 1 auto;
+  width:auto;
+  min-width:80px;
+  padding:0 6px;
+}
+.workspace-chat .message-entry textarea{
+  display:block;
+  width:100%;
+  min-width:0;
+  text-align:left;
+  direction:ltr;
+}
+.workspace-chat #emojiBtn,
+.workspace-chat #attachBtn,
+.workspace-chat #cameraBtn,
+html[data-composer="essential"] .workspace-chat #emojiBtn,
+html[data-composer="essential"] .workspace-chat #attachBtn,
+html[data-composer="essential"] .workspace-chat #cameraBtn{
+  display:grid!important;
+  place-items:center;
+  flex:0 0 40px;
+  width:40px;
+  height:40px;
+}
+.workspace-chat #recordBtn,
+.workspace-chat #sendBtn{
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+}
+.workspace-chat .composer:not(.has-text) #recordBtn{display:grid!important}
+.workspace-chat .composer:not(.has-text) #sendBtn{display:none!important}
+.workspace-chat .composer.has-text #recordBtn{display:none!important}
+.workspace-chat .composer.has-text #sendBtn{display:grid!important}
+.workspace-chat #sendBtn{
+  place-items:center;
+  padding:0!important;
+  border-radius:50%;
+  background:#00a884;
+  color:#fff;
+}
+.workspace-chat #sendBtn span{
+  display:block;
+  font-size:20px;
+  line-height:1;
+  transform:rotate(-8deg);
+}
+@media(max-width:390px){
+  .workspace-chat .composer,
+  html[data-composer="essential"] .workspace-chat .composer{gap:1px}
+  .workspace-chat #emojiBtn,
+  .workspace-chat #attachBtn,
+  .workspace-chat #cameraBtn,
+  html[data-composer="essential"] .workspace-chat #emojiBtn,
+  html[data-composer="essential"] .workspace-chat #attachBtn,
+  html[data-composer="essential"] .workspace-chat #cameraBtn{
+    flex-basis:34px;
+    width:34px;
+  }
+  .workspace-chat .message-entry{min-width:64px;padding:0 3px}
+}
+
+/* v6.7.3 build 6745: polished desktop Settings presentation.
+   The phone layout already defines these components inside its mobile media
+   query; desktop previously fell back to unstyled browser buttons. */
+@media(min-width:801px){
+  .settings-workspace-grid.settings-whatsapp{
+    grid-template-columns:minmax(300px,.82fr) minmax(430px,1.18fr);
+    align-items:start;
+    gap:18px;
+  }
+  .settings-whatsapp>section{
+    min-width:0;
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--panel);
+    box-shadow:0 8px 24px rgba(31,43,68,.06);
+  }
+  .settings-whatsapp .settings-mobile-identity,
+  .settings-whatsapp .settings-mobile-card{
+    padding:0!important;
+  }
+  .settings-identity-button{
+    width:100%;
+    min-height:112px;
+    display:grid;
+    grid-template-columns:68px minmax(0,1fr) auto;
+    align-items:center;
+    gap:15px;
+    padding:20px;
+    border:0;
+    background:transparent;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  .settings-identity-button:hover{background:var(--soft)}
+  .settings-profile-avatar{
+    width:68px;
+    height:68px;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    border-radius:50%;
+    background:linear-gradient(135deg,#536dfe,#8b5cf6);
+    color:#fff;
+    font-size:24px;
+    font-weight:900;
+  }
+  .settings-profile-avatar img{width:100%;height:100%;object-fit:cover}
+  .settings-identity-button>span:nth-child(2){
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .settings-identity-button b{
+    overflow:hidden;
+    font-size:18px;
+    line-height:1.2;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-identity-button small{
+    overflow:hidden;
+    color:var(--muted);
+    font-size:12px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-identity-button em{
+    width:max-content;
+    padding:4px 8px;
+    border-radius:999px;
+    background:var(--soft);
+    color:var(--muted);
+    font-size:10px;
+    font-style:normal;
+    font-weight:800;
+  }
+  .settings-identity-button>i,
+  .settings-mobile-row>i{
+    color:var(--muted);
+    font-size:24px;
+    font-style:normal;
+  }
+  .settings-mobile-row{
+    width:100%;
+    min-height:72px;
+    display:grid;
+    grid-template-columns:44px minmax(0,1fr) auto;
+    align-items:center;
+    gap:13px;
+    padding:13px 16px;
+    border:0;
+    border-bottom:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  .settings-mobile-row:last-child{border-bottom:0}
+  .settings-mobile-row:hover{background:var(--soft)}
+  .settings-mobile-row>span:first-child{
+    width:44px;
+    height:44px;
+    display:grid;
+    place-items:center;
+    border-radius:13px;
+    background:var(--soft);
+    font-size:20px;
+  }
+  .settings-mobile-row>span:nth-child(2){
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+  .settings-mobile-row b{font-size:14px;line-height:1.2}
+  .settings-mobile-row small{
+    overflow:hidden;
+    color:var(--muted);
+    font-size:11px;
+    line-height:1.35;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .settings-logout-row b{color:#c9364f}
+  .settings-whatsapp .appearance-settings{
+    grid-column:1 / -1;
+    padding:22px!important;
+  }
+  .settings-whatsapp .settings-signin-panel{grid-column:1 / -1}
+  .settings-whatsapp .license-information-card{padding:20px!important}
+}
+
+@media(min-width:801px) and (max-width:1050px){
+  .settings-workspace-grid.settings-whatsapp{grid-template-columns:1fr}
+  .settings-whatsapp .appearance-settings,
+  .settings-whatsapp .settings-signin-panel{grid-column:auto}
+}
+
+/* v6.7.3 build 6746: live server/internet quality indicator. */
+.network-quality{
+  position:fixed;
+  top:10px;
+  right:12px;
+  z-index:180;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:0;
+  width:44px;
+  height:50px;
+  min-height:50px;
+  justify-content:center;
+  padding:0;
+  border:1px solid rgba(102,113,125,.2);
+  border-radius:13px;
+  background:rgba(255,255,255,.94);
+  color:#53606b;
+  box-shadow:0 5px 18px rgba(24,33,50,.12);
+  font-size:8px;
+  font-weight:800;
+  backdrop-filter:blur(12px);
+  pointer-events:none;
+}
+.network-quality span{display:block;line-height:1.05;margin-top:1px}
+.network-wifi-icon{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+}
+.network-wifi-icon circle{fill:currentColor;stroke:none}
+.network-quality.good{color:#16834f;border-color:rgba(22,131,79,.26)}
+.network-quality.fair{color:#bd8100;border-color:rgba(189,129,0,.28)}
+.network-quality.poor{color:#d33d52;border-color:rgba(211,61,82,.27)}
+.network-quality.offline{color:#68727d;border-color:rgba(104,114,125,.25)}
+
+@media(max-width:800px){
+  .network-quality{
+    top:calc(env(safe-area-inset-top) + 8px);
+    bottom:auto;
+    right:9px;
+    width:44px;
+    height:50px;
+    min-height:50px;
+    justify-content:center;
+    padding:0;
+    font-size:8px;
+  }
+  .network-wifi-icon{width:19px;height:19px;flex-basis:19px}
+  .chat-video{width:min(74vw,330px);max-height:52vh}
+}
+
+.call-choice-dialog{width:min(460px,100%)}
+.call-choice-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.call-choice-actions>button{
+  min-height:132px;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:7px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:17px;
+  background:var(--soft);
+  color:var(--text);
+  cursor:pointer;
+}
+.call-choice-actions>button:hover{border-color:var(--accent);background:var(--panel)}
+.call-choice-actions .call-symbol{width:44px;height:44px;border-radius:50%;background:var(--panel)}
+.call-choice-actions .call-symbol svg{width:21px;height:21px}
+.call-choice-actions b{font-size:15px}.call-choice-actions small{color:var(--muted);font-size:11px}
+.call-choice-offline{display:block;margin-top:14px;padding:10px 12px;border-radius:11px;background:#fff4df;color:#8a5a00;line-height:1.4}
+.insights-head{padding-right:56px}
+@media(max-width:800px){
+  .workspace-chat .call-actions{padding-right:52px}
+  .workspace-title{padding-right:54px}
+  .call-choice-actions{grid-template-columns:1fr}
+  .call-choice-actions>button{min-height:96px;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto auto;justify-items:start;text-align:left}
+  .call-choice-actions .call-symbol{grid-row:1 / 3}
+}
+
+/* Calls must always be the front-most application surface on every device. */
+.call-overlay{z-index:2147483647!important;position:fixed!important;inset:0!important;isolation:isolate}
+body.call-active{overflow:hidden!important;touch-action:none}
+body.call-active #callOverlay{display:flex!important;visibility:visible!important;opacity:1!important}
+
+.media-confirm-dialog{width:min(520px,100%)}
+.media-confirm-preview{
+  min-height:150px;
+  max-height:min(52vh,440px);
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:16px;
+  background:#101318;
+}
+.media-confirm-preview img,.media-confirm-preview video{
+  display:block;
+  width:100%;
+  max-height:min(52vh,440px);
+  object-fit:contain;
+}
+.media-confirm-preview audio{width:calc(100% - 28px)}
+.media-confirm-details{display:flex;justify-content:space-between;gap:12px;padding:12px 2px;color:var(--text)}
+.media-confirm-details b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media-confirm-details small{flex:0 0 auto;color:var(--muted)}
+.media-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.media-confirm-actions button{min-height:44px}
+@media(max-width:800px){
+  .media-confirm-overlay{padding:12px}
+  .media-confirm-dialog{padding:22px 16px 16px;border-radius:20px}
+  .media-confirm-preview{max-height:48vh}
+  .media-confirm-preview img,.media-confirm-preview video{max-height:48vh}
+}
+
+.capture-overlay{position:fixed;inset:0;width:100vw;height:100dvh;z-index:3000;background:#000;color:#fff;overflow:hidden}.capture-shell{width:min(100%,900px);height:100dvh;max-height:100dvh;margin:0 auto;display:flex;flex-direction:column;background:#000;overflow:hidden}.capture-top{flex:0 0 auto;display:grid;grid-template-columns:60px 1fr 70px;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 16px 10px;text-align:center}.capture-top button{width:44px;height:44px;border:0;border-radius:50%;background:#222;color:#fff;font-size:30px}.capture-top span{font-variant-numeric:tabular-nums}.capture-preview{position:relative;flex:1 1 auto;min-height:0;display:grid;place-items:center;overflow:hidden;background:#080808}.capture-preview video,.capture-preview canvas{width:100%;height:100%;max-height:100%;object-fit:contain}.voice-wave{font-size:clamp(24px,7vw,58px);letter-spacing:4px;animation:voicePulse .7s ease-in-out infinite alternate}.capture-tabs{flex:0 0 auto;display:flex;justify-content:center;gap:8px;padding:8px 10px;background:#000}.capture-tabs button{border:0;background:transparent;color:#aaa;font-weight:800;padding:8px 16px}.capture-tabs button.active{color:#fff;border-bottom:3px solid #43ad8c}.capture-actions{flex:0 0 auto;display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;gap:12px;padding:8px 22px calc(12px + env(safe-area-inset-bottom));background:#000;z-index:2}.capture-actions button{border:0;color:#fff;background:#252525;border-radius:999px;padding:12px 18px;font-weight:800}.capture-actions button:disabled{opacity:.55}.capture-actions #captureMainBtn{width:78px;height:78px;border-radius:50%;background:#fff;border:7px solid #333;padding:0}.capture-overlay.video-mode #captureMainBtn{background:#ef1745;border-color:#fff}.capture-overlay.recording #captureMainBtn{border-radius:22px;transform:scale(.72)}.capture-actions #captureSendBtn{background:#43ad8c}.capture-actions #captureSwitchBtn{font-size:25px;padding:10px 15px}@keyframes voicePulse{to{transform:scaleY(.65);opacity:.7}}
+
+/* Build 6766 recorder controls */
+.capture-actions #captureSendBtn{width:58px;height:58px;padding:0;border-radius:50%;font-size:28px;line-height:1;background:#43ad8c}.capture-actions #captureSendBtn:disabled{opacity:.45}.capture-overlay.recording .capture-tabs{pointer-events:none;opacity:.55}
+
+/* Build 6766: after Stop, Preview and Send are shown together; playback never starts automatically. */
+.capture-actions{grid-template-columns:auto auto 1fr auto auto}
+.capture-actions #capturePreviewBtn{min-width:110px;background:#252525}
+.capture-actions #captureSendBtn{flex:0 0 auto}
+@media(max-width:760px){
+  .capture-actions{grid-template-columns:auto auto 1fr auto;gap:8px;padding-left:12px;padding-right:12px}
+  .capture-actions #captureRetakeBtn{grid-column:1}
+  .capture-actions #capturePreviewBtn{grid-column:2;min-width:96px;padding-left:12px;padding-right:12px}
+  .capture-actions #captureMainBtn{grid-column:3;justify-self:center}
+  .capture-actions #captureSendBtn{grid-column:4}
+  .capture-actions #captureSwitchBtn{grid-column:4}
+  .capture-actions #captureSendBtn:not(.hidden) + #captureSwitchBtn{display:none}
+}
+
+/* Build 6766 mobile recorder: keep post-stop actions visible above iPhone safe area. */
+.capture-actions{position:sticky;bottom:0;min-height:88px;width:100%;box-sizing:border-box;padding-bottom:max(14px,env(safe-area-inset-bottom));}
+.capture-overlay.result-ready .capture-actions{grid-template-columns:1fr 1.25fr 1fr;gap:10px;padding:12px 14px max(16px,env(safe-area-inset-bottom));}
+.capture-overlay.result-ready #captureRetakeBtn{grid-column:1;display:block!important;}
+.capture-overlay.result-ready #capturePreviewBtn:not(.hidden){grid-column:2;display:block!important;min-width:0;width:100%;}
+.capture-overlay.result-ready #captureSendBtn{grid-column:3;display:block!important;width:100%;height:52px;border-radius:999px;font-size:17px;padding:0 14px;white-space:nowrap;}
+.capture-overlay.result-ready #captureMainBtn,.capture-overlay.result-ready #captureSwitchBtn{display:none!important;}
+@media(max-width:760px){
+  .capture-shell{height:100svh;max-height:100svh;}
+  @supports(height:100dvh){.capture-shell{height:100dvh;max-height:100dvh;}}
+  .capture-top{padding-top:max(10px,env(safe-area-inset-top));}
+  .capture-tabs{padding:6px 8px;}
+  .capture-actions{min-height:84px;padding-bottom:max(12px,env(safe-area-inset-bottom));}
+  .capture-overlay.result-ready .capture-actions{grid-template-columns:.9fr 1.25fr 1fr;}
+  .capture-overlay.result-ready #captureRetakeBtn,.capture-overlay.result-ready #capturePreviewBtn,.capture-overlay.result-ready #captureSendBtn{font-size:15px;padding-left:10px;padding-right:10px;}
+}
+
+/* Build 6768: on phones the call-type chooser belongs to the active chat,
+   never to the global Messages/contact-list surface. */
+@media(max-width:800px){
+  .workspace-chat > .call-choice-overlay{
+    position:absolute!important;
+    inset:0!important;
+    z-index:120!important;
+    width:100%!important;
+    height:100%!important;
+    min-height:100%!important;
+    padding:calc(64px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom))!important;
+    place-items:center!important;
+    background:rgba(7,12,24,.66)!important;
+  }
+  .workspace-chat > .call-choice-overlay.hidden{display:none!important}
+  .workspace-chat > .call-choice-overlay .call-choice-dialog{
+    width:min(100%,460px)!important;
+    max-height:calc(100dvh - 110px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow:auto;
+  }
+}
+
+
+/* Build 6769: live Wi-Fi quality is visible on both voice and video call screens. */
+.call-network-quality{
+  position:absolute!important;
+  top:14px!important;
+  right:16px!important;
+  z-index:20!important;
+  pointer-events:none;
+}
+.call-title{padding-left:72px;padding-right:72px}
+@media(max-width:800px){
+  .call-network-quality{
+    top:max(calc(env(safe-area-inset-top) + 8px),12px)!important;
+    right:10px!important;
+  }
+  .call-title{padding-left:58px;padding-right:58px}
+}
+
+
+/* Build 6770: keep call Wi-Fi badge visible on mobile voice/video calls. */
+.call-overlay > .call-network-quality{
+  position:fixed!important;
+  top:calc(env(safe-area-inset-top, 0px) + 12px)!important;
+  right:12px!important;
+  left:auto!important;
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  z-index:2147483647!important;
+  background:rgba(17,24,39,.86)!important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.call-overlay.hidden > .call-network-quality{display:none!important}
+@media(max-width:800px){
+  .call-overlay > .call-network-quality{
+    top:calc(env(safe-area-inset-top, 0px) + 10px)!important;
+    right:10px!important;
+    min-height:32px!important;
+    padding:5px 9px!important;
+    border-radius:16px!important;
+  }
+  .call-overlay > .call-network-quality .network-wifi-icon{width:18px!important;height:18px!important}
+  .call-overlay > .call-network-quality span{display:inline!important;font-size:12px!important;line-height:1!important}
+  .call-card{position:relative;z-index:1}
+}
+
+
+/* Build 6775: missed-call visibility and in-app call attention */
+.rail-item[data-section="calls"]{position:relative}
+.calls-missed-badge{position:absolute;top:5px;right:9px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;display:grid;place-items:center;background:#df2b36;color:#fff;font-size:10px;font-weight:900;line-height:1;box-shadow:0 0 0 2px var(--panel)}
+.call-history-item.missed-call-item{border-color:rgba(223,43,54,.32)!important;background:rgba(223,43,54,.065)!important}
+.call-history-item.missed-call-item .call-symbol,.call-history-item.missed-call-item h3,.call-history-item.missed-call-item .call-history-status{color:#d92736!important}
+.call-history-item.missed-call-item .call-symbol svg{stroke:#d92736!important;fill:none}
+.missed-call-heading-count{display:inline-flex;vertical-align:middle;margin-left:7px;padding:4px 8px;border-radius:999px;background:#d92736;color:#fff;font-size:11px;font-weight:800}
+.missed-call-alert-overlay{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(8,12,18,.62);backdrop-filter:blur(5px)}
+.missed-call-alert-card{width:min(390px,100%);display:grid;grid-template-columns:58px 1fr;gap:14px;align-items:center;padding:22px;border-radius:22px;background:var(--panel);color:var(--text);box-shadow:0 22px 70px rgba(0,0,0,.35);border:1px solid var(--line)}
+.missed-call-alert-icon{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:rgba(217,39,54,.12);color:#d92736}
+.missed-call-alert-icon svg{width:27px;height:27px;stroke:currentColor;fill:none}
+.missed-call-alert-copy small{color:#d92736;font-weight:900}.missed-call-alert-copy h2{margin:2px 0 2px;font-size:20px}.missed-call-alert-copy p{margin:0;color:var(--muted);font-size:12px}
+.missed-call-alert-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}.missed-call-alert-actions button{min-height:44px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:800}.missed-call-alert-actions button.secondary{background:var(--soft);color:var(--text);border:1px solid var(--line)}
+@media(max-width:800px){.missed-call-alert-overlay{align-items:end;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}.missed-call-alert-card{border-radius:22px 22px 18px 18px}.calls-missed-badge{top:3px;right:4px}}
+
+
+/* Build 6775: front-camera live previews show true left/right orientation.
+   Rear camera, remote video, saved photo/video, and media playback are unchanged. */
+#localVideo.front-camera-corrected{transform:none!important;}
+#captureVideo.front-camera-corrected{transform:scaleX(-1)!important;}
+
+/* Build 6775: non-destructive camera filters. Photo captures bake the selected filter; video-call/recorder filters are preview-only to preserve the proven media pipeline. */
+.camera-filter-select,.call-filter-select{border:1px solid rgba(255,255,255,.22);background:#1f1f1f;color:#fff;border-radius:999px;padding:9px 12px;font-weight:700;max-width:130px}
+.capture-tabs .camera-filter-select{margin-left:8px;align-self:center}
+.call-filter-select{min-height:44px}
+.video-stage.audio-only~.call-controls .call-filter-select{display:none}
+@media(max-width:800px){.capture-tabs{flex-wrap:wrap}.capture-tabs .camera-filter-select{flex:0 0 auto;max-width:120px;padding:7px 10px}.call-filter-select{max-width:105px;font-size:12px;padding:8px}}
+
+/* Build 6802: strong live-call filters with face-aware Beauty processing. */
+.call-filter-button{
+  background:linear-gradient(135deg,#6d42e8,#d63f8c)!important;
+}
+.call-filter-tray{
+  flex:1 0 100%;
+  width:100%;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:12px;
+  overflow-x:auto;
+  padding:10px 8px 4px;
+  border-radius:18px;
+  background:rgba(7,12,24,.82);
+  backdrop-filter:blur(14px);
+  scrollbar-width:none;
+  scroll-snap-type:x proximity;
+}
+.call-filter-tray::-webkit-scrollbar{display:none}
+.call-filter-tray.hidden{display:none!important}
+.call-filter-tray button{
+  flex:0 0 70px;
+  display:grid;
+  justify-items:center;
+  gap:5px;
+  padding:5px!important;
+  border:0;
+  border-radius:14px!important;
+  background:transparent!important;
+  color:#e8edf5!important;
+  scroll-snap-align:center;
+}
+.call-filter-tray button.active{
+  color:#fff!important;
+  background:rgba(255,255,255,.14)!important;
+  outline:2px solid #fff;
+  outline-offset:1px;
+}
+.call-filter-tray button b{font-size:10px;white-space:nowrap}
+.filter-swatch{
+  display:block;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.76);
+  box-shadow:0 4px 13px rgba(0,0,0,.35);
+  background:linear-gradient(135deg,#d6a379,#553323);
+}
+.filter-normal{filter:none}
+.filter-beauty{filter:brightness(1.12) contrast(.90) saturate(1.10)}
+.filter-warm{filter:sepia(.34) saturate(1.48) hue-rotate(-12deg) brightness(1.08)}
+.filter-cool{filter:saturate(1.22) hue-rotate(20deg) brightness(1.08)}
+.filter-bw{filter:grayscale(1) contrast(1.28)}
+.filter-bright{filter:brightness(1.38) contrast(1.08)}
+.filter-soft{filter:brightness(1.15) contrast(.76) saturate(.9)}
+.video-stage.audio-only~.call-controls .call-filter-button,
+.video-stage.audio-only~.call-controls .call-filter-tray{display:none!important}
+@media(max-width:800px){
+  .call-filter-tray{
+    grid-column:1/-1;
+    justify-content:flex-start;
+    gap:8px;
+    margin-top:2px;
+    padding:8px 5px 4px;
+  }
+  .call-filter-tray button{flex-basis:62px}
+  .filter-swatch{width:43px;height:43px}
+}
+
+/* Build 6775: true left/right front-camera preview and filter chips visible on desktop + mobile. */
+.camera-filter-bar{flex:0 0 auto;display:flex;gap:8px;overflow-x:auto;padding:8px 12px;background:#000;justify-content:center;scrollbar-width:none}
+.camera-filter-bar::-webkit-scrollbar{display:none}
+.camera-filter-bar button{flex:0 0 auto;border:1px solid rgba(255,255,255,.22);background:#1f1f1f;color:#fff;border-radius:999px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.camera-filter-bar button.active{background:#43ad8c;border-color:#43ad8c;color:#fff}
+.capture-overlay.voice-mode .camera-filter-bar{display:none}
+@media(max-width:800px){.camera-filter-bar{justify-content:flex-start;padding:7px 10px}.camera-filter-bar button{padding:7px 10px;font-size:12px}}
+
+
+/* Build 6781: call local preview already contains the same processed orientation/filter sent to the peer. */
+#localVideo{transform:none!important;}
+
+
+/* Build 6781 — Photo/Video recorder only; stable 6778 base */
+#captureOverlay .front-camera-corrected{transform:none!important}
+#captureOverlay .capture-preview{display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
+#captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{display:block;object-fit:contain!important;transform:none}
+@media(max-width:800px){
+  #captureOverlay .capture-preview{
+    width:100%;
+    min-height:0;
+  }
+  #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
+    width:100%!important;
+    height:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    aspect-ratio:auto;
+    object-fit:cover!important;
+    object-position:center center;
+  }
+  #captureOverlay.result-ready .capture-preview video,
+  #captureOverlay.result-ready .capture-preview canvas{
+    object-fit:contain!important;
+  }
+}
+
+/* Build 6811: keep every conversation filter visible and directly selectable.
+   Five filters wrap into a compact grid instead of hiding Archived off-screen. */
+.workspace-sidebar .filter-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  overflow:visible;
+  padding:12px 4px;
+}
+.workspace-sidebar .chat-filter{
+  width:100%;
+  min-width:0;
+  padding:7px 5px;
+  white-space:nowrap;
+}
+.workspace-sidebar .filter-row::-webkit-scrollbar{display:none}
+@media(max-width:800px){
+  .workspace-sidebar .filter-row{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    padding:5px 2px 10px;
+    overflow:visible;
+  }
+}
+@media(min-width:801px){
+  #captureOverlay .capture-preview video,#captureOverlay .capture-preview canvas{
+    width:min(72vw,760px)!important;height:auto!important;max-height:68vh!important;aspect-ratio:4/3
+  }
+}
+#captureOverlay .capture-filter-control{flex:0 0 auto;width:min(92vw,560px);margin:6px auto;display:flex;align-items:center;gap:10px;padding:0 10px}
+#captureOverlay .capture-filter-control label{font-size:12px;opacity:.75}
+#captureOverlay #cameraFilterSelect{flex:1;max-width:none;min-width:0;height:42px}
+#captureOverlay .capture-actions #captureSaveBtn{background:#252525}
+#captureOverlay #captureCanvas{touch-action:none}
+
+
+/* Build 6783 — recorder orientation only
+   Front-camera live preview is corrected by JS.
+   Captured photo and processed recorded video use raw camera frames (no mirror). */
+#captureOverlay #captureVideo{transform-origin:center center}
+
+
+/* Build 6795 — dedicated voice recording preview/send panel */
+.voice-record-panel{
+  margin:6px 12px 0;
+  padding:9px 12px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.voice-record-panel.hidden{display:none!important}
+.voice-record-live{display:flex;align-items:center;gap:8px;min-width:150px}
+.voice-record-dot{width:9px;height:9px;border-radius:50%;background:currentColor;animation:voicePulse 1s infinite}
+.voice-record-panel audio{height:36px;min-width:180px;flex:1}
+.voice-record-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.voice-record-actions button{min-height:36px}
+@keyframes voicePulse{50%{opacity:.3}}
+@media(max-width:760px){
+  .voice-record-panel{margin:6px 8px 0;gap:8px}
+  .voice-record-panel audio{width:100%;min-width:0;order:3}
+  .voice-record-actions{margin-left:auto}
+}
+
+
+/* Build 6795 — voice panel visible above composer on desktop/mobile */
+.composer{
+  flex-wrap:wrap;
+  overflow:visible!important;
+}
+.composer > .voice-record-panel{
+  order:-10;
+  flex:0 0 100%;
+  width:100%;
+  box-sizing:border-box;
+  position:relative;
+  z-index:5;
+  margin:0 0 8px 0;
+  padding:10px 12px;
+  background:var(--surface, #fff);
+  border:1px solid rgba(120,130,150,.22);
+  box-shadow:0 6px 20px rgba(20,30,50,.08);
+}
+.composer > .voice-record-panel.hidden{display:none!important}
+@media(max-width:760px){
+  .composer{overflow:visible!important}
+  .composer > .voice-record-panel{
+    flex-basis:100%;
+    width:100%;
+    margin:0 0 7px 0;
+    padding:9px 10px;
+  }
+  .voice-record-live{min-width:0;flex:1}
+  .voice-record-actions{margin-left:auto}
+  .voice-record-panel audio{flex:0 0 100%;width:100%;order:5}
+}
+
+
+/* Build 6795 — voice Send arrow + desktop composer visibility */
+.workspace-chat .composer{
+  display:grid!important;
+  grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
+  grid-template-areas:
+    "voice voice voice voice voice voice"
+    "emoji attach camera entry mic send"!important;
+  align-items:center!important;
+  overflow:visible!important;
+  flex-wrap:initial!important;
+}
+.workspace-chat .composer > #voiceRecordPanel{
+  grid-area:voice!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0 0 8px 0!important;
+  padding:10px 12px!important;
+  box-sizing:border-box!important;
+  position:relative!important;
+  inset:auto!important;
+  transform:none!important;
+  z-index:30!important;
+  display:flex;
+}
+.workspace-chat .composer > #voiceRecordPanel.hidden{display:none!important}
+.workspace-chat .composer > #emojiBtn{grid-area:emoji!important}
+.workspace-chat .composer > #attachBtn{grid-area:attach!important}
+.workspace-chat .composer > #cameraBtn{grid-area:camera!important}
+.workspace-chat .composer > .message-entry{grid-area:entry!important;min-width:0!important}
+.workspace-chat .composer > #recordBtn{
+  grid-area:mic!important;
+  display:grid!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:relative!important;
+  inset:auto!important;
+  transform:none!important;
+  z-index:31!important;
+}
+.workspace-chat .composer.has-text > #recordBtn{display:none!important}
+.workspace-chat .composer > #sendBtn{grid-area:send!important}
+.voice-record-actions #voiceRecordSend{
+  width:50px!important;
+  height:50px!important;
+  border-radius:50%!important;
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+  background:#00a884!important;
+  color:#fff!important;
+  font-size:24px!important;
+  border:0!important;
+}
+.voice-record-actions #voiceRecordSend:not(.hidden){display:inline-flex!important}
+.voice-record-actions #voiceRecordSend.hidden{display:none!important}
+
+@media(max-width:760px){
+  .workspace-chat .composer{
+    grid-template-columns:auto auto auto minmax(0,1fr) auto!important;
+    grid-template-areas:
+      "voice voice voice voice voice"
+      "emoji attach camera entry mic"!important;
+  }
+  .workspace-chat .composer > #sendBtn{display:none!important}
+  .workspace-chat .composer > #voiceRecordPanel{
+    flex-wrap:wrap!important;
+    width:100%!important;
+  }
+  .workspace-chat .composer > #recordBtn{
+    display:grid!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .workspace-chat .composer.has-text > #recordBtn{display:none!important}
+  .voice-record-panel audio{order:3;flex:0 0 100%!important;width:100%!important}
+}
+
+
+/* Build 6795 — MOBILE voice flow only */
+@media(max-width:760px){
+  #voiceRecordPanel{
+    display:flex;
+    width:100%;
+    box-sizing:border-box;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  #voiceRecordPanel.hidden{display:none!important}
+  #voiceRecordPreview:not(.hidden){
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    order:3;
+  }
+  #voiceRecordSend:not(.hidden){
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:54px!important;
+    height:54px!important;
+    border-radius:50%!important;
+    background:#00a884!important;
+    color:#fff!important;
+    font-size:26px!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    z-index:50!important;
+  }
+}
+
+
+/* Build 6795 — LAPTOP/Desktop voice recorder fix only */
+@media(min-width:761px){
+  .workspace-chat .composer{
+    display:grid!important;
+    grid-template-columns:auto auto auto minmax(0,1fr) auto auto!important;
+    grid-template-areas:
+      "voice voice voice voice voice voice"
+      "emoji attach camera entry mic send"!important;
+    align-items:center!important;
+    overflow:visible!important;
+    position:absolute!important;
+    left:16px!important;
+    right:16px!important;
+    bottom:14px!important;
+    height:auto!important;
+    min-height:64px!important;
+  }
+
+  .workspace-chat .composer > #voiceRecordPanel{
+    grid-area:voice!important;
+    display:flex;
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    position:relative!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    margin:0 0 8px 0!important;
+    padding:10px 12px!important;
+    z-index:50!important;
+    background:#fff!important;
+    border:1px solid rgba(120,130,150,.22)!important;
+    border-radius:14px!important;
+    box-shadow:0 6px 20px rgba(20,30,50,.08)!important;
+  }
+  .workspace-chat .composer > #voiceRecordPanel.hidden{display:none!important}
+
+  .workspace-chat .composer > #emojiBtn{grid-area:emoji!important}
+  .workspace-chat .composer > #attachBtn{grid-area:attach!important}
+  .workspace-chat .composer > #cameraBtn{grid-area:camera!important}
+  .workspace-chat .composer > .message-entry{grid-area:entry!important;min-width:0!important}
+
+  .workspace-chat .composer > #recordBtn{
+    grid-area:mic!important;
+    display:grid!important;
+    place-items:center!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    inset:auto!important;
+    transform:none!important;
+    width:44px!important;
+    height:44px!important;
+    z-index:60!important;
+  }
+  .workspace-chat .composer.has-text > #recordBtn{display:none!important}
+
+  .workspace-chat .composer > #sendBtn{
+    grid-area:send!important;
+  }
+
+  #voiceRecordPreview:not(.hidden){
+    display:block!important;
+    flex:1 1 280px!important;
+    min-width:220px!important;
+    height:38px!important;
+  }
+
+  #voiceRecordSend:not(.hidden){
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:50px!important;
+    height:50px!important;
+    border-radius:50%!important;
+    background:#00a884!important;
+    color:#fff!important;
+    border:0!important;
+    font-size:24px!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+}
+
+
+/* Build 6795 — desktop microphone enable-state fix */
+@media(min-width:761px){
+  .workspace-chat #recordBtn:not(:disabled){
+    cursor:pointer!important;
+    pointer-events:auto!important;
+    opacity:1!important;
+    filter:none!important;
+  }
+  .workspace-chat #recordBtn:disabled{
+    cursor:not-allowed!important;
+    opacity:.45!important;
+  }
+}
+
+
+/* Build 6795 — AI attachments */
+.workspace-chat.file-drop-active{
+  outline:2px dashed #00a884;
+  outline-offset:-10px;
+}
+.workspace-chat.file-drop-active::after{
+  content:"Drop files here for ConnectChat AI";
+  position:absolute;
+  inset:80px 24px 90px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:rgba(0,168,132,.10);
+  color:#08775d;
+  font-weight:800;
+  z-index:25;
+  pointer-events:none;
+}
+.ai-attachment-card{
+  display:grid;
+  gap:4px;
+  margin-top:8px;
+  padding:9px 11px;
+  border:1px solid rgba(0,168,132,.25);
+  border-radius:12px;
+  background:#f2fbf8;
+}
+.ai-attachment-card small{opacity:.7}
+
+
+/* Build 6798 — AI attachment UX */
+.ai-attachment-tray{
+  margin:8px 16px 0;
+  padding:10px;
+  border:1px solid var(--line,#e5e7eb);
+  border-radius:14px;
+  background:var(--panel,#fff);
+  display:grid;
+  gap:8px;
+}
+.ai-attachment-tray.hidden{display:none!important}
+.ai-attachment-tray-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ai-attachment-tray-list{display:grid;gap:7px}
+.ai-attachment-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 10px;
+  border-radius:11px;
+  background:#f3fbf8;
+  border:1px solid rgba(0,168,132,.18);
+}
+.ai-attachment-item>div{display:grid;gap:2px;min-width:0}
+.ai-attachment-item b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-attachment-item small{opacity:.7}
+.ai-attachment-item button{
+  flex:0 0 32px;width:32px;height:32px;border:0;border-radius:50%;cursor:pointer;
+}
+.workspace-chat.file-drop-active{
+  outline:2px dashed #00a884!important;
+  outline-offset:-8px;
+}
+.workspace-chat.file-drop-active::after{
+  content:"Drop file here";
+  position:absolute;
+  inset:90px 24px 92px;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  background:rgba(0,168,132,.12);
+  color:#08775d;
+  font-size:22px;
+  font-weight:800;
+  z-index:80;
+  pointer-events:none;
+}
+@media(max-width:760px){
+  .ai-attachment-tray{margin:6px 8px 0;padding:8px}
+  .workspace-chat.file-drop-active::after{inset:72px 10px 76px;font-size:18px}
+}
+
+
+/* Build 6798 — AI attachment frontend trigger/visibility only */
+.ai-attachment-item.uploading{opacity:.78}
+.ai-attachment-item.error{border-color:#e5a3a3!important;background:#fff4f4!important}
+.ai-attachment-status{display:block;margin-top:2px}
+#aiAttachmentTray{position:relative;z-index:40}
+
+/* Build 6816: stable swapped-video proportions and compact mobile controls.
+   This block is intentionally last so older responsive rules cannot override it. */
+@media(min-width:801px){
+  .call-card{
+    width:min(920px,calc(100vw - 48px));
+    height:min(750px,calc(100dvh - 28px));
+  }
+  .video-stage{
+    width:min(900px,80vw,calc(52dvh * 16 / 9));
+    max-width:100%;
+    aspect-ratio:16/9;
+    justify-self:center;
+  }
+  #localVideo,
+  .video-stage.self-main #remoteVideo{
+    width:clamp(170px,19vw,230px);
+    height:clamp(96px,10.7vw,130px);
+    aspect-ratio:16/9;
+    object-fit:cover;
+  }
+  .video-stage.self-main #localVideo{
+    width:100%;
+    height:100%;
+    max-width:none;
+    aspect-ratio:auto;
+    object-fit:contain;
+  }
+}
+
+@media(max-width:800px){
+  .call-card{
+    grid-template-rows:58px minmax(240px,1fr) auto;
+    gap:6px;
+    padding:max(env(safe-area-inset-top),6px) 10px max(env(safe-area-inset-bottom),7px);
+  }
+  .call-title{min-height:0;padding:2px 8px}
+  .video-stage{
+    min-height:240px;
+    align-self:stretch;
+  }
+  #localVideo,
+  .video-stage.self-main #remoteVideo{
+    width:140px;
+    height:79px;
+    max-width:38%;
+    aspect-ratio:16/9;
+    object-fit:cover;
+  }
+  .video-stage.self-main #localVideo{
+    width:100%;
+    height:100%;
+    max-width:none;
+    aspect-ratio:auto;
+    object-fit:contain;
+  }
+  .call-controls{
+    position:relative;
+    padding:6px 3px 1px;
+    gap:6px;
+  }
+  .call-controls button,
+  .call-control{
+    min-height:40px;
+    padding:7px 6px;
+    font-size:13px;
+  }
+  .call-filter-tray{
+    position:fixed;
+    left:10px;
+    right:10px;
+    bottom:calc(62px + env(safe-area-inset-bottom));
+    width:auto;
+    z-index:2147483647;
+    margin:0;
+    padding:10px 7px;
+    box-shadow:0 18px 55px rgba(0,0,0,.55);
+  }
+  .call-filter-tray button{flex-basis:58px}
+  .filter-swatch{width:40px;height:40px}
+}
+
+
+/* Build 6818 — call video orientation + PiP layout unification */
+#localVideo,
+#remoteVideo,
+.call-video,
+.video-tile video {
+  transform: none !important;
+}
+
+/* Keep the small video from covering too much of the big video. */
+.call-video-stage,
+.video-call-stage,
+#videoCallStage,
+.call-stage {
+  position: relative;
+}
+
+#localVideo.small,
+#remoteVideo.small,
+.video-tile.small,
+.call-pip,
+.video-pip,
+.pip-video {
+  width: clamp(150px, 18vw, 230px) !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9 !important;
+  max-height: 26vh !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+}
+
+/* Desktop: keep PiP tucked to the edge with a safe margin. */
+@media (min-width: 769px) {
+  .call-pip,
+  .video-pip,
+  .pip-video,
+  #localVideo.small,
+  #remoteVideo.small,
+  .video-tile.small {
+    right: 18px !important;
+    bottom: 88px !important;
+    left: auto !important;
+    top: auto !important;
+  }
+}
+
+/* Mobile: smaller PiP so main video remains clearly visible. */
+@media (max-width: 768px) {
+  .call-pip,
+  .video-pip,
+  .pip-video,
+  #localVideo.small,
+  #remoteVideo.small,
+  .video-tile.small {
+    width: min(34vw, 150px) !important;
+    max-height: 22vh !important;
+    right: 10px !important;
+    bottom: 92px !important;
+    left: auto !important;
+    top: auto !important;
+    border-radius: 12px !important;
+  }
+}
+
+
+/* BUILD 6819 — exact call/camera orientation and PiP overrides.
+   Actual left stays left; actual right stays right. */
+#localVideo,
+#remoteVideo,
+#captureVideo,
+#captureCanvas {
+  transform: none !important;
+}
+
+/* The real PiP elements are #localVideo normally and #remoteVideo after swap. */
+@media (min-width: 801px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position: absolute !important;
+    right: 14px !important;
+    bottom: 14px !important;
+    left: auto !important;
+    top: auto !important;
+    width: clamp(138px, 15vw, 185px) !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 105px !important;
+    object-fit: cover !important;
+    border-radius: 13px !important;
+    z-index: 3 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position: absolute !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    left: auto !important;
+    top: auto !important;
+    width: min(30vw, 118px) !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    max-height: 72px !important;
+    object-fit: cover !important;
+    border-radius: 11px !important;
+    z-index: 3 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    transform: none !important;
+  }
+}
+
+
+/* BUILD 6820 — exact user-approved orientation and compact PiP.
+   Front camera is selfie-oriented: physical left appears screen-left. */
+#captureVideo.front-camera-corrected,
+#localVideo.front-camera-corrected {
+  transform: scaleX(-1) !important;
+}
+
+/* Do not move the PiP to a new location; keep bottom-right but make it compact. */
+@media (min-width: 801px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position:absolute !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:124px !important;
+    height:70px !important;
+    min-width:0 !important;
+    max-width:124px !important;
+    max-height:70px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:11px !important;
+    border:1px solid rgba(255,255,255,.78) !important;
+    z-index:5 !important;
+  }
+}
+@media (max-width: 800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    position:absolute !important;
+    right:8px !important;
+    bottom:8px !important;
+    left:auto !important;
+    top:auto !important;
+    width:96px !important;
+    height:54px !important;
+    min-width:0 !important;
+    max-width:96px !important;
+    max-height:54px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:9px !important;
+    border:1px solid rgba(255,255,255,.78) !important;
+    z-index:5 !important;
+  }
+}
+
+
+/* BUILD 6823 — exact requested orientation + tap-to-swap call layout */
+
+/* Front/self preview: physical left appears on screen-left. */
+#localVideo,
+#captureVideo {
+  transform-origin: center center !important;
+}
+
+/* Main video fills the stage. */
+#videoStage:not(.self-main) #remoteVideo,
+#videoStage.self-main #localVideo {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  max-width:100% !important;
+  max-height:100% !important;
+  object-fit:contain !important;
+  border-radius:inherit !important;
+  z-index:1 !important;
+}
+
+/* Small PiP stays bottom-right, but does not hide much of main video. */
+#videoStage:not(.self-main) #localVideo,
+#videoStage.self-main #remoteVideo {
+  position:absolute !important;
+  right:12px !important;
+  bottom:12px !important;
+  left:auto !important;
+  top:auto !important;
+  width:132px !important;
+  height:74px !important;
+  min-width:132px !important;
+  max-width:132px !important;
+  min-height:74px !important;
+  max-height:74px !important;
+  aspect-ratio:16/9 !important;
+  object-fit:cover !important;
+  border-radius:11px !important;
+  border:1px solid rgba(255,255,255,.8) !important;
+  box-shadow:0 4px 14px rgba(0,0,0,.35) !important;
+  z-index:4 !important;
+  cursor:pointer !important;
+}
+
+/* Mobile parity: same behavior, smaller PiP. */
+@media (max-width:800px) {
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo {
+    right:8px !important;
+    bottom:8px !important;
+    width:100px !important;
+    height:56px !important;
+    min-width:100px !important;
+    max-width:100px !important;
+    min-height:56px !important;
+    max-height:56px !important;
+    border-radius:9px !important;
+  }
+}
+
+
+/* BUILD 6832 — adaptive call framing from Build 6831.
+   Preserve the actual source orientation instead of forcing portrait/landscape. */
+
+#videoStage{
+  overflow:hidden !important;
+}
+
+/* Main video always shows the full source, never stretched/cropped. */
+#videoStage:not(.self-main) #remoteVideo,
+#videoStage.self-main #localVideo{
+  object-fit:contain !important;
+  object-position:center center !important;
+}
+
+/* Landscape main source on desktop: controlled centered 16:9 presentation. */
+@media (min-width:801px){
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    aspect-ratio:16/9 !important;
+    max-height:min(72vh,720px) !important;
+  }
+
+  /* Portrait source stays portrait and centered instead of being stretched wide. */
+  #videoStage.remote-portrait:not(.self-main) #remoteVideo,
+  #videoStage.local-portrait.self-main #localVideo{
+    width:min(100%,520px) !important;
+    height:100% !important;
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%) !important;
+    object-fit:contain !important;
+  }
+}
+
+
+/* BUILD 6836 — camera Photo/Video filter picker matching the approved design. */
+#captureOverlay .capture-filter-control{
+  position:relative !important;
+  overflow:visible !important;
+}
+#captureOverlay .camera-filter-picker{
+  position:relative;
+  flex:1 1 auto;
+  min-width:0;
+}
+#captureOverlay .camera-filter-button{
+  width:100%;
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:2px solid #2687ed;
+  border-radius:999px;
+  padding:9px 16px;
+  background:rgba(30,30,30,.92);
+  color:#fff;
+  font:inherit;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+  box-shadow:0 0 0 3px rgba(38,135,237,.24);
+}
+#captureOverlay .camera-filter-chevron{
+  font-size:17px;
+  line-height:1;
+  transition:transform .18s ease;
+}
+#captureOverlay .camera-filter-button[aria-expanded="true"] .camera-filter-chevron{
+  transform:rotate(180deg);
+}
+#captureOverlay .camera-filter-menu{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:calc(100% + 10px);
+  z-index:20;
+  max-height:min(62vh,520px);
+  overflow-y:auto;
+  padding:16px;
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:30px;
+  background:rgba(235,235,235,.78);
+  -webkit-backdrop-filter:blur(24px) saturate(135%);
+  backdrop-filter:blur(24px) saturate(135%);
+  box-shadow:0 18px 48px rgba(0,0,0,.34);
+}
+#captureOverlay .camera-filter-menu button{
+  position:relative;
+  width:100%;
+  min-height:54px;
+  display:block;
+  border:0;
+  border-radius:14px;
+  padding:10px 12px 10px 48px;
+  background:transparent;
+  color:#111;
+  font:inherit;
+  font-size:clamp(18px,2.1vw,27px);
+  text-align:left;
+  cursor:pointer;
+}
+#captureOverlay .camera-filter-menu button:hover,
+#captureOverlay .camera-filter-menu button:focus-visible{
+  background:rgba(255,255,255,.42);
+  outline:none;
+}
+#captureOverlay .camera-filter-menu button.active:before{
+  content:"✓";
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#111;
+  font-size:25px;
+  font-weight:800;
+}
+@media(max-width:800px){
+  #captureOverlay .capture-filter-control{
+    width:min(94vw,560px) !important;
+    margin:7px auto !important;
+  }
+  #captureOverlay .camera-filter-menu{
+    left:-54px;
+    right:0;
+    padding:13px;
+    border-radius:28px;
+    max-height:min(58vh,470px);
+  }
+  #captureOverlay .camera-filter-menu button{
+    min-height:50px;
+    padding-left:45px;
+    font-size:20px;
+  }
+}
+
+/* On mobile, let portrait sources use the available height and landscape sources
+   remain contained without forced cropping. */
+@media (max-width:800px){
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main{
+    min-height:54vh !important;
+  }
+
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    aspect-ratio:16/9 !important;
+    min-height:0 !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    object-fit:contain !important;
+  }
+}
+
+/* PiP remains compact 16:9 and does not drive main-video orientation. */
+#videoStage:not(.self-main) #localVideo,
+#videoStage.self-main #remoteVideo{
+  object-fit:cover !important;
+  aspect-ratio:16/9 !important;
+}
+
+
+/* BUILD 6833 — larger adaptive call stage + compact scrolling filter tray */
+@media (min-width:801px){
+  #videoStage{
+    width:min(88vw,1100px) !important;
+    max-width:1100px !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main{
+    width:min(86vw,1080px) !important;
+    aspect-ratio:16/9 !important;
+    max-height:72vh !important;
+  }
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main{
+    width:min(52vw,620px) !important;
+    max-width:620px !important;
+    min-height:min(72vh,760px) !important;
+    margin-inline:auto !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:-150px !important;
+    bottom:8px !important;
+    width:132px !important;
+    height:74px !important;
+    max-width:132px !important;
+    max-height:74px !important;
+  }
+}
+@media (max-width:800px){
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:8px !important;
+    bottom:74px !important;
+    width:100px !important;
+    height:56px !important;
+    max-width:100px !important;
+    max-height:56px !important;
+  }
+}
+
+#callFilterTray,
+.call-filter-tray{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  gap:10px !important;
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
+  overscroll-behavior-x:contain !important;
+  -webkit-overflow-scrolling:touch !important;
+  scroll-snap-type:x proximity !important;
+  scrollbar-width:thin !important;
+  max-width:min(94vw,1100px) !important;
+  margin-inline:auto !important;
+  padding:10px 12px !important;
+}
+#callFilterTray > *,
+.call-filter-tray > *{
+  flex:0 0 auto !important;
+  scroll-snap-align:center !important;
+}
+#callFilterTray [data-call-filter],
+.call-filter-tray [data-call-filter]{
+  min-width:88px !important;
+  max-width:104px !important;
+  padding:8px 10px !important;
+  border-radius:14px !important;
+}
+
+@media (max-width:800px){
+  #callFilterTray,
+  .call-filter-tray{
+    max-height:104px !important;
+    padding:8px 10px !important;
+    gap:8px !important;
+  }
+  #callFilterTray [data-call-filter],
+  .call-filter-tray [data-call-filter]{
+    min-width:78px !important;
+    max-width:92px !important;
+    padding:6px 8px !important;
+    font-size:12px !important;
+  }
+}
+
+.call-controls,
+#callControls{
+  position:relative !important;
+  z-index:6 !important;
+}
+
+
+/* BUILD 6834 — exact call sizing + true horizontal filter scrolling */
+
+/* The call stage must not inherit an old fixed 16:9 ratio for portrait sources. */
+@media (min-width:801px){
+  #videoStage.remote-portrait:not(.self-main){
+    height:min(74vh,760px) !important;
+    width:auto !important;
+    aspect-ratio:var(--remote-ar, 0.5625) !important;
+    max-width:min(72vw,620px) !important;
+    min-height:520px !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.local-portrait.self-main{
+    height:min(74vh,760px) !important;
+    width:auto !important;
+    aspect-ratio:var(--local-ar, 0.5625) !important;
+    max-width:min(72vw,620px) !important;
+    min-height:520px !important;
+    margin-inline:auto !important;
+  }
+
+  #videoStage.remote-landscape:not(.self-main){
+    width:min(86vw,1080px) !important;
+    height:auto !important;
+    aspect-ratio:var(--remote-ar,1.7778) !important;
+    max-height:74vh !important;
+    margin-inline:auto !important;
+  }
+  #videoStage.local-landscape.self-main{
+    width:min(86vw,1080px) !important;
+    height:auto !important;
+    aspect-ratio:var(--local-ar,1.7778) !important;
+    max-height:74vh !important;
+    margin-inline:auto !important;
+  }
+
+  /* PiP stays close to the stage edge but outside the participant's face. */
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:-142px !important;
+    bottom:12px !important;
+    width:126px !important;
+    height:71px !important;
+    max-width:126px !important;
+    max-height:71px !important;
+  }
+}
+
+/* Mobile main view preserves actual source aspect ratio, without changing the good 6832 size. */
+@media (max-width:800px){
+  #videoStage.remote-portrait:not(.self-main){
+    aspect-ratio:var(--remote-ar,0.5625) !important;
+  }
+  #videoStage.local-portrait.self-main{
+    aspect-ratio:var(--local-ar,0.5625) !important;
+  }
+
+  /* Lift PiP above the carousel/controls so it doesn't cover the important lower face/body area. */
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:10px !important;
+    bottom:18px !important;
+    width:94px !important;
+    height:53px !important;
+    max-width:94px !important;
+    max-height:53px !important;
+  }
+}
+
+/* Real horizontal scroll/swipe on both laptop and mobile. */
+#callFilterTray,
+.call-filter-tray{
+  justify-content:flex-start !important;
+  overflow-x:scroll !important;
+  overflow-y:hidden !important;
+  touch-action:pan-x !important;
+  -webkit-overflow-scrolling:touch !important;
+  scroll-behavior:smooth !important;
+  scroll-snap-type:x proximity !important;
+  cursor:grab !important;
+}
+#callFilterTray:active,
+.call-filter-tray:active{
+  cursor:grabbing !important;
+}
+#callFilterTray [data-call-filter],
+.call-filter-tray [data-call-filter]{
+  flex:0 0 auto !important;
+  touch-action:pan-x !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+}
+
+/* Mobile tray remains compact; it should never become a tall overlay. */
+@media (max-width:800px){
+  #callFilterTray,
+  .call-filter-tray{
+    left:8px !important;
+    right:8px !important;
+    max-height:98px !important;
+    padding:7px 8px !important;
+    gap:7px !important;
+  }
+  #callFilterTray [data-call-filter],
+  .call-filter-tray [data-call-filter]{
+    min-width:74px !important;
+    max-width:82px !important;
+  }
+}
+
+
+/* BUILD 6835 — corrected laptop call screen.
+   Desktop always uses a controlled 16:9 stage. Portrait phone video is
+   contained inside it without stretching, and PiP remains inside the stage. */
+@media (min-width:801px){
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    width:min(82vw,960px,calc((100vh - 230px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 230px) !important;
+    aspect-ratio:16/9 !important;
+    margin-inline:auto !important;
+  }
+
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center center !important;
+    background:#111827 !important;
+  }
+
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    right:14px !important;
+    bottom:14px !important;
+    left:auto !important;
+    top:auto !important;
+    width:160px !important;
+    height:90px !important;
+    min-width:160px !important;
+    min-height:90px !important;
+    max-width:160px !important;
+    max-height:90px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border-radius:12px !important;
+    z-index:5 !important;
+  }
+}
+
+/* BUILD 6837 LAST RULE — laptop call center and reliable PiP placement. */
+@media(min-width:601px){
+  #callOverlay.call-overlay{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:16px !important;
+  }
+  #callOverlay .call-card{
+    width:min(1080px,calc(100vw - 32px)) !important;
+    max-width:1080px !important;
+    margin:0 auto !important;
+    justify-items:center !important;
+  }
+  #videoStage,
+  #videoStage.remote-portrait:not(.self-main),
+  #videoStage.local-portrait.self-main,
+  #videoStage.remote-landscape:not(.self-main),
+  #videoStage.local-landscape.self-main,
+  #videoStage.remote-square:not(.self-main),
+  #videoStage.local-square.self-main{
+    position:relative !important;
+    width:min(88vw,960px,calc((100vh - 220px) * 16 / 9)) !important;
+    height:auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    max-width:960px !important;
+    max-height:calc(100vh - 220px) !important;
+    aspect-ratio:16/9 !important;
+    margin:0 auto !important;
+    justify-self:center !important;
+  }
+  #videoStage:not(.self-main) #remoteVideo,
+  #videoStage.self-main #localVideo{
+    position:absolute !important;
+    inset:0 !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    width:100% !important;
+    height:100% !important;
+    max-width:100% !important;
+    max-height:100% !important;
+    transform:none !important;
+    object-fit:contain !important;
+    object-position:center !important;
+    background:#111827 !important;
+  }
+  #videoStage:not(.self-main) #localVideo,
+  #videoStage.self-main #remoteVideo{
+    position:absolute !important;
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    right:12px !important;
+    bottom:12px !important;
+    left:auto !important;
+    top:auto !important;
+    width:144px !important;
+    height:81px !important;
+    min-width:144px !important;
+    min-height:81px !important;
+    max-width:144px !important;
+    max-height:81px !important;
+    aspect-ratio:16/9 !important;
+    object-fit:cover !important;
+    border:2px solid rgba(255,255,255,.88) !important;
+    border-radius:12px !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.42) !important;
+    z-index:8 !important;
+  }
+  #callOverlay .call-title,
+  #callOverlay .call-controls{
+    width:100% !important;
+    max-width:960px !important;
+    margin-inline:auto !important;
+  }
+}

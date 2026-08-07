@@ -469,7 +469,7 @@ function connectSocket(){
   if(socket)socket.disconnect();
   socket=io();
   socket.on("connect",()=>{refreshUsers();measureNetworkQuality();if(notificationsEnabled())syncPushSubscription()});
-  socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Bad","Disconnected from the AmalChat server")});
+  socket.on("disconnect",()=>{if(navigator.onLine)setNetworkQuality("poor","Bad","Disconnected from the ConnectChat server")});
   socket.on("privateMessage",msg=>{
     const incoming=Number(msg.receiver_id)===Number(me.id)&&Number(msg.sender_id)!==Number(me.id);
     const relevant=activeUser&&(Number(msg.sender_id)===Number(activeUser.id)||Number(msg.receiver_id)===Number(activeUser.id));
@@ -573,8 +573,8 @@ function connectSocket(){
     if(Number(payload?.groupId)===Number(currentGroupId)){toast("This group call already has six participants.");leaveGroupCall(false)}
   });
   socket.on("call:incoming",data=>{
-    notifyNativeCall("incoming",{callerId:data.callerId,callerName:data.callerName||"AmalChat user",mode:data.mode});
-    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"AmalChat user",`incoming-call-${data.callerId}`);
+    notifyNativeCall("incoming",{callerId:data.callerId,callerName:data.callerName||"ConnectChat user",mode:data.mode});
+    showMessageNotification(`Incoming ${data.mode==="video"?"video":"voice"} call`,data.callerName||"ConnectChat user",`incoming-call-${data.callerId}`);
     showIncomingCall(data);
     if(nativeAnswerRequested){nativeAnswerRequested=false;setTimeout(()=>acceptIncomingCall(),0)}
   });
@@ -616,7 +616,7 @@ function connectSocket(){
     const receiver=payload?.role==="receiver";
     finishCall(receiver?"Missed call":"No answer",false);
     if(receiver){
-      toast(`Missed ${payload?.mode==="video"?"video":"voice"} call from ${payload?.callerName||"an AmalChat user"}.`);
+      toast(`Missed ${payload?.mode==="video"?"video":"voice"} call from ${payload?.callerName||"a ConnectChat user"}.`);
       showMissedCallAlert(payload);
       if(currentWorkspaceSection==="calls")renderCallsWorkspace();else refreshCallsBadge();
     }
@@ -627,8 +627,8 @@ function connectSocket(){
   });
   socket.on("call:missed",payload=>{
     const mode=payload?.mode==="video"?"video":"voice";
-    toast(`Missed ${mode} call from ${payload?.callerName||"an AmalChat user"}.`);
-    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"AmalChat user",`missed-call-${payload?.callId||payload?.callerId}`);
+    toast(`Missed ${mode} call from ${payload?.callerName||"a ConnectChat user"}.`);
+    showMessageNotification(`Missed ${mode} call`,payload?.callerName||"ConnectChat user",`missed-call-${payload?.callId||payload?.callerId}`);
     showMissedCallAlert(payload);
     if(currentWorkspaceSection==="calls")renderCallsWorkspace();
     else refreshCallsBadge();
@@ -1370,7 +1370,7 @@ function showIncomingCall(data){
 function showMissedCallAlert(payload){
   const existing=document.getElementById("missedCallAlert");if(existing)existing.remove();
   const mode=payload?.mode==="video"?"video":"voice";
-  const caller=payload?.callerName||"AmalChat user";
+  const caller=payload?.callerName||"ConnectChat user";
   const when=payload?.startedAt?time(payload.startedAt):"Just now";
   const overlay=document.createElement("div");
   overlay.id="missedCallAlert";overlay.className="missed-call-alert-overlay";
@@ -1557,7 +1557,7 @@ function updateHeader(){
   $("callMenuBtn").classList.toggle("hidden",Boolean(activeUser.isSelf)||Boolean(activeUser.isAI)||!callsEnabled);
   $("moreChatBtn").classList.remove("hidden");
   if($("chatAiBtn"))$("chatAiBtn").disabled=false;
-  $("attachBtn").disabled=false;
+  $("attachBtn").disabled=Boolean(activeUser.isAI);
   if($("archiveChatBtn")){
     const archived=archivedUserIds.has(Number(activeUser.id));
     $("archiveChatBtn").textContent=archived?"📤 Restore chat":"🗃 Archive chat";
@@ -1610,7 +1610,7 @@ function openChatMediaViewer(msg){
   if(kind==="image"){video.pause();video.removeAttribute("src");image.src=url;image.alt=msg.file_name||"Chat photo"}
   else{image.removeAttribute("src");video.src=url;video.load()}
   $("chatMediaViewerType").textContent=kind.toUpperCase();
-  $("chatMediaViewerName").textContent=msg.file_name||`${kind==="image"?"Photo":"Video"} from ${msg.sender_name||"AmalChat"}`;
+  $("chatMediaViewerName").textContent=msg.file_name||`${kind==="image"?"Photo":"Video"} from ${msg.sender_name||"ConnectChat"}`;
   $("chatMediaViewer").classList.remove("hidden");document.body.classList.add("chat-media-viewer-open");
 }
 function closeChatMediaViewer(){
@@ -1623,7 +1623,7 @@ function chatMediaFileName(msg,type){
   if(msg?.file_name)return msg.file_name;
   const video=chatMediaKind(msg)==="video";
   const ext=video?(String(type).includes("mp4")?"mp4":"webm"):(String(type).includes("png")?"png":"jpg");
-  return `AmalChat-${video?"video":"photo"}-${msg?.id||Date.now()}.${ext}`;
+  return `ConnectChat-${video?"video":"photo"}-${msg?.id||Date.now()}.${ext}`;
 }
 async function getChatMediaFile(){
   if(chatMediaFileCache)return chatMediaFileCache;
@@ -1643,7 +1643,7 @@ async function saveChatMedia(){
 }
 async function shareChatMediaExternal(){
   try{
-    const file=await getChatMediaFile(),payload={files:[file],title:`AmalChat ${chatMediaKind(chatMediaMessage)==="video"?"video":"photo"}`};
+    const file=await getChatMediaFile(),payload={files:[file],title:`ConnectChat ${chatMediaKind(chatMediaMessage)==="video"?"video":"photo"}`};
     if(navigator.share&&(!navigator.canShare||navigator.canShare(payload))){await navigator.share(payload);return}
     toast("Native sharing is not supported by this browser.");
   }catch(error){if(error?.name!=="AbortError")toast(error.message||"Media could not be shared.")}
@@ -1672,7 +1672,7 @@ async function forwardChatMedia(){
   if(!chatMediaMessage||chatMediaTransferInFlight)return;
   const allowed=new Set(availableChatMediaRecipients().map(user=>Number(user.id)));
   const receiverIds=[...chatMediaRecipientIds].filter(id=>allowed.has(Number(id)));
-  if(!receiverIds.length)return toast("Select at least one AmalChat user.");
+  if(!receiverIds.length)return toast("Select at least one ConnectChat user.");
   if(mediaUploadInFlight)return toast("Please wait for the current upload to finish.");
   chatMediaTransferInFlight=true;mediaUploadInFlight=true;renderChatMediaRecipients();
   const failed=[],sent=[],kind=chatMediaKind(chatMediaMessage);
@@ -1822,8 +1822,8 @@ async function exportAiMessage(msg,format,button){
     button.disabled=true;button.textContent="…";
     await downloadApiFile("/api/ai/export",{
       method:"POST",
-      body:JSON.stringify({format,title:"AmalChat AI Export",content:msg.body})
-    },`AmalChat-AI-Export.${format}`);
+      body:JSON.stringify({format,title:"ConnectChat AI Export",content:msg.body})
+    },`ConnectChat-AI-Export.${format}`);
     toast(`AI answer exported to ${format.toUpperCase()}.`);
   }catch(error){toast(error.message)}
   finally{button.disabled=false;button.textContent=original}
@@ -1859,7 +1859,7 @@ function loadAiHistory(){
 }
 function saveAiHistory(items){localStorage.setItem(AI_HISTORY_KEY,JSON.stringify(items.slice(-40)))}
 function aiMessage(role,body){
-  return {id:`ai-${Date.now()}-${Math.random()}`,sender_id:role==="user"?me.id:-1,sender_name:role==="user"?me.username:"AmalChat AI",kind:"text",body,created_at:new Date().toISOString(),ai:true};
+  return {id:`ai-${Date.now()}-${Math.random()}`,sender_id:role==="user"?me.id:-1,sender_name:role==="user"?me.username:"ConnectChat AI",kind:"text",body,created_at:new Date().toISOString(),ai:true};
 }
 function aiErrorMessage(error){
   const details=error.details?`\n\nDetails: ${error.details}`:"";
@@ -1867,7 +1867,7 @@ function aiErrorMessage(error){
 }
 function showAiWelcome(){
   $("messages").className="messages empty-state";
-  $("messages").innerHTML="<div><h3>AmalChat AI</h3><p>Ask in Arabic or English, or use Smart actions in another conversation. AI history is private to this browser.</p></div>";
+  $("messages").innerHTML="<div><h3>ConnectChat AI</h3><p>Ask in Arabic or English, or use Smart actions in another conversation. AI history is private to this browser.</p></div>";
 }
 async function loadAiStatus(){
   try{
@@ -1893,7 +1893,7 @@ async function loadAiStatus(){
 }
 async function sendAi(body){
   if(aiBusy)return;
-  aiBusy=true;$("sendBtn").disabled=true;$("messageInput").disabled=true;$("typingText").textContent="AmalChat AI is thinking…";
+  aiBusy=true;$("sendBtn").disabled=true;$("messageInput").disabled=true;$("typingText").textContent="ConnectChat AI is thinking…";
   const items=loadAiHistory();const userMsg=aiMessage("user",body);items.push(userMsg);saveAiHistory(items);addMessage(userMsg);
   try{
     const history=items.slice(0,-1).filter(x=>!x.aiError).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
@@ -2077,10 +2077,10 @@ function resizeMessageInput(){
 function syncVoiceMicAvailability(){
   const btn=$("recordBtn");
   if(!btn)return;
-  const enabled=Boolean(activeUser);
+  const enabled=Boolean(activeUser&&!activeUser.isAI);
   btn.disabled=!enabled;
   btn.setAttribute("aria-disabled",String(!enabled));
-  btn.title=!enabled?"Select a user to record voice":activeUser.isAI?"Ask AmalChat AI by voice":"Record voice";
+  btn.title=enabled?"Record voice":"Select a user to record voice";
 }
 
 function updateComposer(){
@@ -2173,7 +2173,6 @@ if($("clearAiAttachmentsBtn"))$("clearAiAttachmentsBtn").onclick=()=>{aiPendingA
 async function uploadAiFile(file){
   if(!activeUser?.isAI)return false;
   if(file.size>30*1024*1024){toast(`${file.name} is larger than 30 MB.`);return false}
-  if(file.type?.startsWith("image/")&&file.size>10*1024*1024){toast("AI images must be 10 MB or smaller.");return false}
   const allowed=/\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(file.name||"");
   if(!allowed){toast("Unsupported AI attachment type.");return false}
 
@@ -2213,7 +2212,7 @@ async function uploadAiFile(file){
     const input=$("messageInput");
     if(input&&!input.value.trim())input.value=`Summarize the attached file: ${pending.name}`;
     updateComposer();
-    toast("Attachment ready for AmalChat AI");
+    toast("Attachment ready for ConnectChat AI");
     return true;
   }catch(e){
     pending.state="error";pending.error=e.message||"Upload failed";pending.status=pending.error;
@@ -2275,7 +2274,7 @@ $("fileInput").onchange=e=>{
   if(files?.length)uploadFiles(files);
   e.target.value="";
 };
-$("cameraInput").onchange=e=>{const f=e.target.files[0];if(f){if(activeUser?.isAI)uploadAiFile(f);else previewAndUploadMedia(f,"image")}e.target.value=""};
+$("cameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"image");e.target.value=""};
 $("videoCameraInput").onchange=e=>{const f=e.target.files[0];if(f)previewAndUploadMedia(f,"video");e.target.value=""};
 
 
@@ -2380,6 +2379,7 @@ function showVoicePreview(blob,file){
 }
 async function startVoiceHoldRecording(){
   if(!activeUser)return toast("Select a user first.");
+  if(activeUser.isAI)return toast("Voice messages are available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia||!("MediaRecorder" in window))return toast("Voice recording is not supported by this browser.");
   if(isRecording||videoRecording||voiceRecordingStopping)return;
   resetVoiceRecorderUi();
@@ -2471,21 +2471,8 @@ $("voiceRecordSend").onclick=async()=>{
   }
   const btn=$("voiceRecordSend");btn.disabled=true;
   try{
-    if(activeUser.isAI){
-      $("voiceRecordState").textContent="Transcribing for AmalChat AI…";
-      const fd=new FormData();fd.append("file",voicePendingFile);
-      const data=await api("/api/ai/transcribe",{method:"POST",body:fd});
-      const transcript=String(data?.text||"").trim();
-      if(!transcript)throw new Error("No speech was detected. Please record again.");
-      resetVoiceRecorderUi();
-      await sendAi(transcript);
-      return;
-    }
     const sent=await uploadFile(voicePendingFile,"voice");
     if(sent)resetVoiceRecorderUi();
-  }catch(error){
-    $("voiceRecordState").textContent="Voice ready";
-    toast(error.message||"Voice transcription failed.");
   }finally{btn.disabled=false}
 };
 
@@ -2867,7 +2854,7 @@ async function prepareCapture(mode){
 }
 function openCapture(mode){
   if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI&&mode!=="photo")return toast("AmalChat AI camera currently supports photos.");
+  if(activeUser.isAI)return toast("Media recording is available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia)return toast("Camera recording is not supported by this browser.");
   captureReceiverId=Number(activeUser.id);$("captureOverlay").classList.remove("hidden");refreshCaptureOrientation();prepareCapture(mode);
 }
@@ -3192,14 +3179,14 @@ $("captureCloseBtn").onclick=closeCapture;
 $("captureRetakeBtn").onclick=()=>prepareCapture("photo");
 function capturedPhotoFile(){
   if(captureMode!=="photo"||!captureBlob||captureBlob.size<1024)return null;
-  return new File([captureBlob],`AmalChat-selfie-${Date.now()}.jpg`,{type:captureBlob.type||"image/jpeg",lastModified:Date.now()});
+  return new File([captureBlob],`ConnectChat-selfie-${Date.now()}.jpg`,{type:captureBlob.type||"image/jpeg",lastModified:Date.now()});
 }
 function capturedResultFile(){
   if(!captureBlob||captureBlob.size<1024)return null;
   const video=captureMode==="video";
   const type=captureBlob.type||(video?"video/webm":"image/jpeg");
   const ext=video?(type.includes("mp4")?"mp4":"webm"):"jpg";
-  return new File([captureBlob],`AmalChat-${video?"video":"photo"}-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
+  return new File([captureBlob],`ConnectChat-${video?"video":"photo"}-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
 }
 function saveCapturedPhoto(){
   const file=capturedPhotoFile();if(!file)return;
@@ -3217,7 +3204,7 @@ async function shareCapturedPhotoExternal(){
   const file=capturedResultFile();if(!file)return;
   const label=captureMode==="video"?"video":"photo";
   try{
-    const payload={files:[file],title:`AmalChat ${label}`};
+    const payload={files:[file],title:`ConnectChat ${label}`};
     if(navigator.share&&(!navigator.canShare||navigator.canShare(payload))){
       await navigator.share(payload);
       return;
@@ -3234,7 +3221,7 @@ async function sendCapturedPhotoToRecipients(){
   const label=captureMode==="video"?"Video":"Photo";
   const allowed=new Set(availableCaptureRecipients().map(user=>Number(user.id)));
   const receiverIds=[...captureRecipientIds].filter(id=>allowed.has(Number(id)));
-  if(!receiverIds.length)return toast("Select at least one AmalChat user.");
+  if(!receiverIds.length)return toast("Select at least one ConnectChat user.");
   if(mediaUploadInFlight)return toast("Please wait for the current upload to finish.");
   captureSendInFlight=true;mediaUploadInFlight=true;
   const sendBtn=$("captureRecipientSendBtn");sendBtn.disabled=true;
@@ -3306,7 +3293,7 @@ $("captureSendBtn").onclick=async()=>{
     const kind=captureMode==="photo"?"image":"video";
     const file=new File([captureBlob],`${kind}-${Date.now()}.${ext}`,{type,lastModified:Date.now()});
     if(!activeUser||Number(activeUser.id)!==Number(captureReceiverId))return toast("Return to the chat where you opened the camera before sending.");
-    const sent=activeUser.isAI?await uploadAiFile(file):await uploadFile(file,kind);
+    const sent=await uploadFile(file,kind);
     if(sent)closeCapture();else setCaptureSendReady(true);
   }finally{
     captureSendInFlight=false;
@@ -3613,7 +3600,7 @@ if($("deleteConversationBtn"))$("deleteConversationBtn").onclick=async()=>{
   if(!activeUser)return;
   const name=activeUser.isSelf?"Saved Messages":(activeUser.displayName||activeUser.username);
   if(activeUser.isAI){
-    if(!confirm("Delete all private AmalChat AI history on this device? This cannot be undone."))return;
+    if(!confirm("Delete all private ConnectChat AI history on this device? This cannot be undone."))return;
     saveAiHistory([]);activeConversation=[];$("messages").innerHTML="";$("conversationMenu").classList.add("hidden");
     showAiWelcome();updateWorkspaceOverview();renderUsers();toast("AI conversation history deleted.");
     return;
@@ -4231,10 +4218,10 @@ function renderSettingsWorkspace(){
         <button id="settingsSwitchBtn" type="button" class="settings-mobile-row"><span>💻</span><span><b>Switch account</b><small>Use a different account</small></span><i>›</i></button>
         ${me.isAdmin?`<button id="settingsAdminBtn" type="button" class="settings-mobile-row"><span>👥</span><span><b>Administration</b><small>Approve and manage users</small></span><i>›</i></button>`:""}
         <button id="settingsDeleteAccountBtn" type="button" class="settings-mobile-row settings-logout-row"><span>🗑</span><span><b>Delete my account</b><small>Permanently remove this account and its data</small></span><i>›</i></button>
-        <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of AmalChat</small></span><i>›</i></button>
+        <button id="settingsLogoutBtn" type="button" class="settings-mobile-row settings-logout-row"><span>↪</span><span><b>Logout</b><small>Sign out of ConnectChat</small></span><i>›</i></button>
       </section>
       <section class="license-information-card">
-        <div class="license-information-head"><span>🛡️</span><div><h2>Licence information</h2><p>AmalChat Commercial Trial</p></div></div>
+        <div class="license-information-head"><span>🛡️</span><div><h2>Licence information</h2><p>ConnectChat Pro v6.7.3</p></div></div>
         <dl>
           <div><dt>Edition</dt><dd>Trial Version</dd></div>
           <div><dt>Licensor</dt><dd>Aboassad</dd></div>
@@ -4273,14 +4260,14 @@ function renderSettingsWorkspace(){
   $("settingsRecoveryBtn").onclick=()=>$("recoveryBtn").click();
   $("settingsSwitchBtn").onclick=logoutAndReturn;
   $("settingsDeleteAccountBtn").onclick=async()=>{
-    const password=prompt("Enter your password to delete your AmalChat account:");
+    const password=prompt("Enter your password to delete your ConnectChat account:");
     if(password===null)return;
     if(!password)return toast("Your password is required.");
-    if(!confirm("Permanently delete your AmalChat account, messages and stored files? This cannot be undone."))return;
+    if(!confirm("Permanently delete your ConnectChat account, messages and stored files? This cannot be undone."))return;
     try{
       $("settingsDeleteAccountBtn").disabled=true;
       await api("/api/account",{method:"DELETE",body:JSON.stringify({password,confirm:"DELETE MY ACCOUNT"})});
-      alert("Your AmalChat account was deleted.");
+      alert("Your ConnectChat account was deleted.");
       location.reload();
     }catch(error){
       $("settingsDeleteAccountBtn").disabled=false;toast(error.message);
