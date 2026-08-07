@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="AmalChat">
   <title>AmalChat Commercial Trial</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json?v=6873">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=6866">
-  <link rel="stylesheet" href="style-6864.css?v=6866">
+  <link rel="stylesheet" href="style.css?v=6873">
+  <link rel="stylesheet" href="style-6864.css?v=6873">
 </head>
 <body>
   <section id="authView" class="auth-view">
@@ -105,6 +105,29 @@
     </aside>
 
     <main id="chatPanel" class="chat workspace-chat">
+      <section id="desktopWelcome" class="desktop-web-welcome hidden" aria-label="AmalChat desktop welcome">
+        <div class="desktop-welcome-card">
+          <img class="desktop-welcome-logo" src="logo.svg" alt="AmalChat">
+          <span class="desktop-welcome-trial">COMMERCIAL TRIAL</span>
+          <h1>AmalChat</h1>
+          <p class="desktop-welcome-lead">Chat. Connect. Work with AI.</p>
+          <div class="desktop-welcome-primary-actions">
+            <button id="desktopDownloadAppBtn" class="desktop-download-btn" type="button">⬇ Download AmalChat App</button>
+            <button id="desktopContinueWebBtn" class="desktop-continue-btn" type="button">Continue on Web</button>
+          </div>
+          <small id="desktopInstallStatus" class="desktop-install-status">You can always use AmalChat directly in your browser.</small>
+          <div id="desktopInstallHelp" class="desktop-install-help hidden" role="status" aria-live="polite">
+            <div><b>Install AmalChat on this computer</b><span id="desktopInstallHelpText">Use your browser menu to install AmalChat.</span></div>
+            <button id="desktopInstallHelpClose" type="button">Got it</button>
+          </div>
+          <div class="desktop-welcome-divider"><span>Quick actions</span></div>
+          <div class="desktop-quick-actions">
+            <button id="desktopAiWelcomeBtn" type="button"><span>🤖</span><b>AI Conversation</b><small>Start chatting with AmalChat AI</small></button>
+            <button id="desktopAddContactBtn" type="button"><span>👤</span><b>Add Contact</b><small>Find an AmalChat user</small></button>
+            <button id="desktopShareBtn" type="button"><span>↗</span><b>Share AmalChat</b><small>Invite someone to join</small></button>
+          </div>
+        </div>
+      </section>
       <header class="chat-head">
         <button id="backBtn" class="back-btn" type="button" aria-label="Back to chats">←</button>
         <div class="active-avatar" id="activeAvatar">?</div>
@@ -204,26 +227,6 @@
       <div id="sectionContent" class="section-page-content"></div>
     </main>
 
-    <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
-      <div class="insights-head"><div><small>AMALCHAT COMMERCIAL TRIAL</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
-      <div class="insight-tabs"><button class="active" type="button" data-insight-tab="overview">Overview</button><button type="button" data-insight-tab="files">Files</button><button type="button" data-insight-tab="media">Media</button></div>
-      <div id="insightOverviewPanel" class="insight-panel-content">
-        <div class="workspace-profile-card">
-          <div id="workspaceProfileAvatar" class="workspace-profile-avatar">ME</div>
-          <div><small>Signed in as</small><h3 id="workspaceProfileName">User</h3><span id="workspaceProfileRole">Member</span></div>
-        </div>
-        <div class="workspace-stat-grid">
-          <div><b id="workspaceContactCount">0</b><small>Contacts</small></div>
-          <div><b id="workspaceOnlineCount">0</b><small>Online now</small></div>
-          <div><b id="workspaceUnreadCount">0</b><small>Unread</small></div>
-          <div><b id="workspaceCallStatus">Ready</b><small>Calls</small></div>
-        </div>
-        <div class="workspace-help-card"><b>Current conversation</b><p id="workspaceConversationSummary">Select a real contact from the left panel.</p></div>
-        <div class="security-card"><b>🔒 Secure workspace</b><p>Protected sessions, validated uploads, encrypted transport and account recovery are enabled.</p></div>
-      </div>
-      <div id="insightFilesPanel" class="insight-panel-content hidden"></div>
-      <div id="insightMediaPanel" class="insight-panel-content hidden"></div>
-    </aside>
   </section>
 
   <section id="profilePage" class="profile-page hidden" aria-label="Profile page">
@@ -523,7 +526,7 @@
   </section>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="face-filters.js?v=6866"></script>
-  <script src="app.js?v=6866"></script>
+  <script type="module" src="face-filters.js?v=6873"></script>
+  <script src="app.js?v=6873"></script>
 </body>
 </html>

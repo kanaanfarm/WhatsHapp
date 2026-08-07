@@ -1,13 +1,17 @@
 {
-  "name": "ConnectChat Pro Enterprise v6.7.3",
-  "short_name": "ConnectChat",
+  "name": "AmalChat Commercial Trial",
+  "short_name": "AmalChat",
   "start_url": "/",
-  "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone"],
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
   "background_color": "#eef2f7",
   "theme_color": "#182132",
   "description": "Private AI-enhanced collaboration for mobile and PC",
   "icons": [
-    {"src":"/logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
   ]
 }

@@ -85,6 +85,41 @@
   }
 }
 
+/* Build 6873: in-workspace desktop welcome + reliable PWA install guidance. Mobile is unchanged. */
+.desktop-web-welcome{display:none}
+@media(min-width:801px){
+  .desktop-web-welcome{
+    position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    padding:30px;background:
+      radial-gradient(circle at 20% 15%,rgba(91,108,255,.18),transparent 34%),
+      radial-gradient(circle at 80% 80%,rgba(54,196,190,.13),transparent 30%),#f7f9ff;
+  }
+  .desktop-web-welcome.hidden{display:none}
+  .desktop-welcome-card{
+    width:min(760px,calc(100% - 28px));padding:38px 42px 34px;text-align:center;background:#fff;
+    border:1px solid #e1e6f0;border-radius:28px;box-shadow:0 28px 70px rgba(31,42,82,.14);
+  }
+  .desktop-welcome-logo{width:72px;height:72px;display:block;margin:0 auto 14px;filter:drop-shadow(0 8px 12px rgba(91,80,245,.18))}
+  .desktop-welcome-trial{display:inline-block;color:#626cff;font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+  .desktop-welcome-card h1{margin:8px 0 5px;font-size:36px;line-height:1.05;color:#111b30}
+  .desktop-welcome-lead{margin:0 0 25px;color:#74809a;font-size:17px}
+  .desktop-welcome-primary-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+  .desktop-welcome-primary-actions button{min-width:220px;min-height:48px;padding:12px 20px;border-radius:13px;font-size:14px;font-weight:800;cursor:pointer}
+  .desktop-download-btn{border:0;color:#fff;background:linear-gradient(135deg,#6658f6,#3488ed);box-shadow:0 10px 22px rgba(74,93,235,.22)}
+  .desktop-continue-btn{border:1px solid #dce2ef;color:#24314a;background:#fff}
+  .desktop-install-status{display:block;min-height:18px;margin:12px auto 0;color:#8891a5;font-size:11px}
+  .desktop-install-help{margin:12px auto 0;max-width:560px;padding:11px 12px;border:1px solid #cfd7ff;border-radius:12px;background:#f4f6ff;color:#36415b;display:flex;align-items:center;gap:12px;text-align:left}
+  .desktop-install-help.hidden{display:none}.desktop-install-help>div{display:grid;gap:3px;flex:1}.desktop-install-help b{font-size:12px}.desktop-install-help span{font-size:11px;line-height:1.4;color:#66718a}.desktop-install-help button{border:1px solid #cbd2e4;border-radius:9px;background:#fff;padding:7px 10px;font-weight:800;color:#34405a;cursor:pointer;white-space:nowrap}
+  .desktop-welcome-divider{display:flex;align-items:center;gap:12px;margin:24px 0 15px;color:#9aa3b6;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  .desktop-welcome-divider:before,.desktop-welcome-divider:after{content:"";height:1px;background:#e4e8f1;flex:1}
+  .desktop-quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .desktop-quick-actions button{display:grid;grid-template-columns:38px 1fr;text-align:left;column-gap:10px;row-gap:3px;padding:16px;border:1px solid #e2e7f0;border-radius:16px;background:#fbfcff;color:#1c2940;cursor:pointer}
+  .desktop-quick-actions button:hover{border-color:#bfc8ff;background:#f5f6ff;transform:translateY(-1px)}
+  .desktop-quick-actions button>span{grid-row:1/3;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#eef1ff;font-size:20px}
+  .desktop-quick-actions b{font-size:13px;align-self:end}.desktop-quick-actions small{font-size:10px;color:#7f899f;line-height:1.35}
+}
+@media(max-width:800px){.desktop-web-welcome{display:none !important}}
+
 /* BUILD 6838 LAST RULE — vertical live video-call filter menu. */
 #callOverlay .call-controls{
   position:relative !important;
@@ -454,7 +489,7 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 
 /* ConnectChat Pro v4.2 real workspace */
 :root{--rail:#151a2d;--panel:#fff;--canvas:#f7f8fc;--line:#e5e9f2;--text:#111827;--muted:#75809a;--accent:#5b63f6;--accent2:#7c4dff}
-.app-v4{display:grid;grid-template-columns:94px 310px minmax(440px,1fr) 288px;height:100dvh;background:var(--canvas);overflow:hidden}.app-v4.hidden{display:none}
+.app-v4{display:grid;grid-template-columns:94px 310px minmax(440px,1fr);height:100dvh;background:var(--canvas);overflow:hidden}.app-v4.hidden{display:none}
 .rail{background:var(--rail);color:#d9def0;display:flex;flex-direction:column;align-items:center;padding:14px 8px;gap:8px;z-index:4}.rail-brand{border:0;background:none;width:54px;height:54px;margin-bottom:8px}.rail-brand img{width:48px;height:48px}.rail-item{position:relative;width:70px;min-height:58px;border:0;border-radius:14px;background:transparent;color:#c7cee3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}.rail-item span{font-size:21px}.rail-item small{font-size:11px}.rail-item:hover,.rail-item.active{background:#2a3047;color:#fff}.rail-item.active:before{content:"";position:absolute;left:-8px;width:3px;height:30px;border-radius:3px;background:#6d74ff}.rail-spacer{flex:1}.rail-profile{width:50px;height:50px;border-radius:16px;border:8px solid #292f47;background:linear-gradient(135deg,#6d72ff,#9a5cff);color:#fff;font-weight:800}.rail-badge{position:absolute;right:6px;top:4px;background:#f04464;color:white;border-radius:999px;min-width:18px;height:18px;font-size:10px;display:grid;place-items:center}.workspace-sidebar{position:relative;width:auto;min-width:0;background:#fff;color:var(--text);border-right:1px solid var(--line);padding:20px 12px 145px}.workspace-title{display:flex;justify-content:space-between;align-items:center;padding:0 6px 12px}.workspace-title small{color:#626cff;font-weight:700}.workspace-title h1{font-size:25px;margin:2px 0}.new-btn{border:0;border-radius:11px;background:linear-gradient(135deg,#6658f6,#3488ed);color:#fff;font-weight:700;padding:11px 15px}.workspace-sidebar .search-box{height:44px;background:#f6f7fb;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;padding:0 12px;margin:0 4px}.workspace-sidebar .search-box input{background:transparent;color:#222;border:0;width:100%;font-size:14px;outline:0}.filter-row{display:flex;gap:7px;padding:12px 4px}.chat-filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;color:#6f7890;font-weight:700;font-size:12px}.chat-filter.active{background:#397ef3;color:#fff;border-color:#397ef3}.quick-contacts{display:flex;gap:14px;padding:6px 7px 15px;min-height:66px;overflow:hidden}.quick-contact{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:43px;color:#68738c;font-size:10px}.quick-contact .avatar{width:39px;height:39px;border-radius:12px}.plain-icon{border:0;background:none;color:#7d879b;cursor:pointer}.workspace-sidebar .section-label{padding:8px 6px;border-top:1px solid var(--line);color:#8d95a8;font-size:10px}.workspace-sidebar .users-list{padding:0;overflow:auto}.workspace-sidebar .user{border-radius:13px;margin:3px 0;padding:10px 9px}.workspace-sidebar .user.active{background:#f0f2fb}.workspace-sidebar .user .avatar{border-radius:13px}.compact-actions{position:absolute;left:12px;right:12px;bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px}.compact-actions button{min-height:36px}.compact-actions .admin-btn,.compact-actions .status-btn{grid-column:1/-1}.workspace-chat{min-width:0;background:#fafbff;border-right:1px solid var(--line);position:relative}.workspace-chat .chat-head{height:82px;background:#fff;border-bottom:1px solid var(--line);padding:0 18px}.chat-identity{min-width:0}.chat-identity h2{font-size:18px}.workspace-chat .messages{padding:48px 72px 145px;background:radial-gradient(circle at 70% 60%,rgba(60,200,205,.08),transparent 22%),radial-gradient(circle at 28% 25%,rgba(112,92,255,.07),transparent 24%),#fafbff}.date-chip{position:absolute;top:100px;left:50%;transform:translateX(-50%);z-index:2;padding:5px 13px;border:1px solid var(--line);background:#fff;border-radius:999px;color:#7c8497;font-size:11px}.workspace-chat .msg{max-width:72%}.workspace-chat .bubble{border-radius:14px;box-shadow:0 8px 24px rgba(34,42,78,.06)}.workspace-chat .own .bubble{background:linear-gradient(135deg,#6655f6,#5c65f6)}.workspace-chat .smart-strip{position:absolute;left:18px;right:18px;bottom:82px;border:0;background:transparent;pointer-events:none}.workspace-chat .smart-strip div{pointer-events:auto;display:flex;gap:8px;margin-left:auto}.workspace-chat .smart-strip button{background:#fff;border:1px solid var(--line);border-radius:999px}.workspace-chat .composer{position:absolute;left:16px;right:16px;bottom:14px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 7px 25px rgba(30,39,76,.06)}.workspace-chat .send-btn{width:46px;border-radius:13px;font-size:21px}.workspace-insights{width:auto;position:relative;background:#fff;padding:18px;border-left:0;overflow:auto}.insight-tabs{display:flex;background:#f2f4f8;border:1px solid var(--line);border-radius:10px;padding:3px;margin:12px 0}.insight-tabs button{flex:1;border:0;background:transparent;border-radius:8px;padding:7px;font-size:11px}.insight-tabs button.active{background:#fff;box-shadow:0 1px 4px #d8dce6}.workspace-insights .premium-card{background:linear-gradient(145deg,#49308d,#7252dc)}
 .call-controls{flex-wrap:wrap}.call-control{min-width:110px}.video-stage.screen-sharing #remoteVideo{object-fit:contain;background:#0b0d12}.share-active{background:#f0a23b!important;color:#111!important}
 @media(max-width:1200px){.app-v4{grid-template-columns:82px 290px minmax(400px,1fr)}.workspace-insights{display:none}}
@@ -578,8 +613,8 @@ body{background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--bg) 88%
 .workspace-composer label{display:flex;align-items:center;gap:6px;font-size:13px}
 
 /* v5.3 user-controlled professional sizing */
-:root{--cc-rail-width:76px;--cc-sidebar-width:270px;--cc-insights-width:250px}
-.app-v4{grid-template-columns:var(--cc-rail-width) var(--cc-sidebar-width) minmax(420px,1fr) var(--cc-insights-width)}
+:root{--cc-rail-width:76px;--cc-sidebar-width:270px}
+.app-v4{grid-template-columns:var(--cc-rail-width) var(--cc-sidebar-width) minmax(420px,1fr)}
 .rail{padding:10px 6px;gap:5px}.rail-brand{width:46px;height:46px;margin-bottom:4px}.rail-brand img{width:40px;height:40px}
 .rail-item{width:58px;min-height:49px;border-radius:12px}.rail-item span{font-size:18px}.rail-item small{font-size:9px}
 .rail-profile{width:42px;height:42px;border-width:6px;border-radius:13px}

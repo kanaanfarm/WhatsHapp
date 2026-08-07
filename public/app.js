@@ -32,7 +32,6 @@ let chatAiDraftBusy=false;
 let aiStatus=null;
 let activeConversation=[];
 let archivedUserIds=new Set();
-let currentInsightTab="overview";
 let currentCalculationPreviewId=null,currentCalculationPreviewCanDownload=false,calculationPreviewObjectUrl=null;
 let avatarCropImage=null,avatarCropObjectUrl=null,avatarCropBaseScale=1,avatarCropZoom=1,avatarCropX=0,avatarCropY=0,avatarCropDragging=false,avatarCropPointerX=0,avatarCropPointerY=0;
 let profilePhotoViewerScale=1;
@@ -45,7 +44,7 @@ const AI_PROVIDER_KEY="connectchat-ai-provider-v1";
 const NOTIFICATIONS_KEY="connectchat-message-notifications";
 const PHONE_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg>';
 const VIDEO_ICON_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>';
-const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",insights:"show",composer:"essential",avatarFit:"cover"};
+const DEFAULT_APPEARANCE={density:"compact",text:"standard",icons:"compact",sidebar:"narrow",composer:"essential",avatarFit:"cover"};
 const $=id=>document.getElementById(id);
 
 function notifyNativeCall(event,payload={}){
@@ -56,7 +55,7 @@ function notifyNativeCall(event,payload={}){
 }
 
 const INTERNAL_SCROLL_SELECTOR=[
-  ".rail",".users-list",".quick-contacts",".messages",".workspace-insights",
+  ".rail",".users-list",".quick-contacts",".messages",
   ".section-page",".profile-page",".dialog-overlay",".statuses-list",
   ".admin-users",".calculation-preview-content",".calculation-table-wrap",
   ".calculation-preview-tabs",".emoji-picker",".smart-strip",
@@ -84,7 +83,6 @@ function applyAppearance(settings=loadAppearance()){
   root.dataset.textSize=settings.text;
   root.dataset.iconSize=settings.icons;
   root.dataset.sidebarSize=settings.sidebar;
-  root.dataset.insights=settings.insights;
   root.dataset.composer=settings.composer;
   root.dataset.avatarFit=settings.avatarFit;
 }
@@ -453,6 +451,8 @@ $("statusOverlay").onclick=e=>{if(e.target===$("statusOverlay"))$("statusOverlay
 async function startApp(){
   applyAppearance();
   $("authView").classList.add("hidden");$("appView").classList.remove("hidden");
+  const desktopWelcome=$("desktopWelcome");
+  if(desktopWelcome)desktopWelcome.classList.toggle("hidden",!shouldShowDesktopWebWelcome());
   if($("railInitials"))setAvatarElement($("railInitials"),me,initials(me.username));
   $("adminBtn").classList.toggle("hidden",!me.isAdmin);
   users=await api("/api/users");
@@ -725,20 +725,6 @@ function updateWorkspaceOverview(){
   if($("workspaceConversationSummary"))$("workspaceConversationSummary").textContent=activeUser
     ? `${activeUser.displayName||activeUser.username} · ${activeConversation.length} visible message${activeConversation.length===1?"":"s"}`
     : "Select a real contact from the left panel.";
-  if(window.innerWidth>1200&&document.documentElement.dataset.insights!=="hide")renderWorkspaceInsightTab(currentInsightTab);
-}
-
-function renderWorkspaceInsightTab(tab="overview"){
-  currentInsightTab=tab;
-  document.querySelectorAll("[data-insight-tab]").forEach(button=>button.classList.toggle("active",button.dataset.insightTab===tab));
-  ["overview","files","media"].forEach(name=>$(`insight${name[0].toUpperCase()+name.slice(1)}Panel`)?.classList.toggle("hidden",name!==tab));
-  if(tab==="overview")return;
-  const attachments=activeConversation.filter(item=>item.file_url);
-  const selected=tab==="media"
-    ? attachments.filter(item=>["image","voice","audio"].includes(item.kind))
-    : attachments.filter(item=>!["image","voice","audio"].includes(item.kind));
-  const panel=$(tab==="media"?"insightMediaPanel":"insightFilesPanel");
-  panel.innerHTML=selected.length?`<div class="insight-file-list">${selected.map(item=>`<a href="${escapeHtml(safeFileUrl(item.file_url))}" target="_blank" rel="noopener"><b>${tab==="media"?(item.kind==="image"?"🖼":"🎤"):"📄"}</b><span>${escapeHtml(item.file_name||item.kind||"Attachment")}<small>${escapeHtml(time(item.created_at))}</small></span></a>`).join("")}</div>`:`<div class="insight-empty">No ${tab} in the selected conversation.</div>`;
 }
 
 function renderUsers(){
@@ -1795,7 +1781,6 @@ function addMessage(msg){
   }
   if(!activeUser?.isAI&&msg?.id&&!activeConversation.some(item=>Number(item.id)===Number(msg.id))){
     activeConversation.push(msg);
-    if(currentInsightTab!=="overview")renderWorkspaceInsightTab(currentInsightTab);
   }
   const own=Number(msg.sender_id)===Number(me.id);
   const canDelete=!msg.ai&&(own||me.isAdmin);
@@ -1898,9 +1883,11 @@ async function sendAi(body){
   try{
     const history=items.slice(0,-1).filter(x=>!x.aiError).slice(-12).map(x=>({role:Number(x.sender_id)===Number(me.id)?"user":"assistant",content:x.body}));
     const provider=$("aiProviderSelect")?.value||"auto";
-    const historyAttachmentIds=items.filter(x=>x?.aiAttachment?.attachmentId).slice(-5).map(x=>x.aiAttachment.attachmentId);
     const pendingAttachmentIds=aiPendingAttachments.map(x=>x.attachmentId);
-    const attachmentIds=[...new Set([...pendingAttachmentIds,...historyAttachmentIds])].slice(-10);
+    // Attachments belong only to the current AI request. Re-sending attachment
+    // IDs from older history caused old images to force every later message
+    // through the OpenAI vision provider, even when Ollama was selected.
+    const attachmentIds=[...new Set(pendingAttachmentIds)].slice(-10);
     const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message:body,history,provider,attachmentIds})});
     aiPendingAttachments=[];renderAiAttachmentTray();
     const source=`${data.provider} · ${data.model}${data.fallbackUsed?" · automatic fallback":""}`;
@@ -3630,8 +3617,6 @@ document.addEventListener("click",event=>{
   if(!event.target.closest("#smartStrip,#chatAiBtn,.user-ai-tool"))$("smartStrip")?.classList.add("hidden");
   if(!event.target.closest("#conversationMenu,#moreChatBtn"))$("conversationMenu")?.classList.add("hidden");
 });
-document.querySelectorAll("[data-insight-tab]").forEach(button=>button.onclick=()=>renderWorkspaceInsightTab(button.dataset.insightTab));
-
 const LOCAL_GROUPS_KEY="connectchat-local-groups-v1";
 const LOCAL_CHANNELS_KEY="connectchat-local-channels-v1";
 
@@ -3644,7 +3629,6 @@ function sectionEscape(value){return escapeHtml(String(value??""))}
 function setMainWorkspaceVisible(showChat){
   $("chatPanel").classList.toggle("hidden",!showChat);
   $("sectionPage").classList.toggle("hidden",showChat);
-  document.querySelector(".workspace-insights")?.classList.toggle("hidden",!showChat);
 }
 
 function workspaceEmpty(icon,title,description,action=""){
@@ -4222,7 +4206,6 @@ function renderSettingsWorkspace(){
         <label>Text size<select id="appearanceText"><option value="small">Small</option><option value="standard">Standard</option><option value="large">Large</option></select></label>
         <label>Icon size<select id="appearanceIcons"><option value="compact">Compact</option><option value="standard">Standard</option></select></label>
         <label>Conversation sidebar<select id="appearanceSidebar"><option value="narrow">Narrow</option><option value="standard">Standard</option></select></label>
-        <label>Overview panel<select id="appearanceInsights"><option value="show">Show</option><option value="hide">Hide</option></select></label>
         <label>Message-bar icons<select id="appearanceComposer"><option value="essential">Hide extra icons</option><option value="all">Show all icons</option></select></label>
         <label>Profile-photo display<select id="appearanceAvatarFit"><option value="cover">Crop to fill</option><option value="contain">Fit full photo</option></select></label>
         <div class="settings-button-row"><button id="settingsThemeBtn">Toggle theme</button><button id="settingsAccentBtn">Change accent</button><button id="appearanceResetBtn">Reset layout</button></div>
@@ -4263,7 +4246,7 @@ function renderSettingsWorkspace(){
   $("settingsAppearanceBtn").onclick=()=>$("appearanceDensity")?.closest(".appearance-settings")?.scrollIntoView({block:"start"});
   $("settingsThemeBtn").onclick=()=>$("themeBtn")?.click();
   $("settingsAccentBtn").onclick=()=>$("accentBtn")?.click();
-  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceInsights:"insights",appearanceComposer:"composer",appearanceAvatarFit:"avatarFit"};
+  const controls={appearanceDensity:"density",appearanceText:"text",appearanceIcons:"icons",appearanceSidebar:"sidebar",appearanceComposer:"composer",appearanceAvatarFit:"avatarFit"};
   Object.entries(controls).forEach(([id,key])=>{
     $(id).value=appearance[key];
     $(id).onchange=()=>{const next=loadAppearance();next[key]=$(id).value;saveAppearance(next)};
@@ -4342,11 +4325,68 @@ async function openWorkspaceSection(section){
 }
 
 if($("sectionBackBtn"))$("sectionBackBtn").onclick=()=>openWorkspaceSection("chats");
-document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onclick=()=>openWorkspaceSection(button.dataset.section));
+document.querySelectorAll(".rail-item[data-section]").forEach(button=>button.onclick=()=>{
+  closeDesktopWebWelcome();
+  openWorkspaceSection(button.dataset.section);
+});
 
+function shouldShowDesktopWebWelcome(){
+  if(!window.matchMedia("(min-width: 801px)").matches)return false;
+  if(window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone)return false;
+  if(window.ConnectChatNative)return false;
+  try{if(window.Capacitor?.isNativePlatform?.())return false}catch{}
+  return true;
+}
 
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden")});
-$("installBtn").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").classList.add("hidden")};
+function closeDesktopWebWelcome(){
+  $("desktopWelcome")?.classList.add("hidden");
+}
+
+if($("desktopContinueWebBtn"))$("desktopContinueWebBtn").onclick=()=>closeDesktopWebWelcome();
+if($("desktopAiWelcomeBtn"))$("desktopAiWelcomeBtn").onclick=()=>{closeDesktopWebWelcome();openWorkspaceSection("ai")};
+if($("desktopAddContactBtn"))$("desktopAddContactBtn").onclick=()=>{
+  closeDesktopWebWelcome();openWorkspaceSection("chats");
+  setTimeout(()=>{$("userSearch")?.focus();toast("Search and select an AmalChat user to start a conversation.")},50);
+};
+if($("desktopShareBtn"))$("desktopShareBtn").onclick=async()=>{
+  const url=`${location.origin}/`;
+  const payload={title:"AmalChat",text:"Join me on AmalChat.",url};
+  try{
+    if(navigator.share){await navigator.share(payload);return}
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);toast("AmalChat link copied.");return}
+    window.prompt("Copy this AmalChat link:",url);
+  }catch(error){if(error?.name!=="AbortError")toast("Could not share AmalChat on this browser.")}
+};
+
+async function installAmalChatApp(){
+  const status=$("desktopInstallStatus");
+  const help=$("desktopInstallHelp"),helpText=$("desktopInstallHelpText");
+  if(window.matchMedia("(display-mode: standalone)").matches){if(status)status.textContent="AmalChat is already installed.";return}
+  if(!deferredPrompt){
+    const edge=/Edg\//.test(navigator.userAgent);
+    const chrome=/Chrome\//.test(navigator.userAgent)&&!edge;
+    const instruction=edge
+      ? "Microsoft Edge: click ⋯ at the top-right → Apps → Install AmalChat."
+      : chrome
+        ? "Google Chrome: click ⋮ at the top-right → Cast, save and share → Install AmalChat."
+        : "Open this page in Microsoft Edge or Google Chrome, then use the browser menu to install AmalChat.";
+    if(status)status.textContent="The browser did not show its automatic install prompt.";
+    if(helpText)helpText.textContent=instruction;
+    help?.classList.remove("hidden");
+    return;
+  }
+  help?.classList.add("hidden");
+  deferredPrompt.prompt();
+  const choice=await deferredPrompt.userChoice;
+  if(status)status.textContent=choice.outcome==="accepted"?"AmalChat installation started.":"Installation cancelled. You can continue on the web.";
+  deferredPrompt=null;
+  $("installBtn")?.classList.add("hidden");
+}
+if($("desktopDownloadAppBtn"))$("desktopDownloadAppBtn").onclick=installAmalChatApp;
+if($("desktopInstallHelpClose"))$("desktopInstallHelpClose").onclick=()=>$("desktopInstallHelp")?.classList.add("hidden");
+
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").classList.remove("hidden");$("desktopInstallHelp")?.classList.add("hidden")});
+$("installBtn").onclick=installAmalChatApp;
 
 bindCallVideoSwap();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
