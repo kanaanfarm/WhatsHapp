@@ -2077,10 +2077,10 @@ function resizeMessageInput(){
 function syncVoiceMicAvailability(){
   const btn=$("recordBtn");
   if(!btn)return;
-  const enabled=Boolean(activeUser&&!activeUser.isAI);
+  const enabled=Boolean(activeUser);
   btn.disabled=!enabled;
   btn.setAttribute("aria-disabled",String(!enabled));
-  btn.title=enabled?"Record voice":"Select a user to record voice";
+  btn.title=!enabled?"Select a user to record voice":activeUser.isAI?"Ask AmalChat AI by voice":"Record voice";
 }
 
 function updateComposer(){
@@ -2380,7 +2380,6 @@ function showVoicePreview(blob,file){
 }
 async function startVoiceHoldRecording(){
   if(!activeUser)return toast("Select a user first.");
-  if(activeUser.isAI)return toast("Voice messages are available in human chats.");
   if(!navigator.mediaDevices?.getUserMedia||!("MediaRecorder" in window))return toast("Voice recording is not supported by this browser.");
   if(isRecording||videoRecording||voiceRecordingStopping)return;
   resetVoiceRecorderUi();
@@ -2472,8 +2471,21 @@ $("voiceRecordSend").onclick=async()=>{
   }
   const btn=$("voiceRecordSend");btn.disabled=true;
   try{
+    if(activeUser.isAI){
+      $("voiceRecordState").textContent="Transcribing for AmalChat AI…";
+      const fd=new FormData();fd.append("file",voicePendingFile);
+      const data=await api("/api/ai/transcribe",{method:"POST",body:fd});
+      const transcript=String(data?.text||"").trim();
+      if(!transcript)throw new Error("No speech was detected. Please record again.");
+      resetVoiceRecorderUi();
+      await sendAi(transcript);
+      return;
+    }
     const sent=await uploadFile(voicePendingFile,"voice");
     if(sent)resetVoiceRecorderUi();
+  }catch(error){
+    $("voiceRecordState").textContent="Voice ready";
+    toast(error.message||"Voice transcription failed.");
   }finally{btn.disabled=false}
 };
 
