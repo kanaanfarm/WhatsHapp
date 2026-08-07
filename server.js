@@ -39,7 +39,7 @@ if (String(process.env.TELEGRAM_BOT_TOKEN || "").trim()) {
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6864";
+const APP_BUILD = "6865";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -3122,7 +3122,7 @@ io.on("connection", async socket => {
       title: `Incoming ${mode === "video" ? "video" : "voice"} call`,
       body: `${username} is calling you`,
       tag: `incoming-call-${userId}`,
-      url: `/?v=6864&callFrom=${userId}&mode=${mode}`
+      url: `/?v=6865&callFrom=${userId}&mode=${mode}`
     }).catch(error => console.error("Incoming call push failed:", error.message));
   });
 

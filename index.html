@@ -1,12 +1,529 @@
-{
-  "name": "ConnectChat Pro Enterprise v6.7.3",
-  "short_name": "ConnectChat",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#eef2f7",
-  "theme_color": "#182132",
-  "description": "Private AI-enhanced collaboration for mobile and PC",
-  "icons": [
-    {"src":"/logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
-  ]
-}
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-accent="violet">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#182132">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AmalChat">
+  <title>AmalChat Commercial Trial</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=6865">
+  <link rel="stylesheet" href="style-6864.css?v=6865">
+</head>
+<body>
+  <section id="authView" class="auth-view">
+    <div class="auth-card">
+      <img class="brand-logo" src="logo.svg" alt="AmalChat">
+      <h1>AmalChat</h1>
+      <p id="authSubtitle">Welcome back. Sign in to continue.</p>
+
+      <form id="authForm" novalidate>
+        <div class="tabs">
+          <button type="button" id="loginTab" class="active">Login</button>
+          <button type="button" id="registerTab">Register</button>
+        </div>
+
+        <label class="auth-label" for="authUsername">Username</label>
+        <input id="authUsername" placeholder="Username, email or phone" maxlength="254" autocomplete="username" required>
+        <label class="auth-label" for="authPassword">Password</label>
+        <div class="password-field">
+          <input id="authPassword" type="password" placeholder="Enter your password" minlength="6" maxlength="128" autocomplete="current-password" required>
+          <button id="togglePasswordBtn" type="button" aria-label="Show password">Show</button>
+        </div>
+        <button id="authSubmit" type="submit" class="primary">Login</button>
+        <button id="forgotBtn" type="button" class="text-btn">Forgot username or password?</button>
+        <div id="authError" class="error" role="alert"></div>
+      </form>
+      <div class="trial-license-mark" aria-label="AmalChat trial licence">
+        <b>Trial Version</b>
+        <span>Licensed by Aboassad</span>
+        <small>All Rights Reserved © 2026</small>
+      </div>
+    </div>
+  </section>
+
+  <section id="appView" class="app app-v4 hidden">
+    <div id="networkQuality" class="network-quality checking" role="status" aria-live="polite" title="Checking connection quality">
+      <svg class="network-wifi-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 9.5a14.7 14.7 0 0 1 18 0"></path>
+        <path d="M6.3 13a9.7 9.7 0 0 1 11.4 0"></path>
+        <path d="M9.5 16.5a4.4 4.4 0 0 1 5 0"></path>
+        <circle cx="12" cy="20" r="1.25"></circle>
+      </svg>
+      <span>Checking…</span>
+    </div>
+    <button id="themeBtn" class="hidden" type="button" aria-hidden="true"></button>
+    <button id="accentBtn" class="hidden" type="button" aria-hidden="true"></button>
+    <nav class="rail" aria-label="Primary navigation">
+      <button class="rail-brand" type="button" title="AmalChat"><img src="logo.svg" alt="AmalChat"></button>
+      <button class="rail-item active" type="button" data-section="chats"><span>💬</span><small>Chats</small><b id="railUnread" class="rail-badge hidden">0</b></button>
+      <button class="rail-item" type="button" data-section="ai"><span>🤖</span><small>AI</small></button>
+      <button class="rail-item" type="button" data-section="groups"><span>👥</span><small>Groups</small></button>
+      <button class="rail-item" type="button" data-section="files"><span>📁</span><small>Files</small></button>
+      <button class="rail-item" type="button" data-section="calculations"><span>📊</span><small>Sheets</small></button>
+      <button class="rail-item" type="button" data-section="calls"><span>📞</span><small>Calls</small></button>
+      <div class="rail-spacer"></div>
+      <button class="rail-item" type="button" data-section="settings"><span>⚙️</span><small>Settings</small></button>
+      <button class="rail-profile" type="button"><span id="railInitials">ME</span></button>
+    </nav>
+
+    <aside id="sidebar" class="sidebar workspace-sidebar">
+      <div class="workspace-title"><div><small>Workspace</small><h1 id="workspaceHeading">Messages</h1></div><button id="newChatBtn" class="new-btn" type="button">＋ New</button></div>
+      <div class="search-box"><span>⌕</span><input id="userSearch" placeholder="Search conversations"></div>
+      <div class="filter-row">
+        <button class="chat-filter active" type="button" data-filter="all">All</button>
+        <button class="chat-filter" type="button" data-filter="unread">Unread</button>
+        <button class="chat-filter" type="button" data-filter="groups">Groups</button>
+        <button class="chat-filter" type="button" data-filter="pinned">Pinned</button>
+        <button class="chat-filter" type="button" data-filter="archived">Archived</button>
+      </div>
+      <div id="quickContacts" class="quick-contacts"></div>
+      <div class="section-label"><span>RECENT</span><button id="refreshUsersBtn" class="plain-icon" type="button" title="Refresh">↻</button></div>
+      <div id="usersList" class="users-list"></div>
+      <div class="sidebar-actions compact-actions hidden-utility-actions" aria-hidden="true">
+        <button id="adminBtn" class="admin-btn hidden">Manage users</button>
+        <button id="statusBtn" class="status-btn">Status</button>
+        <button id="installBtn" class="install-btn hidden">Install app</button>
+        <button id="recoveryBtn" class="install-btn">Recovery code</button>
+      </div>
+      <div class="account-dock" aria-label="Current account">
+        <button id="accountMenuBtn" class="account-summary" type="button" aria-expanded="false">
+          <span id="accountAvatar" class="account-avatar">ME</span>
+          <span class="account-copy"><b id="accountName">Account</b><small id="accountRole">Member</small></span>
+          <span class="account-chevron">⌃</span>
+        </button>
+        <div id="accountMenu" class="account-menu hidden">
+          <button id="profileBtn" type="button">👤 Profile</button>
+          <button id="accountSettingsBtn" type="button">⚙ Settings</button>
+          <button id="switchAccountBtn" type="button">⇄ Switch account</button>
+        </div>
+        <button id="logoutBtn" class="logout-btn persistent-logout" type="button">↪ Logout</button>
+      </div>
+    </aside>
+
+    <main id="chatPanel" class="chat workspace-chat">
+      <header class="chat-head">
+        <button id="backBtn" class="back-btn" type="button" aria-label="Back to chats">←</button>
+        <div class="active-avatar" id="activeAvatar">?</div>
+        <div class="chat-identity"><h2 id="chatName">Select a user</h2><span id="chatStatus">Start a private conversation</span></div>
+        <div class="call-actions">
+          <button id="searchChatBtn" class="header-btn" title="Search conversation">⌕</button>
+          <button id="callMenuBtn" class="header-btn call-symbol" title="Call options" aria-label="Choose voice or video call" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg>
+          </button>
+          <button id="chatAiBtn" class="header-btn" title="AI tools for this conversation" disabled>✦</button>
+          <button id="moreChatBtn" class="header-btn" title="More">⋮</button>
+        </div>
+      </header>
+      <div id="conversationMenu" class="conversation-menu hidden">
+        <button id="archiveChatBtn" type="button">🗃 Archive chat</button>
+        <button id="deleteConversationBtn" class="danger-link" type="button">🗑 Delete all chat</button>
+      </div>
+      <div class="date-chip">Today</div>
+      <div id="messages" class="messages empty-state"><div><h3>Your messages</h3><p>Select a user to start chatting.</p></div></div>
+      <div id="smartStrip" class="smart-strip smart-popup hidden" aria-label="AI conversation tools"><span>✦ Conversation AI</span><div><label id="aiProviderControl" class="ai-provider-control hidden">AI <select id="aiProviderSelect" aria-label="AI provider"><option value="auto">Auto</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option></select></label><button type="button" data-smart="summary">Summarize</button><button type="button" data-smart="tasks">Action items</button><button type="button" data-smart="translate">Translate</button></div></div>
+      <div id="typingText" class="typing"></div><div id="uploadStatus" class="upload-status hidden">Uploading…</div>
+
+      <div id="aiAttachmentTray" class="ai-attachment-tray hidden">
+        <div class="ai-attachment-tray-head">
+          <strong>AI attachments</strong>
+          <button id="clearAiAttachmentsBtn" type="button" class="secondary-btn">Clear</button>
+        </div>
+        <div id="aiAttachmentTrayList" class="ai-attachment-tray-list"></div>
+      </div>
+      <section id="chatAiAssistant" class="chat-ai-assistant hidden" role="dialog" aria-modal="false" aria-labelledby="chatAiAssistantTitle">
+        <div class="chat-ai-assistant-head">
+          <div><span class="chat-ai-mark" aria-hidden="true">✦</span><h3 id="chatAiAssistantTitle">AI assistant</h3></div>
+          <button id="closeChatAiAssistantBtn" type="button" aria-label="Close AI assistant">×</button>
+        </div>
+        <div class="chat-ai-actions" aria-label="AI draft actions">
+          <button type="button" data-ai-draft-action="reply">✦ Suggest reply</button>
+          <button type="button" data-ai-draft-action="rewrite">✎ Rewrite</button>
+          <button type="button" data-ai-draft-action="translate">◎ Translate</button>
+          <button type="button" data-ai-draft-action="summary">▤ Summarize</button>
+        </div>
+        <p id="chatAiAssistantStatus" class="chat-ai-status">Choose an action. AI creates a draft and never sends automatically.</p>
+        <div id="chatAiDraftBox" class="chat-ai-draft-box hidden">
+          <label for="chatAiDraft">AI draft</label>
+          <textarea id="chatAiDraft" rows="5" maxlength="4000" aria-label="Editable AI draft"></textarea>
+          <div class="chat-ai-draft-buttons">
+            <button id="cancelChatAiDraftBtn" type="button">Cancel</button>
+            <button id="insertChatAiDraftBtn" class="primary" type="button">Insert draft</button>
+          </div>
+          <small>✓ Review before sending</small>
+        </div>
+      </section>
+<footer class="composer">
+<div id="voiceRecordPanel" class="voice-record-panel hidden" aria-live="polite">
+        <div class="voice-record-live">
+          <span class="voice-record-dot" aria-hidden="true"></span>
+          <strong id="voiceRecordState">Recording voice</strong>
+          <span id="voiceRecordTimer">00:00</span>
+        </div>
+        <audio id="voiceRecordPreview" class="hidden" controls preload="metadata"></audio>
+        <div class="voice-record-actions">
+          <button id="voiceRecordCancel" type="button" class="secondary-btn">Cancel</button>
+          <button id="voiceRecordStop" type="button" class="secondary-btn">Stop</button>
+          <button id="voiceRecordSend" type="button" class="send-btn hidden" aria-label="Send voice message">➤</button>
+        </div>
+      </div>
+        <input id="fileInput" type="file" accept="image/*,application/pdf,text/plain,text/csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+        <input id="videoCameraInput" type="file" accept="video/*" capture="environment" hidden>
+        <button id="emojiBtn" class="circle-btn" type="button" title="Emoji">😊</button>
+        <button id="attachBtn" class="circle-btn attach-btn" type="button" title="Add photos or documents" aria-label="Add photos or documents" disabled>📎</button>
+        <button id="cameraBtn" class="circle-btn apple-control-icon" type="button" title="Tap for photo · Hold for video" aria-label="Tap for photo or hold to record video">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 6.3 9.4 4.5h5.2l1.3 1.8H19a2.5 2.5 0 0 1 2.5 2.5v8.7A2.5 2.5 0 0 1 19 20H5a2.5 2.5 0 0 1-2.5-2.5V8.8A2.5 2.5 0 0 1 5 6.3h3.1Z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+        <div class="message-entry">
+          <div id="emojiPicker" class="emoji-picker hidden" aria-label="Emoji picker"></div>
+          <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Write a message…" disabled></textarea>
+          <small class="composer-hint">Enter to send · Shift+Enter for new line</small>
+        </div>
+        <button id="composerAiBtn" class="circle-btn composer-ai-btn hidden" type="button" title="AI reply assistant" aria-label="Open AI reply assistant" disabled><span aria-hidden="true">✦</span><small>AI</small></button>
+        <button id="recordBtn" class="circle-btn record-btn apple-control-icon" type="button" title="Record voice" aria-label="Record voice">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5"></rect><path d="M5.5 11.5v.8a6.5 6.5 0 0 0 13 0v-.8M12 18.8v2.7M8.7 21.5h6.6"></path></svg>
+        </button>
+        <button id="sendBtn" class="send-btn" type="button" title="Send" aria-label="Send message" disabled><span aria-hidden="true">➤</span></button>
+      </footer>
+    </main>
+
+
+    <main id="sectionPage" class="section-page hidden" aria-label="Workspace page">
+      <header class="section-page-head">
+        <div>
+          <small id="sectionEyebrow">AMALCHAT</small>
+          <h1 id="sectionTitle">Workspace</h1>
+          <p id="sectionDescription">Choose a workspace from the navigation.</p>
+        </div>
+        <button id="sectionBackBtn" class="secondary-btn" type="button">Back to chats</button>
+      </header>
+      <div id="sectionContent" class="section-page-content"></div>
+    </main>
+
+    <aside class="insights-panel workspace-insights" aria-label="Smart workspace">
+      <div class="insights-head"><div><small>AMALCHAT COMMERCIAL TRIAL</small><h3>Workspace overview</h3></div><button class="mini-icon" type="button" title="Workspace information">ⓘ</button></div>
+      <div class="insight-tabs"><button class="active" type="button" data-insight-tab="overview">Overview</button><button type="button" data-insight-tab="files">Files</button><button type="button" data-insight-tab="media">Media</button></div>
+      <div id="insightOverviewPanel" class="insight-panel-content">
+        <div class="workspace-profile-card">
+          <div id="workspaceProfileAvatar" class="workspace-profile-avatar">ME</div>
+          <div><small>Signed in as</small><h3 id="workspaceProfileName">User</h3><span id="workspaceProfileRole">Member</span></div>
+        </div>
+        <div class="workspace-stat-grid">
+          <div><b id="workspaceContactCount">0</b><small>Contacts</small></div>
+          <div><b id="workspaceOnlineCount">0</b><small>Online now</small></div>
+          <div><b id="workspaceUnreadCount">0</b><small>Unread</small></div>
+          <div><b id="workspaceCallStatus">Ready</b><small>Calls</small></div>
+        </div>
+        <div class="workspace-help-card"><b>Current conversation</b><p id="workspaceConversationSummary">Select a real contact from the left panel.</p></div>
+        <div class="security-card"><b>🔒 Secure workspace</b><p>Protected sessions, validated uploads, encrypted transport and account recovery are enabled.</p></div>
+      </div>
+      <div id="insightFilesPanel" class="insight-panel-content hidden"></div>
+      <div id="insightMediaPanel" class="insight-panel-content hidden"></div>
+    </aside>
+  </section>
+
+  <section id="profilePage" class="profile-page hidden" aria-label="Profile page">
+    <header class="profile-page-head">
+      <button id="closeProfilePageBtn" type="button" class="profile-back">← Back</button>
+      <div><small>AMALCHAT</small><h1 id="profilePageTitle">My profile</h1></div>
+    </header>
+    <main class="profile-page-body">
+      <section class="profile-photo-card">
+        <div id="profilePhotoPreview" class="profile-photo-preview" role="button" tabindex="0" title="View profile photo" aria-label="View profile photo">ME</div>
+        <div class="profile-photo-copy">
+          <h2 id="profilePageName">User</h2>
+          <p id="profilePageRole">Workspace member</p>
+          <div id="profileOwnerActions" class="profile-photo-actions">
+            <label for="profilePhotoInput" class="primary profile-upload-label">Upload photo</label>
+            <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+            <button id="removeProfilePhotoBtn" type="button" class="secondary-btn">Remove photo</button>
+          </div>
+          <div id="profileViewerActions" class="profile-photo-actions hidden">
+            <button id="profileMessageBtn" type="button" class="primary">Message</button>
+            <button id="profileCallBtn" type="button" class="secondary-btn">Call</button>
+          </div>
+          <small id="profilePhotoHelp">JPG, PNG, WEBP or GIF. Maximum 12 MB. Square photos look best.</small>
+          <div id="profilePhotoResult" class="dialog-result"></div>
+        </div>
+      </section>
+      <section class="profile-details-card">
+        <h3>Account information</h3>
+        <div class="profile-detail-row"><span>Username</span><b id="profileUsername">—</b></div>
+        <div class="profile-detail-row"><span>Role</span><b id="profileRole">—</b></div>
+        <div class="profile-detail-row"><span>Status</span><b id="profileStatus">Approved</b></div>
+        <p id="profilePermissionNote">Only you can upload, replace or remove your profile photo.</p>
+      </section>
+    </main>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+
+  <section id="captureOverlay" class="capture-overlay hidden" aria-label="Media recorder">
+    <div class="capture-shell">
+      <div class="capture-top"><button id="captureCloseBtn" type="button">×</button><b id="captureTitle">Photo</b><span id="captureTimer">00:00</span></div>
+      <div id="capturePreview" class="capture-preview"><video id="captureVideo" autoplay playsinline muted></video><audio id="captureAudio" class="hidden" playsinline preload="metadata"></audio><canvas id="captureCanvas" class="hidden"></canvas><div id="voiceWave" class="voice-wave hidden">▂▅▇▃▆▂▇▅▃▆▂▅▇</div></div>
+      <div class="capture-tabs"><button data-mode="photo">PHOTO</button><button data-mode="video">VIDEO</button></div>
+      <div class="capture-filter-control">
+        <label for="cameraFilterButton">Filter</label>
+        <div class="camera-filter-picker">
+          <button id="cameraFilterButton" class="camera-filter-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cameraFilterMenu">
+            <span id="cameraFilterButtonLabel">Normal</span><span class="camera-filter-chevron" aria-hidden="true">⌃</span>
+          </button>
+          <div id="cameraFilterMenu" class="camera-filter-menu hidden" role="listbox" aria-label="Camera filter">
+            <button type="button" role="option" data-camera-filter="normal">Normal</button>
+            <button type="button" role="option" data-camera-filter="beauty">Beauty / Smooth</button>
+            <button type="button" role="option" data-camera-filter="youngslim">🌿 Young + Slim</button>
+            <button type="button" role="option" data-camera-filter="warm">Warm</button>
+            <button type="button" role="option" data-camera-filter="cool">Cool</button>
+            <button type="button" role="option" data-camera-filter="bw">B&amp;W</button>
+            <button type="button" role="option" data-camera-filter="bright">Bright</button>
+            <button type="button" role="option" data-camera-filter="soft">Soft</button>
+          </div>
+        </div>
+        <select id="cameraFilterSelect" class="hidden" tabindex="-1" aria-hidden="true">
+          <option value="normal">Normal</option>
+          <option value="beauty">Beauty / Smooth</option>
+          <option value="youngslim">🌿 Young + Slim</option>
+          <option value="warm">Warm</option>
+          <option value="cool">Cool</option>
+          <option value="bw">B&amp;W</option>
+          <option value="bright">Bright</option>
+          <option value="soft">Soft</option>
+        </select>
+      </div>
+      <div class="capture-actions"><button id="captureSaveBtn" class="hidden" type="button">⬇ Save</button><button id="captureShareBtn" class="hidden" type="button">↗ Share</button><button id="captureRetakeBtn" class="hidden" type="button">Retake</button><button id="capturePreviewBtn" class="hidden" type="button" aria-label="Preview recording">▶ Preview</button><button id="captureMainBtn" type="button" aria-label="Capture"></button><button id="captureSendBtn" class="hidden" type="button" aria-label="Send">➤</button><button id="captureSwitchBtn" type="button" aria-label="Switch front or rear camera" title="Switch front or rear camera"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="switch-camera-body" d="M8 11h4l2-3h4l2 3h4a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-9a3 3 0 0 1 3-3Z"/><circle class="switch-camera-lens" cx="16" cy="18" r="4"/><path class="switch-camera-arrow" d="M7 8a12 12 0 0 1 18-2m0 0V2m0 4h-4M25 24a12 12 0 0 1-18 2m0 0v4m0-4h4"/></svg></button></div>
+      <div id="capturePhotoReview" class="capture-photo-review hidden" role="dialog" aria-modal="true" aria-label="Review selfie before sharing or sending">
+        <button id="captureReviewCloseBtn" class="capture-review-close" type="button" aria-label="Close preview">×</button>
+        <img id="captureReviewImage" alt="Captured selfie preview">
+        <div class="capture-review-actions">
+          <button id="captureReviewRetakeBtn" type="button">↻ Retake</button>
+          <button id="captureReviewSaveBtn" type="button">⬇ Save</button>
+          <button id="captureReviewShareBtn" type="button">↗ Share</button>
+          <button id="captureReviewSendBtn" class="capture-review-send" type="button">➤ Send</button>
+        </div>
+      </div>
+      <div id="captureRecipientPicker" class="capture-recipient-picker hidden" role="dialog" aria-modal="true" aria-label="Share selfie with AmalChat users">
+        <div class="capture-recipient-card">
+          <div class="capture-recipient-head"><div><b>Share inside AmalChat</b><small>Select one or more approved users</small></div><button id="captureRecipientCloseBtn" type="button" aria-label="Close recipient list">×</button></div>
+          <input id="captureRecipientSearch" type="search" placeholder="Search users" autocomplete="off">
+          <div id="captureRecipientList" class="capture-recipient-list"></div>
+          <div id="captureRecipientSummary" class="capture-recipient-summary">No users selected</div>
+          <div class="capture-recipient-actions"><button id="captureExternalShareBtn" type="button">↗ Other apps</button><button id="captureRecipientSendBtn" type="button" disabled>➤ Send selected</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="callOverlay" class="call-overlay hidden">
+    <div id="callNetworkQuality" class="network-quality checking call-network-quality" role="status" aria-live="polite" title="Checking connection quality">
+      <svg class="network-wifi-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2.5 8.5a14 14 0 0 1 19 0"></path>
+        <path d="M5.5 12a9.5 9.5 0 0 1 13 0"></path>
+        <path d="M8.8 15.5a5 5 0 0 1 6.4 0"></path>
+        <circle cx="12" cy="19" r="1.25"></circle>
+      </svg>
+      <span>Checking</span>
+    </div>
+    <div class="call-card">
+      <div class="call-title">
+        <div>
+          <h2 id="callName">Call</h2>
+          <div class="call-status-line">
+            <span id="callStatus">Connecting…</span>
+            <b id="callTimer" aria-label="Call timer">00:00</b>
+          </div>
+        </div>
+      </div>
+      <div id="videoStage" class="video-stage">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="localVideo" autoplay playsinline muted></video>
+      </div>
+      <div class="call-controls">
+        <button id="acceptCallBtn" class="accept-call hidden">Accept</button>
+        <button id="declineCallBtn" class="decline-call hidden">Decline</button>
+        <button id="muteBtn" class="call-control hidden">🎤 Mute</button>
+        <button id="cameraToggleBtn" class="call-control hidden">📹 Camera</button>
+        <button id="switchCameraBtn" class="call-control hidden">🔄 Switch</button>
+        <button id="shareScreenBtn" class="call-control hidden">🖥 Share screen</button>
+        <div id="callFilterControl" class="call-filter-native hidden">
+          <span aria-hidden="true">✨</span>
+          <select id="callFilterSelect" aria-label="Live camera filter">
+            <option value="normal">Normal</option>
+            <option value="beauty">Beauty / Smooth</option>
+            <option value="youngslim">🌿 Young + Slim</option>
+            <option value="warm">Warm</option>
+            <option value="cool">Cool</option>
+            <option value="bw">B&amp;W</option>
+            <option value="bright">Bright</option>
+            <option value="soft">Soft</option>
+          </select>
+        </div>
+        <button id="endCallBtn" class="end-call hidden">End call</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="callChoiceOverlay" class="dialog-overlay call-choice-overlay hidden" role="dialog" aria-modal="true" aria-label="Choose call type">
+    <div class="dialog-card call-choice-dialog">
+      <button id="closeCallChoiceBtn" class="dialog-close" type="button" aria-label="Close call options">×</button>
+      <h2>Start a call</h2>
+      <p id="callChoiceContact" class="dialog-intro">Choose how you want to call this user.</p>
+      <div class="call-choice-actions">
+        <button id="chooseVoiceCallBtn" type="button"><span class="call-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 3.3 9.2 7 7.6 9.1c1.2 2.7 3.3 4.8 6 6l2.1-1.6 3.7 2.5c.5.3.7.9.5 1.5l-.7 2.2c-.2.7-.9 1.1-1.6 1.1C9.7 20.3 3.7 14.3 3.2 6.4c0-.7.4-1.4 1.1-1.6l2.2-.7c.6-.2 1.2.1 1.5.5Z"></path></svg></span><b>Voice call</b><small>Use microphone only</small></button>
+        <button id="chooseVideoCallBtn" type="button"><span class="call-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg></span><b>Video call</b><small>Use camera and microphone</small></button>
+      </div>
+      <small id="callChoiceOfflineNote" class="call-choice-offline hidden">This user is offline. AmalChat will save a missed-call notification.</small>
+    </div>
+  </section>
+
+  <section id="statusOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card status-dialog">
+      <button id="closeStatusBtn" class="dialog-close" aria-label="Close">×</button>
+      <div class="status-title-row">
+        <div>
+          <h2>24-hour Status</h2>
+          <p class="dialog-intro">Share text, a photo, or a short video. It disappears after 24 hours.</p>
+        </div>
+        <button id="refreshStatusBtn" class="secondary-btn status-refresh">Refresh</button>
+      </div>
+      <div class="status-create">
+        <textarea id="statusText" maxlength="500" placeholder="Write a status or an optional media caption"></textarea>
+        <div class="status-create-actions">
+          <label class="status-file-label" for="statusFile">Choose photo/video</label>
+          <input id="statusFile" type="file" accept="image/*,video/mp4,video/webm,video/quicktime">
+          <button id="postStatusBtn" class="primary">Post status</button>
+        </div>
+        <div id="statusResult" class="dialog-result"></div>
+      </div>
+      <div id="statusesList" class="statuses-list"></div>
+    </div>
+  </section>
+
+  <section id="recoveryOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card">
+      <button id="closeRecoveryBtn" class="dialog-close" aria-label="Close">×</button>
+      <h2>Account recovery</h2>
+      <p id="recoveryIntro" class="dialog-intro">Use the private recovery code supplied when the account was created.</p>
+
+      <div id="savedCodePanel" class="hidden">
+        <p>Save this code somewhere private. It is shown only now.</p>
+        <div id="recoveryCodeText" class="recovery-code"></div>
+        <button id="copyRecoveryBtn" class="primary">Copy recovery code</button>
+      </div>
+
+      <div id="recoverFormPanel">
+        <label for="recoveryCodeInput">Recovery code</label>
+        <input id="recoveryCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+        <div class="recovery-actions">
+          <button id="findUsernameBtn" class="secondary-btn">Find username</button>
+        </div>
+        <div class="divider"><span>or reset password</span></div>
+        <label for="newPasswordInput">New password</label>
+        <input id="newPasswordInput" type="password" placeholder="At least 6 characters" minlength="6" maxlength="128" autocomplete="new-password">
+        <button id="resetPasswordBtn" class="primary">Reset password</button>
+      </div>
+
+      <div id="recoveryResult" class="dialog-result"></div>
+    </div>
+  </section>
+
+  <section id="adminOverlay" class="dialog-overlay hidden">
+    <div class="dialog-card admin-dialog">
+      <button id="closeAdminBtn" class="dialog-close" aria-label="Close">×</button>
+      <div class="admin-title-row">
+        <div>
+          <h2>User administration</h2>
+          <p class="dialog-intro">Approve new accounts, block access, or permanently delete users.</p>
+        </div>
+        <button id="refreshAdminBtn" class="secondary-btn admin-refresh">Refresh</button>
+      </div>
+      <div id="adminUsersList" class="admin-users"></div>
+      <div id="adminResult" class="dialog-result"></div>
+    </div>
+  </section>
+
+  <section id="calculationPreviewOverlay" class="dialog-overlay calculation-preview-overlay hidden">
+    <div class="calculation-preview-dialog">
+      <header><div><small>CALCULATION SHEET</small><h2 id="calculationPreviewTitle">Preview</h2><p id="calculationPreviewNote"></p></div><div><button id="calculationPreviewDownload" type="button">Download</button><button id="closeCalculationPreview" class="dialog-close" type="button" aria-label="Close">×</button></div></header>
+      <div id="calculationPreviewTabs" class="calculation-preview-tabs"></div>
+      <div id="calculationPreviewContent" class="calculation-preview-content"></div>
+    </div>
+  </section>
+
+  <section id="avatarCropOverlay" class="dialog-overlay avatar-crop-overlay hidden" aria-label="Crop profile photo">
+    <div class="dialog-card avatar-crop-dialog">
+      <button id="closeAvatarCropBtn" class="dialog-close" type="button" aria-label="Close">×</button>
+      <h2>Crop profile photo</h2>
+      <p class="dialog-intro">Drag the photo to position it, then zoom in or out. The square result will be used everywhere.</p>
+      <div class="avatar-crop-stage"><canvas id="avatarCropCanvas" width="640" height="640"></canvas></div>
+      <label class="avatar-zoom-control" for="avatarZoomRange"><span>Zoom out</span><input id="avatarZoomRange" type="range" min="1" max="3" value="1" step="0.01"><span>Zoom in</span></label>
+      <div class="avatar-crop-actions"><button id="cancelAvatarCropBtn" class="secondary-btn" type="button">Cancel</button><button id="saveAvatarCropBtn" class="primary" type="button">Crop and upload</button></div>
+      <div id="avatarCropResult" class="dialog-result"></div>
+    </div>
+  </section>
+
+  <section id="mediaConfirmOverlay" class="dialog-overlay media-confirm-overlay hidden" role="dialog" aria-modal="true" aria-label="Confirm media before sending">
+    <div class="dialog-card media-confirm-dialog">
+      <button id="closeMediaConfirmBtn" class="dialog-close" type="button" aria-label="Cancel media">×</button>
+      <h2 id="mediaConfirmTitle">Preview</h2>
+      <p class="dialog-intro">Check this media before uploading it to the chat.</p>
+      <div id="mediaConfirmPreview" class="media-confirm-preview"></div>
+      <div class="media-confirm-details"><b id="mediaConfirmName">Media</b><small id="mediaConfirmSize"></small></div>
+      <div class="media-confirm-actions">
+        <button id="cancelMediaConfirmBtn" class="secondary-btn" type="button">Cancel</button>
+        <button id="sendMediaConfirmBtn" class="primary" type="button">Send</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="chatMediaViewer" class="chat-media-viewer hidden" role="dialog" aria-modal="true" aria-label="Chat photo or video viewer">
+    <header class="chat-media-viewer-head">
+      <button id="closeChatMediaViewer" type="button" aria-label="Close media viewer">×</button>
+      <div><small id="chatMediaViewerType">PHOTO</small><b id="chatMediaViewerName">AmalChat media</b></div>
+      <button id="chatMediaMenuBtn" type="button" aria-label="Media options" aria-expanded="false">⋯</button>
+    </header>
+    <div id="chatMediaViewerStage" class="chat-media-viewer-stage">
+      <img id="chatMediaViewerImage" class="hidden" alt="Chat photo" draggable="false">
+      <video id="chatMediaViewerVideo" class="hidden" controls playsinline preload="metadata"></video>
+    </div>
+    <div id="chatMediaActions" class="chat-media-actions hidden" role="menu">
+      <button id="chatMediaForwardBtn" type="button">Forward to AmalChat users</button>
+      <button id="chatMediaExternalBtn" type="button">↗ Share to another application</button>
+      <button id="chatMediaSaveBtn" type="button">⬇ Save to device</button>
+    </div>
+    <div id="chatMediaRecipientPicker" class="chat-media-recipient-picker hidden" role="dialog" aria-modal="true" aria-label="Forward media to AmalChat users">
+      <div class="chat-media-recipient-card">
+        <div class="chat-media-recipient-head"><div><b>Forward media</b><small>Select one or more approved users</small></div><button id="chatMediaRecipientCloseBtn" type="button" aria-label="Close recipient list">×</button></div>
+        <input id="chatMediaRecipientSearch" type="search" placeholder="Search users" autocomplete="off">
+        <div id="chatMediaRecipientList" class="chat-media-recipient-list"></div>
+        <div id="chatMediaRecipientSummary" class="chat-media-recipient-summary">No users selected</div>
+        <button id="chatMediaRecipientSendBtn" type="button" disabled>➤ Forward selected</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="profilePhotoViewer" class="profile-photo-viewer hidden" aria-label="Profile photo viewer" aria-modal="true" role="dialog">
+    <header class="profile-photo-viewer-head">
+      <div><small>PROFILE PHOTO</small><h2 id="profilePhotoViewerName">User</h2></div>
+      <button id="closeProfilePhotoViewer" type="button" aria-label="Close profile photo">×</button>
+    </header>
+    <div id="profilePhotoViewerStage" class="profile-photo-viewer-stage">
+      <img id="profilePhotoViewerImage" alt="Profile photo" draggable="false">
+    </div>
+    <footer class="profile-photo-viewer-controls">
+      <button id="profilePhotoZoomOut" type="button" aria-label="Zoom out">−</button>
+      <button id="profilePhotoZoomReset" type="button">100%</button>
+      <button id="profilePhotoZoomIn" type="button" aria-label="Zoom in">+</button>
+    </footer>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="face-filters.js?v=6865"></script>
+  <script src="app.js?v=6865"></script>
+</body>
+</html>
