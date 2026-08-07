@@ -39,7 +39,7 @@ if (String(process.env.TELEGRAM_BOT_TOKEN || "").trim()) {
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const APP_BUILD = "6865";
+const APP_BUILD = "6866";
 const ROOT = __dirname;
 const SUPABASE_URL = String(process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -66,6 +66,7 @@ if (PUSH_ENABLED) {
 const AI_PROVIDER = String(process.env.AI_PROVIDER || "openai").trim().toLowerCase();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
+const OPENAI_TRANSCRIBE_MODEL = String(process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
 const DEEPSEEK_API_KEY = String(process.env.DEEPSEEK_API_KEY || "").trim();
 const DEEPSEEK_MODEL = String(process.env.DEEPSEEK_MODEL || "deepseek-v4-flash").trim();
 const DEEPSEEK_BASE_URL = String(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/$/, "");
@@ -1413,6 +1414,62 @@ app.post("/api/ai/upload", auth, upload.single("file"), async (req,res)=>{
   }catch(error){
     console.error("AI upload failed",error);
     res.status(500).json({error:"Could not process this file for AI."});
+  }
+});
+
+app.post("/api/ai/transcribe", aiLimiter, auth, upload.single("file"), async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) {
+      return res.status(503).json({ error: "AI voice requires OpenAI to be configured on the server." });
+    }
+    if (!req.file) return res.status(400).json({ error: "No voice recording received." });
+    if (req.file.size > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: "Voice recordings must be 25 MB or smaller." });
+    }
+
+    const normalizedAudioFile = {
+      ...req.file,
+      mimetype: String(req.file.mimetype || "").split(";", 1)[0].toLowerCase()
+    };
+    const verified = await verifyUpload(normalizedAudioFile);
+    if (verified.kind !== "voice") {
+      return res.status(400).json({ error: "The uploaded recording is not a supported audio file." });
+    }
+
+    const form = new FormData();
+    const filename = cleanFileName(req.file.originalname || `voice.${verified.ext || "webm"}`);
+    form.append("file", new Blob([req.file.buffer], { type: verified.mime }), filename);
+    form.append("model", OPENAI_TRANSCRIBE_MODEL);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.min(AI_REQUEST_TIMEOUT_MS, 90000));
+    let response;
+    try {
+      response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
+        body: form,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("AI voice transcription failed:", response.status, data?.error?.message || "Unknown OpenAI error");
+      if (response.status === 401) return res.status(502).json({ error: "OpenAI rejected the server API key." });
+      if (response.status === 429) return res.status(429).json({ error: "AI voice usage limit reached. Please try again shortly." });
+      return res.status(502).json({ error: "AmalChat AI could not transcribe this recording." });
+    }
+
+    const text = cleanText(data?.text, 4000);
+    if (!text) return res.status(422).json({ error: "No speech was detected. Please record again." });
+    res.json({ text, model: OPENAI_TRANSCRIBE_MODEL });
+  } catch (error) {
+    if (error?.name === "AbortError") return res.status(504).json({ error: "Voice transcription took too long. Please try again." });
+    console.error("AI voice transcription error:", error);
+    res.status(500).json({ error: "Could not process this voice recording." });
   }
 });
 
@@ -3122,7 +3179,7 @@ io.on("connection", async socket => {
       title: `Incoming ${mode === "video" ? "video" : "voice"} call`,
       body: `${username} is calling you`,
       tag: `incoming-call-${userId}`,
-      url: `/?v=6865&callFrom=${userId}&mode=${mode}`
+      url: `/?v=6866&callFrom=${userId}&mode=${mode}`
     }).catch(error => console.error("Incoming call push failed:", error.message));
   });
 
