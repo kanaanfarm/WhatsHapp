@@ -84,7 +84,7 @@ const AI_CONFIGURED = AI_PROVIDER === "hybrid"
   ? OPENAI_CONFIGURED || DEEPSEEK_CONFIGURED || OLLAMA_CONFIGURED
   : AI_PROVIDER === "ollama" ? OLLAMA_CONFIGURED : AI_PROVIDER === "deepseek" ? DEEPSEEK_CONFIGURED : OPENAI_CONFIGURED;
 const AI_ENABLED = process.env.AI_ENABLED !== "false" && AI_CONFIGURED;
-const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are ConnectChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
+const AI_SYSTEM_PROMPT = String(process.env.AI_SYSTEM_PROMPT || "You are AmalChat AI, a helpful, accurate assistant. Reply in the same language as the user unless asked otherwise. Be especially helpful with MEP, HVAC, construction correspondence, calculations, translation, and general questions. Clearly state uncertainty and never invent project facts.").slice(0, 4000);
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax",
@@ -111,8 +111,18 @@ if (IS_PRODUCTION && (SESSION_SECRET.length < 32 || SESSION_SECRET.includes("cha
   process.exit(1);
 }
 
+const supabaseServerFetch = async (input, init = {}) => {
+  const headers = new Headers(init.headers || {});
+  // New Supabase secret keys authenticate through the apikey header and must
+  // not be forwarded as an Authorization Bearer token. Keep Bearer behavior
+  // unchanged for legacy JWT service_role keys.
+  if (SUPABASE_SERVICE_ROLE_KEY.startsWith("sb_secret_")) headers.delete("Authorization");
+  return fetch(input, { ...init, headers });
+};
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  global: { fetch: supabaseServerFetch }
 });
 const supabaseOrigin = new URL(SUPABASE_URL).origin;
 
@@ -361,7 +371,7 @@ function openCallPair(firstUserId, secondUserId, metadata = {}) {
   const record = {
     callerId: Number(metadata.callerId || firstUserId),
     receiverId: Number(metadata.receiverId || secondUserId),
-    callerName: String(metadata.callerName || "ConnectChat user"),
+    callerName: String(metadata.callerName || "AmalChat user"),
     mode: metadata.mode === "audio" ? "audio" : "video",
     callLogId: Number(metadata.callLogId) || null,
     startedAt: metadata.startedAt || new Date().toISOString(),
@@ -485,11 +495,8 @@ async function auth(req, res, next) {
   try {
     const user = await getUserById(req.session.userId, "id,username,avatar,status,is_admin");
     if (!user) return res.status(401).json({ error: "Account not found" });
-    if (user.status !== "approved") {
-      return res.status(403).json({
-        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval.",
-        code: String(user.status || "pending").toUpperCase()
-      });
+    if (user.status === "blocked") {
+      return res.status(403).json({ error: "This account has been blocked by the administrator.", code: "BLOCKED" });
     }
     req.currentUser = user;
     req.session.username = user.username;
@@ -684,10 +691,10 @@ async function extractAiFileText(file){
     return cleanExtractedText(buf.toString("utf8"));
   }
   if(name.endsWith(".pptx")||name.endsWith(".ppt")||mime.includes("presentation")){
-    return "[PowerPoint uploaded. Export to PDF for full text extraction in ConnectChat AI.]";
+    return "[PowerPoint uploaded. Export to PDF for full text extraction in AmalChat AI.]";
   }
   if(mime.startsWith("image/")){
-    return "[Image uploaded. OCR/vision extraction is not enabled in this build.]";
+    return "[Image attached for AmalChat AI visual analysis.]";
   }
   return "[File uploaded. This file type does not have text extraction enabled in this build.]";
 }
@@ -803,26 +810,41 @@ app.post("/api/register", async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const recoveryCode = createRecoveryCode();
-    const { data, error } = await supabase.from("users").insert({
+    const { error: insertError } = await supabase.from("users").insert({
       username,
       password_hash: passwordHash,
       recovery_hash: recoveryHash(recoveryCode),
-      status: "pending",
+      status: "approved",
       is_admin: false
-    }).select("id,username,avatar,status,is_admin").single();
-    if (error) {
-      if (error.code === "23505") return res.status(409).json({ error: "Username already exists." });
-      throw error;
+    });
+    if (insertError) {
+      if (insertError.code === "23505") return res.status(409).json({ error: "Username already exists." });
+      throw insertError;
     }
-    io.emit("users:changed", { reason: "registration", userId: Number(data.id), status: "pending" });
-    res.status(201).json({
-      ...safeUser(data),
-      recoveryCode,
-      pending: true,
-      message: "Account created. Wait for administrator approval before logging in."
+    const { data: createdUser, error: lookupError } = await supabase.from("users")
+      .select("id,username,avatar,status,is_admin")
+      .eq("username", username)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!createdUser) throw new Error("Registration insert completed but user was not found.");
+
+    io.emit("users:changed", { reason: "registration", userId: Number(createdUser.id), status: "approved" });
+    req.session.regenerate(regenerateError => {
+      if (regenerateError) return res.status(500).json({ error: "Registration succeeded but login could not start." });
+      req.session.userId = Number(createdUser.id);
+      req.session.username = createdUser.username;
+      req.session.save(saveError => {
+        if (saveError) return res.status(500).json({ error: "Registration succeeded but login could not start." });
+        res.status(201).json({
+          ...safeUser(createdUser),
+          recoveryCode,
+          pending: false,
+          message: "Account created successfully."
+        });
+      });
     });
   } catch (error) {
-    console.error(error);
+    console.error("Registration error:", error);
     res.status(500).json({ error: "Registration failed." });
   }
 });
@@ -849,11 +871,8 @@ app.post("/api/login", async (req, res) => {
     if (!user || !passwordMatches) {
       return res.status(401).json({ error: "Invalid username, email, phone or password." });
     }
-    if (user.status !== "approved") {
-      return res.status(403).json({
-        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval.",
-        code: String(user.status || "pending").toUpperCase()
-      });
+    if (user.status === "blocked") {
+      return res.status(403).json({ error: "This account has been blocked by the administrator.", code: "BLOCKED" });
     }
     const responseUser = await attachSignInOptions(await safeUserWithAvatar(user));
     req.session.regenerate(regenerateError => {
@@ -936,11 +955,7 @@ app.get("/api/me", async (req, res) => {
   try {
     const user = await getUserById(req.session.userId, "id,username,avatar,status,is_admin");
     if (!user) return res.status(401).json({ error: "Account not found" });
-    if (user.status !== "approved") {
-      return res.status(403).json({
-        error: user.status === "blocked" ? "This account has been blocked by the administrator." : "Your account is waiting for administrator approval."
-      });
-    }
+    if (user.status === "blocked") return res.status(403).json({ error: "This account has been blocked by the administrator." });
     res.json(await attachSignInOptions(await safeUserWithAvatar(user)));
   } catch (error) {
     console.error(error);
@@ -1236,7 +1251,13 @@ function aiFailureText(provider, error) {
   return `${label} request failed`;
 }
 
-async function requestOpenAI(message, history, signal) {
+async function requestOpenAI(message, history, signal, imageDataUrls = []) {
+  const userContent = imageDataUrls.length
+    ? [
+        { type: "input_text", text: message },
+        ...imageDataUrls.map(image_url => ({ type: "input_image", image_url, detail: "auto" }))
+      ]
+    : message;
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -1246,7 +1267,7 @@ async function requestOpenAI(message, history, signal) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       instructions: AI_SYSTEM_PROMPT,
-      input: [...history, { role: "user", content: message }],
+      input: [...history, { role: "user", content: userContent }],
       max_output_tokens: 1600
     }),
     signal
@@ -1360,7 +1381,12 @@ app.post("/api/ai/upload", auth, upload.single("file"), async (req,res)=>{
     const allowed = /\.(pdf|docx?|xlsx?|csv|txt|pptx?|png|jpe?g|webp)$/i.test(req.file.originalname||"")
       || /^(application\/pdf|text\/|image\/)/i.test(req.file.mimetype||"");
     if(!allowed)return res.status(400).json({error:"This file type is not supported for AI attachments yet."});
+    const isImage=(req.file.mimetype||"").toLowerCase().startsWith("image/");
+    if(isImage&&req.file.size>10*1024*1024)return res.status(413).json({error:"AI images must be 10 MB or smaller."});
     const text=await extractAiFileText(req.file);
+    const imageDataUrl=isImage
+      ? `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`
+      : null;
     const attachmentId=`aiatt-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
     aiAttachmentStore.set(attachmentId,{
       id:attachmentId,
@@ -1369,6 +1395,7 @@ app.post("/api/ai/upload", auth, upload.single("file"), async (req,res)=>{
       type:req.file.mimetype||"application/octet-stream",
       size:req.file.size,
       text,
+      imageDataUrl,
       createdAt:Date.now()
     });
     // Keep store bounded.
@@ -1381,7 +1408,7 @@ app.post("/api/ai/upload", auth, upload.single("file"), async (req,res)=>{
       type:req.file.mimetype,
       size:req.file.size,
       extractedChars:text.length,
-      summary:text.startsWith("[")?text:`Ready for AI analysis · ${text.length.toLocaleString()} extracted characters`
+      summary:isImage?"Ready for AI vision analysis":text.startsWith("[")?text:`Ready for AI analysis · ${text.length.toLocaleString()} extracted characters`
     });
   }catch(error){
     console.error("AI upload failed",error);
@@ -1393,15 +1420,21 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
   try {
     if (!AI_ENABLED) {
       return res.status(503).json({
-        error: "ConnectChat AI is not configured. Check the DeepSeek, OpenAI, or Ollama server settings."
+        error: "AmalChat AI is not configured. Check the DeepSeek, OpenAI, or Ollama server settings."
       });
     }
     const message = cleanText(req.body?.message, 4000);
     if (!message) return res.status(400).json({ error: "Please enter a message." });
     const attachmentIds = Array.isArray(req.body?.attachmentIds) ? req.body.attachmentIds.slice(-10) : [];
-    const attachmentContext = attachmentIds
+    const selectedAttachments = attachmentIds
       .map(id => aiAttachmentStore.get(String(id)))
-      .filter(item => item && Number(item.userId) === Number(req.currentUser.id))
+      .filter(item => item && Number(item.userId) === Number(req.currentUser.id));
+    const imageDataUrls = selectedAttachments
+      .filter(item => item.imageDataUrl)
+      .slice(-4)
+      .map(item => item.imageDataUrl);
+    const attachmentContext = selectedAttachments
+      .filter(item => !item.imageDataUrl)
       .map(item => `FILE: ${item.name}\n${item.text}`)
       .join("\n\n---\n\n");
     const messageWithFiles = attachmentContext
@@ -1416,7 +1449,14 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     const allowed = AI_PROVIDER === "hybrid" ? ["deepseek", "openai", "ollama"] : [AI_PROVIDER === "ollama" ? "ollama" : AI_PROVIDER === "deepseek" ? "deepseek" : "openai"];
     const available = allowed.filter(provider => provider === "openai" ? OPENAI_CONFIGURED : provider === "deepseek" ? DEEPSEEK_CONFIGURED : OLLAMA_CONFIGURED);
     let queue;
-    if (requested !== "auto") {
+    if (imageDataUrls.length) {
+      if (!OPENAI_CONFIGURED) {
+        return res.status(503).json({ error: "Image analysis requires the OpenAI vision provider to be configured on the server." });
+      }
+      // This build uses the OpenAI Responses vision input for images. Text/document
+      // attachments continue to follow the user's normal provider selection.
+      queue = ["openai"];
+    } else if (requested !== "auto") {
       const requestedLabel = requested === "openai" ? "OpenAI" : requested === "deepseek" ? "DeepSeek" : "Ollama";
       if (!allowed.includes(requested)) return res.status(400).json({ error: `${requestedLabel} is disabled by the server administrator.` });
       if (!available.includes(requested)) return res.status(503).json({ error: `${requestedLabel} is not configured on the server.` });
@@ -1441,7 +1481,7 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
           ? await requestOllama(messageWithFiles, history, controller.signal)
           : provider === "deepseek"
             ? await requestDeepSeek(messageWithFiles, history, controller.signal)
-            : await requestOpenAI(messageWithFiles, history, controller.signal);
+            : await requestOpenAI(messageWithFiles, history, controller.signal, imageDataUrls);
         if (answer) { usedProvider = provider; break; }
       } catch (error) {
         lastError = error;
@@ -1453,21 +1493,22 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
     }
     if (!answer && lastError) {
       return res.status(502).json({
-        error: "ConnectChat AI could not answer.",
+        error: "AmalChat AI could not answer.",
         details: failures.join(" · "),
         retryable: true
       });
     }
-    if (!answer) return res.status(502).json({ error: "ConnectChat AI returned an empty response." });
+    if (!answer) return res.status(502).json({ error: "AmalChat AI returned an empty response." });
     res.json({
       answer,
       provider: usedProvider === "ollama" ? "Ollama" : usedProvider === "deepseek" ? "DeepSeek" : "OpenAI",
       model: usedProvider === "ollama" ? OLLAMA_MODEL : usedProvider === "deepseek" ? DEEPSEEK_MODEL : OPENAI_MODEL,
       fallbackUsed: requested === "auto" && queue[0] !== usedProvider,
+      visionUsed: imageDataUrls.length > 0,
       status: aiPublicStatus()
     });
   } catch (error) {
-    if (error?.name === "AbortError") return res.status(504).json({ error: "ConnectChat AI took too long to respond." });
+    if (error?.name === "AbortError") return res.status(504).json({ error: "AmalChat AI took too long to respond." });
     console.error("AI chat failed:", error);
     if (error?.status === 401) return res.status(502).json({ error: "The AI provider rejected its API key." });
     if (error?.status === 429) return res.status(429).json({ error: "AI usage limit reached. Please try again shortly." });
@@ -1476,8 +1517,8 @@ app.post("/api/ai/chat", aiLimiter, auth, async (req, res) => {
 });
 
 function exportFileName(title, extension) {
-  const base = cleanFileName(title || "ConnectChat AI Export").replace(/\.[^.]+$/, "").slice(0, 80);
-  return `${base || "ConnectChat AI Export"}.${extension}`;
+  const base = cleanFileName(title || "AmalChat AI Export").replace(/\.[^.]+$/, "").slice(0, 80);
+  return `${base || "AmalChat AI Export"}.${extension}`;
 }
 
 function createPdfBuffer(title, content) {
@@ -1489,7 +1530,7 @@ function createPdfBuffer(title, content) {
     pdf.on("error", reject);
     pdf.fontSize(18).fillColor("#25304a").text(title);
     pdf.moveDown();
-    pdf.fontSize(10).fillColor("#6b7280").text(`Exported from ConnectChat AI · ${new Date().toISOString()}`);
+    pdf.fontSize(10).fillColor("#6b7280").text(`Exported from AmalChat AI · ${new Date().toISOString()}`);
     pdf.moveDown();
     pdf.fontSize(11).fillColor("#111827").text(content, { lineGap: 3 });
     pdf.end();
@@ -1499,7 +1540,7 @@ function createPdfBuffer(title, content) {
 app.post("/api/ai/export", auth, async (req, res) => {
   try {
     const format = String(req.body?.format || "").toLowerCase();
-    const title = cleanText(req.body?.title || "ConnectChat AI Export", 100);
+    const title = cleanText(req.body?.title || "AmalChat AI Export", 100);
     const content = cleanText(req.body?.content, 50000);
     if (!content) return res.status(400).json({ error: "There is no AI content to export." });
     if (!["docx", "pdf", "xlsx"].includes(format)) return res.status(400).json({ error: "Choose Word, PDF, or Excel." });
@@ -1511,7 +1552,7 @@ app.post("/api/ai/export", auth, async (req, res) => {
         sections: [{
           children: [
             new Paragraph({ text: title, heading: HeadingLevel.TITLE }),
-            new Paragraph({ text: `Exported from ConnectChat AI · ${new Date().toISOString()}` }),
+            new Paragraph({ text: `Exported from AmalChat AI · ${new Date().toISOString()}` }),
             ...content.split(/\r?\n/).map(line => new Paragraph({ text: line || " " }))
           ]
         }]
@@ -1520,7 +1561,7 @@ app.post("/api/ai/export", auth, async (req, res) => {
       mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     } else if (format === "xlsx") {
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = "ConnectChat AI";
+      workbook.creator = "AmalChat AI";
       const sheet = workbook.addWorksheet("AI Export", { views: [{ state: "frozen", ySplit: 1 }] });
       sheet.columns = [{ header: "Line", key: "line", width: 10 }, { header: "AI content", key: "content", width: 100 }];
       content.split(/\r?\n/).forEach((line, index) => sheet.addRow({ line: index + 1, content: line }));
@@ -2307,7 +2348,7 @@ app.get("/api/calculation-sheets/:id/preview", auth, async (req, res) => {
       activeSheet: worksheet.name,
       rows,
       truncated: worksheet.rowCount > 500 || worksheet.columnCount > 100,
-      note: "Formula results are the values saved in the uploaded workbook; ConnectChat does not recalculate Excel formulas."
+      note: "Formula results are the values saved in the uploaded workbook; AmalChat does not recalculate Excel formulas."
     });
   } catch (error) {
     console.error("Calculation sheet preview failed:", error);
@@ -2410,8 +2451,8 @@ app.get("/api/users", auth, async (req, res) => {
     }));
     result.unshift({
       id: -1,
-      username: "ConnectChat AI",
-      displayName: "ConnectChat AI",
+      username: "AmalChat AI",
+      displayName: "AmalChat AI",
       isAI: true,
       isSelf: false,
       online: AI_ENABLED,
@@ -2952,7 +2993,7 @@ io.on("connection", async socket => {
         socket.emit("call:missed", {
           callId: Number(call.id),
           callerId: Number(call.caller_id),
-          callerName: callerNames.get(Number(call.caller_id)) || "ConnectChat user",
+          callerName: callerNames.get(Number(call.caller_id)) || "AmalChat user",
           mode: call.mode === "video" ? "video" : "audio",
           startedAt: call.started_at
         });
@@ -3274,7 +3315,7 @@ app.use((error, req, res, next) => {
 });
 
 async function start() {
-  console.log("Starting ConnectChat Pro with Supabase storage...");
+  console.log("Starting AmalChat Commercial Trial with Supabase storage...");
   const { error: databaseError } = await supabase.from("users").select("id,status,is_admin", { head: true, count: "exact" });
   if (databaseError) throw new Error(`Supabase database is not ready: ${databaseError.message}`);
   const { error: sessionTableError } = await supabase.from("app_sessions").select("sid", { head: true, count: "exact" });
@@ -3301,25 +3342,14 @@ async function start() {
   }
   const { error: cleanupError } = await supabase.from("app_sessions").delete().lt("expires_at", new Date().toISOString());
   if (cleanupError) console.error("Could not clean expired sessions:", cleanupError.message);
-  const { data: bucket, error: bucketError } = await supabase.storage.getBucket(STORAGE_BUCKET);
-  if (bucketError && !String(bucketError.message).toLowerCase().includes("not found")) throw bucketError;
-  if (!bucket) {
-    const { error } = await supabase.storage.createBucket(STORAGE_BUCKET, {
-      public: false,
-      fileSizeLimit: MAX_UPLOAD_BYTES,
-      allowedMimeTypes
-    });
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.storage.updateBucket(STORAGE_BUCKET, {
-      public: false,
-      fileSizeLimit: MAX_UPLOAD_BYTES,
-      allowedMimeTypes
-    });
-    if (error) throw error;
-  }
+  // Storage bucket provisioning is an infrastructure task. The production
+  // bucket is created/configured in Supabase and must not be managed on every
+  // application boot. Some Supabase projects restrict the bucket-management
+  // API even when normal object operations are available, so making these
+  // calls here can incorrectly prevent the entire chat service from starting.
+  console.log(`Using configured Supabase storage bucket: ${STORAGE_BUCKET}`);
   await cleanupExpiredStatuses();
-  server.listen(PORT, "0.0.0.0", () => console.log(`ConnectChat Pro is running at http://localhost:${PORT}`));
+  server.listen(PORT, "0.0.0.0", () => console.log(`AmalChat Commercial Trial is running at http://localhost:${PORT}`));
 }
 
 function shutdown(signal) {
